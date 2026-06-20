@@ -1,0 +1,1 @@
+STATIC OK - if you see this, the folder is reachable. PHP is not required for this file.
