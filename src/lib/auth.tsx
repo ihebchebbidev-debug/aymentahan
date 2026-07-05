@@ -66,6 +66,7 @@ type AuthState = {
   user: AuthUser | null;
   loading: boolean;
   permissionsLoading: boolean;
+  permissionsHydrated: boolean;
   apiEnabled: boolean;
   permissions: Record<string, boolean>;
   hasPermission: (key: string) => boolean;
@@ -196,15 +197,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(API_ENABLED && !!getToken());
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [permissionsLoading, setPermissionsLoading] = useState<boolean>(API_ENABLED && !!getToken());
+  const [permissionsHydrated, setPermissionsHydrated] = useState<boolean>(false);
 
-  const applyPermsForUser = useCallback(async (u: AuthUser | null) => {
-    if (!u) { setPermissions({}); setPermissionsLoading(false); return; }
-    setPermissionsLoading(true);
+  const applyPermsForUser = useCallback(async (u: AuthUser | null, opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
+    if (!u) {
+      setPermissions({});
+      setPermissionsLoading(false);
+      setPermissionsHydrated(false);
+      return;
+    }
+    if (!silent) setPermissionsLoading(true);
     try {
       const perms = await loadPermissionsForUser(u);
       setPermissions(perms);
+      setPermissionsHydrated(true);
     } finally {
-      setPermissionsLoading(false);
+      if (!silent) setPermissionsLoading(false);
     }
   }, []);
 
@@ -249,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       if (now - last < MIN_MS) return;
       last = now;
-      void applyPermsForUser(user);
+      void applyPermsForUser(user, { silent: true });
     };
     document.addEventListener("visibilitychange", maybeRefresh);
     window.addEventListener("focus", maybeRefresh);
@@ -454,7 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user, loading, permissionsLoading, apiEnabled: API_ENABLED,
+        user, loading, permissionsLoading, permissionsHydrated, apiEnabled: API_ENABLED,
         permissions, hasPermission, refreshPermissions,
         login, verifyOtp, resendOtp, signup, changePassword, updateProfile, clearMustChange, logout,
       }}

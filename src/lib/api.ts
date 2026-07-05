@@ -3,7 +3,7 @@
 // fallback for backwards compatibility.
 const _envBase = typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_API_BASE_URL : undefined;
 const PROD_FALLBACK = "";
-const BASE = 'http://www.api-test.animacom.com.tn/code_source/backend/php'
+const BASE = 'https://ttshop.pro/code_source/backend/php'
 export const API_ENABLED = !!BASE;
 export const API_BASE = BASE;
 

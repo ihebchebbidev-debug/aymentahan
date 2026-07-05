@@ -66,10 +66,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 
 // ---------- DATABASE --------------------------------------------------
 class Database {
-    private $host = "localhost";
+    private $host = "ttshopmuser.mysql.db";
     private $username = "ttshopvente";
-    private $password = "8Jjs%1g23";
-    private $database = "wordpress_18";
+    private $password = "Ttshop2026";
+    private $database = "ttshopmuser";
     public $conn;
 
     public function getConnection() {

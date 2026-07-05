@@ -1,6 +1,6 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Upload, X, FileText, Image as ImageIcon, Loader2, AlertTriangle, UserPlus } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
 import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
+import { useUnsavedForm } from "@/lib/unsavedForm";
 import {
   CategorizedAttachmentSlots,
   type AttachmentCategoryKey,
@@ -109,6 +110,31 @@ function NewProspectPage() {
   const [staging, setStaging] = useState(false);
   const [slots, setSlots] = useState<Record<string, CategorizedSlotState>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isDirty = useMemo(
+    () =>
+      Boolean(
+        lastName.trim() ||
+          firstName.trim() ||
+          phone.trim() ||
+          phone2.trim() ||
+          cin.trim() ||
+          email.trim() ||
+          address.trim() ||
+          observ1.trim() ||
+          observ2.trim() ||
+          animateur.trim() ||
+          ancienLigne.trim() ||
+          files.length > 0 ||
+          Object.keys(slots).length > 0 ||
+          Object.values(customValues).some((v) => v.trim() !== ""),
+      ),
+    [
+      lastName, firstName, phone, phone2, cin, email, address,
+      observ1, observ2, animateur, ancienLigne, files.length, slots, customValues,
+    ],
+  );
+  useUnsavedForm(isDirty);
 
   // Vérification anciens clients (CIN / téléphone)
   useEffect(() => {
@@ -255,7 +281,13 @@ function NewProspectPage() {
         }
       />
 
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <form
+        className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         <Card className="p-6 shadow-elegant lg:col-span-2 space-y-6">
           {/* Identité */}
           <section>
@@ -458,7 +490,7 @@ function NewProspectPage() {
             <Button variant="outline" asChild disabled={saving}>
               <Link to="/prospects">Annuler</Link>
             </Button>
-            <Button onClick={submit} disabled={saving}>
+            <Button type="submit" disabled={saving}>
               {saving ? "Création…" : "Créer le prospect"}
             </Button>
           </div>
@@ -495,7 +527,7 @@ function NewProspectPage() {
             </Card>
           )}
         </aside>
-      </div>
+      </form>
     </AppLayout>
   );
 }

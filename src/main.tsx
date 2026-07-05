@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { getRouter } from "./router";
 import "./styles.css";
+import { hasUnsavedForms } from "./lib/unsavedForm";
 
 // Handle "Failed to fetch dynamically imported module" — happens when a new
 // build is deployed and the old index.html references chunk hashes that no
@@ -17,6 +18,10 @@ if (typeof window !== "undefined") {
     return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk [\w-]+ failed|error loading dynamically imported module/i.test(s);
   };
   const tryReload = (reason: string) => {
+    if (hasUnsavedForms()) {
+      console.warn("[chunk-reload] deferred (unsaved form):", reason);
+      return;
+    }
     const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0);
     if (Date.now() - last < COOLDOWN_MS) {
       console.warn("[chunk-reload] suppressed (cooldown):", reason);

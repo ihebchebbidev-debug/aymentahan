@@ -17,7 +17,7 @@ import {
  * screen. Buttons / links to forbidden pages are hidden upstream.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, loading, permissionsLoading, permissions, hasPermission, logout } = useAuth();
+  const { user, loading, permissionsLoading, permissionsHydrated, permissions, hasPermission, logout } = useAuth();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
 
@@ -98,7 +98,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   // actually know what they can access. Without this, a user with 0
   // permissions could briefly see a PUBLIC_AUTH_ROUTE (/profile, etc.) or
   // the app shell before the gate kicks in.
-  if (user.role !== "Administrateur" && permissionsLoading) {
+  if (user.role !== "Administrateur" && permissionsLoading && !permissionsHydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

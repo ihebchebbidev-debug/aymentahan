@@ -51,7 +51,7 @@ This will:
 
 The `.env` file is already configured for testing:
 ```env
-VITE_API_BASE_URL=http://www.api-test.animacom.com.tn/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 For **local development**, you can override it:
@@ -84,7 +84,7 @@ npm run dev
 ### Step 1: Ensure `.env` is Correct
 Verify the production API URL in `.env`:
 ```env
-VITE_API_BASE_URL=http://www.api-test.animacom.com.tn/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 ### Step 2: Run Production Build
@@ -150,10 +150,10 @@ Using an FTP client (FileZilla, WinSCP, etc.):
 #### Step 3: Verify Deployment
 ```bash
 # Test health endpoint
-curl http://www.api-test.animacom.com.tn/code_source/backend/php/health.php
+curl https://ttshop.pro/code_source/backend/php/health.php
 
 # Test login
-curl -X POST http://www.api-test.animacom.com.tn/code_source/backend/php/auth_login.php \
+curl -X POST https://ttshop.pro/code_source/backend/php/auth_login.php \
   -H "Content-Type: application/json" \
   -d '{"username":"AymenAdmin","password":"Admin@2026"}'
 ```
@@ -224,7 +224,7 @@ npm run build -- --mode staging
 ### Production
 **File: `.env.production` or `.env`**
 ```env
-VITE_API_BASE_URL=http://www.api-test.animacom.com.tn/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 **Build:**
@@ -329,7 +329,7 @@ Using FTP:
 
 **6. Test on server**
 ```bash
-# Visit http://www.api-test.animacom.com.tn/code_source/
+# Visit https://ttshop.pro/code_source/
 # Login with: AymenAdmin / Admin@2026
 ```
 
@@ -397,7 +397,7 @@ npm run dev -- --port 3000
 cat .env
 
 # Should show:
-# VITE_API_BASE_URL=http://www.api-test.animacom.com.tn/code_source/backend/php
+# VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 ### Issue: `build` folder is too large
@@ -414,7 +414,7 @@ npm run build
 
 1. Verify backend is running:
    ```bash
-   curl http://www.api-test.animacom.com.tn/code_source/backend/php/health.php
+   curl https://ttshop.pro/code_source/backend/php/health.php
    ```
 
 2. Check database connection:
@@ -424,7 +424,7 @@ npm run build
 
 3. Check CORS headers:
    ```bash
-   curl -i http://www.api-test.animacom.com.tn/code_source/backend/php/health.php
+   curl -i https://ttshop.pro/code_source/backend/php/health.php
    # Should see: Access-Control-Allow-Origin: *
    ```
 
@@ -484,7 +484,7 @@ npm run preview         # Test build locally
 # 1. npm run build
 # 2. Upload dist/* to server
 # 3. Verify .env and .htaccess
-# 4. Test at http://www.api-test.animacom.com.tn/code_source/
+# 4. Test at https://ttshop.pro/code_source/
 ```
 
 ---

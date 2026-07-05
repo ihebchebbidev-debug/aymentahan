@@ -37,11 +37,11 @@ export function RequirePerm({
   backLabel?: string;
   children: ReactNode;
 }) {
-  const { user, hasPermission, permissionsLoading } = useAuth();
+  const { user, hasPermission, permissionsLoading, permissionsHydrated } = useAuth();
 
-  // Wait for permissions to hydrate before deciding — avoids a flash of
-  // "Accès refusé" right after login while /roles.php is still in flight.
-  if (permissionsLoading) {
+  // Only block on the first permissions fetch after login — never on background
+  // refreshes (tab focus / 5 min poll), which used to unmount forms mid-entry.
+  if (permissionsLoading && !permissionsHydrated) {
     return (
       <AppLayout>
         <div className="p-6 text-sm text-muted-foreground">Chargement…</div>

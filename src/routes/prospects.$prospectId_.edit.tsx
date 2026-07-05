@@ -17,6 +17,7 @@ import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
+import { useUnsavedForm } from "@/lib/unsavedForm";
 
 import { RequirePerm } from "@/components/RequirePerm";
 
@@ -83,6 +84,8 @@ function EditProspectPage() {
   const [lostReason, setLostReason] = useState("");
 
   const [hydrated, setHydrated] = useState(false);
+  const [formTouched, setFormTouched] = useState(false);
+  useUnsavedForm(formTouched);
 
   useEffect(() => {
     if (!prospect || hydrated) return;
@@ -229,7 +232,14 @@ function EditProspectPage() {
         }
       />
 
-      <div className="mt-6">
+      <form
+        className="mt-6"
+        onInput={() => setFormTouched(true)}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         <Card className="p-6 shadow-elegant space-y-6">
           {/* Identité */}
           <section>
@@ -397,12 +407,12 @@ function EditProspectPage() {
             <Button variant="outline" asChild disabled={saving}>
               <Link to="/prospects/$prospectId" params={{ prospectId: prospect.id }}>Annuler</Link>
             </Button>
-            <Button onClick={submit} disabled={saving}>
+            <Button type="submit" disabled={saving}>
               {saving ? "Enregistrement…" : "Enregistrer les modifications"}
             </Button>
           </div>
         </Card>
-      </div>
+      </form>
     </AppLayout>
   );
 }
