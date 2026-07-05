@@ -140,7 +140,7 @@ npm run build
 #### Step 2: Upload to Server
 Using an FTP client (FileZilla, WinSCP, etc.):
 
-1. Connect to: `www.api-test.animacom.com.tn`
+1. Connect to: `ttshop.pro`
 2. Navigate to: `/public_html/code_source/`
 3. Upload contents of `dist/` folder
 4. Upload `.env` file
@@ -170,7 +170,7 @@ git commit -m "Initial commit"
 #### Step 2: Add Remote (on server)
 ```bash
 # On your server, create a bare repository
-ssh user@www.api-test.animacom.com.tn
+ssh user@ttshop.pro
 mkdir -p /var/repo/code_source.git
 cd /var/repo/code_source.git
 git init --bare
@@ -191,7 +191,7 @@ chmod +x /var/repo/code_source.git/hooks/post-receive
 
 #### Step 4: Push to Server
 ```bash
-git remote add production ssh://user@www.api-test.animacom.com.tn/var/repo/code_source.git
+git remote add production ssh://user@ttshop.pro/var/repo/code_source.git
 git push production main
 ```
 
@@ -213,7 +213,7 @@ npm run dev
 ### Staging
 **File: `.env.staging`**
 ```env
-VITE_API_BASE_URL=http://staging.api-test.animacom.com.tn/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 **Build:**

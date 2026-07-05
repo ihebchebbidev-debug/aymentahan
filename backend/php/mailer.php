@@ -4,7 +4,7 @@
  *
  * Env:
  *   MAIL_TRANSPORT     = native | smtp   (default: native)
- *   MAIL_FROM          = direction@animacom.com.tn
+ *   MAIL_FROM          = direction@ttshop.pro
  *   MAIL_FROM_NAME     = CRM AnimaCom
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, SMTP_FROM, SMTP_FROM_NAME
  */
@@ -16,7 +16,7 @@ defined('MAIL_TRANSPORT') or define(
 
 defined('MAIL_FROM') or define(
     'MAIL_FROM',
-    trim((string) (getenv('MAIL_FROM') ?: getenv('SMTP_FROM') ?: 'direction@animacom.com.tn'))
+    trim((string) (getenv('MAIL_FROM') ?: getenv('SMTP_FROM') ?: 'direction@ttshop.pro'))
 );
 
 defined('MAIL_FROM_NAME') or define(

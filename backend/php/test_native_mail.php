@@ -10,7 +10,7 @@ if ($token !== 'crm-mail-test-2026') {
 
 echo "STEP 2 token OK\n";
 
-$fromEmail = 'direction@animacom.com.tn';
+$fromEmail = 'direction@ttshop.pro';
 $fromName  = 'CRM AnimaCom';
 $toEmail   = 'ihebchebbidev@gmail.com';
 $subject   = 'Test mail CRM ' . date('Y-m-d H:i:s');

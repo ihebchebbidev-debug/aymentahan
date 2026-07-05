@@ -63,7 +63,7 @@
    ┌─────────────────────────────────────────────┐
    │  $ npm run build                            │
    │  Upload dist/ folder to server              │
-   │  Test at: http://www.api-test.animacom...  │
+   │  Test at: https://ttshop.pro/code_source/  │
    └─────────────────────────────────────────────┘
 
 

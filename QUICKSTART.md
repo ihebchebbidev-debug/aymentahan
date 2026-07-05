@@ -138,14 +138,14 @@ Before uploading to production:
 ## File Upload Instructions (FTP)
 
 ### Using FileZilla:
-1. Connect to: `www.api-test.animacom.com.tn`
+1. Connect to: `ttshop.pro`
 2. Username: (your FTP username)
 3. Password: (your FTP password)
 4. Navigate to: `/public_html/code_source/`
 5. Drag & drop files from `dist/` folder
 
 ### Using WinSCP:
-1. Hostname: `www.api-test.animacom.com.tn`
+1. Hostname: `ttshop.pro`
 2. Protocol: SFTP
 3. Upload `dist/` contents to: `/code_source/`
 
