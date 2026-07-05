@@ -55,10 +55,10 @@ This creates a `dist/` folder with optimized files.
 ### Test on Server
 ```bash
 # Open in browser
-https://crm.ttshop.pro/code_source/
+https://ttshop.pro/code_source/
 
 # Test API
-curl https://crm.ttshop.pro/code_source/backend/php/health.php
+curl https://ttshop.pro/code_source/backend/php/health.php
 ```
 
 ---
@@ -84,7 +84,7 @@ A file that stores configuration variables (like API URL).
 
 ### Current Configuration
 ```env
-VITE_API_BASE_URL=https://crm.ttshop.pro/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 ### For Local Testing
@@ -94,7 +94,7 @@ VITE_API_BASE_URL=http://localhost:8000/backend/php
 
 ### For Production
 ```env
-VITE_API_BASE_URL=https://crm.ttshop.pro/code_source/backend/php
+VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
 ```
 
 ---
@@ -209,10 +209,10 @@ dist/
 ### Monitor the Site
 ```bash
 # Test health
-curl https://crm.ttshop.pro/code_source/backend/php/health.php
+curl https://ttshop.pro/code_source/backend/php/health.php
 
 # Check if you can login
-# Open: https://crm.ttshop.pro/code_source/
+# Open: https://ttshop.pro/code_source/
 ```
 
 ### If Something Breaks

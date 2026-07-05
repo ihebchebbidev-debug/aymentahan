@@ -4,7 +4,7 @@
 
 ### Environment Files
 - [ ] `.env` exists in project root
-- [ ] `.env` contains: `VITE_API_BASE_URL=https://crm.ttshop.pro/code_source/backend/php`
+- [ ] `.env` contains: `VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php`
 - [ ] `.htaccess` exists in project root
 - [ ] `.htaccess` excludes `backend/php/` from rewriting
 
@@ -20,13 +20,13 @@
 ### API Verification
 - [ ] Health endpoint works:
   ```bash
-  curl https://crm.ttshop.pro/code_source/backend/php/health.php
+  curl https://ttshop.pro/code_source/backend/php/health.php
   ```
   Should return JSON with `"success": true`
 
 - [ ] Login endpoint works:
   ```bash
-  curl -X POST https://crm.ttshop.pro/code_source/backend/php/auth_login.php \
+  curl -X POST https://ttshop.pro/code_source/backend/php/auth_login.php \
     -H "Content-Type: application/json" \
     -d '{"username":"AymenAdmin","password":"Admin@2026"}'
   ```
@@ -130,11 +130,11 @@
 ### Health Check
 - [ ] Endpoint returns JSON:
   ```bash
-  curl https://crm.ttshop.pro/code_source/backend/php/health.php
+  curl https://ttshop.pro/code_source/backend/php/health.php
   ```
 
 ### Frontend Access
-- [ ] Can access https://crm.ttshop.pro/code_source/
+- [ ] Can access https://ttshop.pro/code_source/
 - [ ] Page loads (not 404)
 - [ ] No CORS errors in console
 - [ ] CSS/JS assets load (check Network tab)
@@ -222,7 +222,7 @@ If something goes wrong:
 
 2. **Check API:**
    ```bash
-   curl https://crm.ttshop.pro/code_source/backend/php/health.php
+   curl https://ttshop.pro/code_source/backend/php/health.php
    ```
 
 3. **Check database:**
