@@ -2,7 +2,7 @@
 // API base URL is read from Vite env (VITE_API_BASE_URL) with a production
 // fallback for backwards compatibility.
 const _envBase = typeof import.meta !== "undefined" ? (import.meta as any).env?.VITE_API_BASE_URL : undefined;
-const PROD_FALLBACK = "https://ttshop.pro/code_source/backend/php";
+const PROD_FALLBACK = "https://erp.ttshop.pro/code_source/backend/php";
 const BASE = (_envBase && String(_envBase).trim()) || PROD_FALLBACK;
 export const API_ENABLED = !!BASE;
 export const API_BASE = BASE;

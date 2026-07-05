@@ -38,7 +38,7 @@ YOU MUST ALSO configure DNS + sending method on the server:
    Ask OVH support: sending IP PTR should resolve to mail.ttshop.pro or ttshop.pro.
 
 6) Test
-   https://ttshop.pro/code_source/backend/php/test_native_mail.php?token=crm-mail-test-2026
+   https://erp.ttshop.pro/code_source/backend/php/test_native_mail.php?token=crm-mail-test-2026
    Then check: https://www.mail-tester.com (send test to the address they give)
 
 7) Warm up

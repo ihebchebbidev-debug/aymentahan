@@ -63,7 +63,7 @@
    ┌─────────────────────────────────────────────┐
    │  $ npm run build                            │
    │  Upload dist/ folder to server              │
-   │  Test at: https://ttshop.pro/code_source/  │
+   │  Test at: https://erp.ttshop.pro/code_source/  │
    └─────────────────────────────────────────────┘
 
 
@@ -88,7 +88,7 @@ Production
 ═══════════════════════════════════════════════════════════════════════════
 
 Current Configuration:
-  ├─ API URL: https://ttshop.pro/code_source/backend/php
+  ├─ API URL: https://erp.ttshop.pro/code_source/backend/php
   ├─ Database: wordpress_18 (localhost)
   ├─ DB User: ttshopvente
   ├─ Frontend: http://localhost:5173/ (dev)
@@ -99,11 +99,11 @@ Current Configuration:
 ═══════════════════════════════════════════════════════════════════════════
 
 Test Health Endpoint:
-  curl https://ttshop.pro/code_source/backend/php/health.php
+  curl https://erp.ttshop.pro/code_source/backend/php/health.php
   └─ Should return: {"success":true,...}
 
 Test Login Endpoint:
-  curl -X POST https://ttshop.pro/code_source/backend/php/auth_login.php \
+  curl -X POST https://erp.ttshop.pro/code_source/backend/php/auth_login.php \
     -H "Content-Type: application/json" \
     -d '{"username":"AymenAdmin","password":"Admin@2026"}'
   └─ Should return: {"token":"...","user":{...}}
@@ -180,8 +180,8 @@ STEP 4: Verify Files
   └─ health.php accessible
 
 STEP 5: Test
-  curl https://ttshop.pro/code_source/backend/php/health.php
-  Open: https://ttshop.pro/code_source/
+  curl https://erp.ttshop.pro/code_source/backend/php/health.php
+  Open: https://erp.ttshop.pro/code_source/
   Login: AymenAdmin / Admin@2026
   ✅ Done!
 
