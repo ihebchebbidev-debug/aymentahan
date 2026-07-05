@@ -5,19 +5,19 @@ Upload ALL files in backend/php/ including .htaccess and ping.txt
 Test IN ORDER (copy exact URLs, change domain if needed):
 
 1) Static file (no PHP):
-   https://ttshop.pro/code_source/backend/php/ping.txt
+   https://crm.ttshop.pro/code_source/backend/php/ping.txt
    MUST show: STATIC OK
 
 2) Minimal PHP:
-   https://ttshop.pro/code_source/backend/php/test_php_ping.php
+   https://crm.ttshop.pro/code_source/backend/php/test_php_ping.php
    MUST show: PHP OK 8.x
 
 3) API health (already on server):
-   https://ttshop.pro/code_source/backend/php/health.php
+   https://crm.ttshop.pro/code_source/backend/php/health.php
    MUST show: JSON {"ok":...}
 
 4) Mail test:
-   https://ttshop.pro/code_source/backend/php/test_native_mail.php?token=crm-mail-test-2026
+   https://crm.ttshop.pro/code_source/backend/php/test_native_mail.php?token=crm-mail-test-2026
 
 If (1) is white or 404: files not uploaded to /code_source/backend/php/
 If (1) works but (2) is white: PHP broken or .htaccess missing on server

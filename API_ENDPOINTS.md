@@ -1,6 +1,6 @@
 # 📚 Complete API Endpoints Documentation
 
-**Base URL:** `https://ttshop.pro/code_source/backend/php`
+**Base URL:** `https://crm.ttshop.pro/code_source/backend/php`
 
 ---
 
@@ -190,33 +190,33 @@
 
 ### Test Health
 ```bash
-curl https://ttshop.pro/code_source/backend/php/health.php
+curl https://crm.ttshop.pro/code_source/backend/php/health.php
 ```
 
 ### Test Login
 ```bash
-curl -X POST https://ttshop.pro/code_source/backend/php/auth_login.php \
+curl -X POST https://crm.ttshop.pro/code_source/backend/php/auth_login.php \
   -H "Content-Type: application/json" \
   -d '{"username":"AymenAdmin","password":"Admin@2026"}'
 ```
 
 ### Test Get User (requires token from login)
 ```bash
-curl -X GET "https://ttshop.pro/code_source/backend/php/auth_me.php" \
+curl -X GET "https://crm.ttshop.pro/code_source/backend/php/auth_me.php" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "X-Auth-Token: YOUR_TOKEN"
 ```
 
 ### Test Get Prospects
 ```bash
-curl -X GET "https://ttshop.pro/code_source/backend/php/prospects.php" \
+curl -X GET "https://crm.ttshop.pro/code_source/backend/php/prospects.php" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "X-Auth-Token: YOUR_TOKEN"
 ```
 
 ### Test Get Dashboard
 ```bash
-curl -X GET "https://ttshop.pro/code_source/backend/php/dashboard.php" \
+curl -X GET "https://crm.ttshop.pro/code_source/backend/php/dashboard.php" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "X-Auth-Token: YOUR_TOKEN"
 ```
@@ -236,9 +236,9 @@ Content-Type: application/json
 
 ## ✨ Configuration Summary
 
-- **Base URL:** `https://ttshop.pro/code_source/backend/php`
+- **Base URL:** `https://crm.ttshop.pro/code_source/backend/php`
 - **Database:** `wordpress_18` on `localhost`
 - **DB User:** `ttshopvente`
-- **Frontend Base:** `https://ttshop.pro/code_source/`
+- **Frontend Base:** `https://crm.ttshop.pro/code_source/`
 - **CORS:** Enabled for all origins
 - **JWT:** Token-based authentication

@@ -5,7 +5,7 @@
  * Env:
  *   MAIL_TRANSPORT     = native | smtp   (default: native)
  *   MAIL_FROM          = direction@ttshop.pro
- *   MAIL_FROM_NAME     = CRM AnimaCom
+ *   MAIL_FROM_NAME     = TTshop CRM
  *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, SMTP_FROM, SMTP_FROM_NAME
  */
 
@@ -21,7 +21,7 @@ defined('MAIL_FROM') or define(
 
 defined('MAIL_FROM_NAME') or define(
     'MAIL_FROM_NAME',
-    trim((string) (getenv('MAIL_FROM_NAME') ?: getenv('SMTP_FROM_NAME') ?: 'CRM AnimaCom'))
+    trim((string) (getenv('MAIL_FROM_NAME') ?: getenv('SMTP_FROM_NAME') ?: 'TTshop CRM'))
 );
 
 defined('SMTP_HOST') or define('SMTP_HOST', getenv('SMTP_HOST') ?: 'ssl0.ovh.net');
@@ -35,6 +35,34 @@ defined('SMTP_FROM_NAME') or define('SMTP_FROM_NAME', getenv('SMTP_FROM_NAME') ?
 class SmtpException extends RuntimeException {}
 
 class MailException extends RuntimeException {}
+
+/** Domain part of MAIL_FROM (e.g. ttshop.pro) — used for Message-ID / EHLO alignment. */
+function crm_mail_domain(): string
+{
+    $from = MAIL_FROM;
+    $at = strrpos($from, '@');
+    if ($at === false) {
+        return 'ttshop.pro';
+    }
+    return substr($from, $at + 1) ?: 'ttshop.pro';
+}
+
+/** Shared transactional headers that improve inbox placement vs spam. */
+function crm_mail_common_headers(string $from, string $fname): string
+{
+    $domain = crm_mail_domain();
+    $msgId = bin2hex(random_bytes(12)) . '@' . $domain;
+
+    $h = 'From: ' . mail_encode_header($fname) . " <{$from}>\r\n";
+    $h .= 'Reply-To: ' . $from . "\r\n";
+    $h .= 'Return-Path: ' . $from . "\r\n";
+    $h .= 'MIME-Version: 1.0' . "\r\n";
+    $h .= 'Date: ' . date('r') . "\r\n";
+    $h .= 'Message-ID: <' . $msgId . ">\r\n";
+    $h .= "Auto-Submitted: auto-generated\r\n";
+    $h .= "X-Auto-Response-Suppress: All\r\n";
+    return $h;
+}
 
 /** Send HTML + plain email (OTP and notifications). Uses native mail() by default. */
 function crm_mail_send(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = ''): void
@@ -71,11 +99,8 @@ function native_mail_send(string $toEmail, string $toName, string $subject, stri
     $boundary = 'b_' . bin2hex(random_bytes(8));
     $encodedSubject = mail_encode_header($subject);
 
-    $headers = 'From: ' . mail_encode_header($fname) . " <{$from}>\r\n";
-    $headers .= 'Reply-To: ' . $from . "\r\n";
-    $headers .= 'MIME-Version: 1.0' . "\r\n";
+    $headers = crm_mail_common_headers($from, $fname);
     $headers .= 'Content-Type: multipart/alternative; boundary="' . $boundary . '"' . "\r\n";
-    $headers .= 'X-Mailer: PHP/' . phpversion() . "\r\n";
 
     $body = '--' . $boundary . "\r\n";
     $body .= "Content-Type: text/plain; charset=UTF-8\r\n";
@@ -87,7 +112,8 @@ function native_mail_send(string $toEmail, string $toName, string $subject, stri
     $body .= $htmlBody . "\r\n";
     $body .= '--' . $boundary . "--\r\n";
 
-    $ok = @mail($toEmail, $encodedSubject, $body, $headers);
+    // -f sets envelope sender so SPF aligns with From (critical for inbox vs spam).
+    $ok = @mail($toEmail, $encodedSubject, $body, $headers, '-f' . $from);
     if (!$ok) {
         throw new MailException('mail() failed to send message');
     }
@@ -140,7 +166,7 @@ function smtp_send_raw(string $toEmail, string $toName, string $subject, string 
     };
 
     $read();
-    $ehlo = 'EHLO ' . ($_SERVER['SERVER_NAME'] ?? 'localhost');
+    $ehlo = 'EHLO ' . crm_mail_domain();
     fwrite($fp, $ehlo . "\r\n");
     $read();
 
@@ -162,13 +188,10 @@ function smtp_send_raw(string $toEmail, string $toName, string $subject, string 
     $send('DATA', 354);
 
     $boundary = 'b_' . bin2hex(random_bytes(8));
-    $headers = 'From: ' . mail_encode_header($fname) . " <$from>\r\n";
+    $headers = crm_mail_common_headers($from, $fname);
     $headers .= 'To: ' . mail_encode_header($toName) . " <$toEmail>\r\n";
     $headers .= 'Subject: ' . mail_encode_header($subject) . "\r\n";
-    $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= 'Date: ' . date('r') . "\r\n";
-    $headers .= 'Message-ID: <' . bin2hex(random_bytes(8)) . '@' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . ">\r\n";
-    $headers .= "Content-Type: multipart/alternative; boundary=\"$boundary\"\r\n";
+    $headers .= 'Content-Type: multipart/alternative; boundary="' . $boundary . '"' . "\r\n";
 
     $text = $textBody !== '' ? $textBody : strip_tags($htmlBody);
     $body = "--$boundary\r\n";
@@ -203,7 +226,7 @@ function mail_encode_header(string $s): string
 function build_otp_email(string $code, string $fullName): array
 {
     $safeName = htmlspecialchars($fullName, ENT_QUOTES, 'UTF-8');
-    $subject = "Votre code de connexion CRM : $code";
+    $subject = "Votre code de connexion TTshop : $code";
     $digits = str_split($code);
     $cells = '';
     foreach ($digits as $d) {
@@ -212,7 +235,7 @@ function build_otp_email(string $code, string $fullName): array
     $html = '<!doctype html><html lang="fr"><body style="margin:0;background:#f3f4f6;font-family:\'Segoe UI\',Roboto,Arial,sans-serif;color:#111827;">'
         . '<div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 6px 24px rgba(15,23,42,.08);">'
         . '<div style="background:linear-gradient(135deg,#2563eb,#7c3aed);padding:24px 28px;color:#fff;">'
-        . '<div style="font-size:12px;letter-spacing:3px;opacity:.85;text-transform:uppercase;">CRM</div>'
+        . '<div style="font-size:12px;letter-spacing:3px;opacity:.85;text-transform:uppercase;">TTshop</div>'
         . '<div style="font-size:22px;font-weight:600;margin-top:4px;">Code de vérification</div>'
         . '</div>'
         . '<div style="padding:28px;">'
@@ -223,8 +246,8 @@ function build_otp_email(string $code, string $fullName): array
         . '<hr style="border:none;border-top:1px solid #e5e7eb;margin:22px 0;">'
         . '<p style="margin:0;font-size:12px;color:#6b7280;line-height:1.55;">Si vous n\'êtes pas à l\'origine de cette tentative, ignorez ce message et changez immédiatement votre mot de passe.</p>'
         . '</div>'
-        . '<div style="padding:16px 28px;background:#f9fafb;color:#9ca3af;font-size:11px;text-align:center;">&copy; ' . date('Y') . ' CRM &mdash; message automatique, ne pas répondre.</div>'
+        . '<div style="padding:16px 28px;background:#f9fafb;color:#9ca3af;font-size:11px;text-align:center;">&copy; ' . date('Y') . ' TTshop CRM &mdash; message automatique.</div>'
         . '</div></body></html>';
-    $text = "Bonjour $fullName,\n\nVotre code de vérification CRM est : $code\nIl est valable 10 minutes.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.";
+    $text = "Bonjour $fullName,\n\nVotre code de vérification TTshop est : $code\nIl est valable 10 minutes.\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.";
     return array($subject, $html, $text);
 }

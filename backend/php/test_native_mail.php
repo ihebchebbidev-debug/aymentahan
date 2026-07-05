@@ -10,21 +10,21 @@ if ($token !== 'crm-mail-test-2026') {
 
 echo "STEP 2 token OK\n";
 
-$fromEmail = 'direction@ttshop.pro';
-$fromName  = 'CRM AnimaCom';
-$toEmail   = 'ihebchebbidev@gmail.com';
-$subject   = 'Test mail CRM ' . date('Y-m-d H:i:s');
-$message   = "Test PHP mail() from server.\nPHP " . phpversion() . "\n";
+require_once __DIR__ . '/mailer.php';
 
-$headers = "From: {$fromName} <{$fromEmail}>\r\n";
-$headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+$fromEmail = MAIL_FROM;
+$fromName  = MAIL_FROM_NAME;
+$toEmail   = getenv('MAIL_TEST_TO') ?: 'ihebchebbidev@gmail.com';
+$subject   = 'Test mail TTshop CRM ' . date('Y-m-d H:i:s');
+$html      = '<p>Test email from <strong>TTshop CRM</strong>.</p><p>PHP ' . htmlspecialchars(phpversion()) . '</p>';
+$text      = "Test email from TTshop CRM.\nPHP " . phpversion() . "\n";
 
-if (!function_exists('mail')) {
-    echo "STEP 3 ERROR: mail() is disabled.\n";
-    exit;
+echo "STEP 3 sending to {$toEmail} via " . MAIL_TRANSPORT . "...\n";
+try {
+    crm_mail_send($toEmail, 'Test', $subject, $html, $text);
+    echo "STEP 4 sent OK\n";
+} catch (Throwable $e) {
+    echo "STEP 4 ERROR: " . $e->getMessage() . "\n";
+    exit(1);
 }
-
-echo "STEP 3 sending to {$toEmail}...\n";
-$ok = mail($toEmail, $subject, $message, $headers);
-echo $ok ? "STEP 4 mail() returned TRUE\n" : "STEP 4 mail() returned FALSE\n";
 echo "Check inbox and spam. sendmail_path=" . ini_get('sendmail_path') . "\n";

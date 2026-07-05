@@ -1,0 +1,46 @@
+TTshop CRM — avoid spam folder (direction@ttshop.pro)
+=====================================================
+
+Code fixes (mailer.php) already applied:
+  - Envelope sender (-f) aligned with From address
+  - Message-ID @ttshop.pro
+  - Date, Return-Path, Auto-Submitted headers
+  - Removed X-Mailer: PHP/...
+
+YOU MUST ALSO configure DNS + sending method on the server:
+
+1) PREFER SMTP (best inbox rate on OVH)
+   Set on hosting (env vars or .user.ini / Apache SetEnv):
+     MAIL_TRANSPORT=smtp
+     SMTP_HOST=ssl0.ovh.net
+     SMTP_PORT=465
+     SMTP_SECURE=ssl
+     SMTP_USER=direction@ttshop.pro
+     SMTP_PASS=<mailbox password>
+     SMTP_FROM=direction@ttshop.pro
+     SMTP_FROM_NAME=TTshop CRM
+
+2) SPF record (DNS for ttshop.pro)
+   TXT @ :
+     v=spf1 include:mx.ovh.com ~all
+   (If mail is only from OVH — adjust if using another provider.)
+
+3) DKIM (OVH manager)
+   Web OVH → Emails → ttshop.pro → DKIM → Enable
+   Copy the CNAME/TXT record OVH gives you into DNS.
+
+4) DMARC (DNS for ttshop.pro)
+   TXT _dmarc :
+     v=DMARC1; p=none; rua=mailto:direction@ttshop.pro; fo=1
+   After 2–4 weeks with good delivery, change p=none to p=quarantine.
+
+5) Reverse DNS / PTR
+   Ask OVH support: sending IP PTR should resolve to mail.ttshop.pro or ttshop.pro.
+
+6) Test
+   https://crm.ttshop.pro/code_source/backend/php/test_native_mail.php?token=crm-mail-test-2026
+   Then check: https://www.mail-tester.com (send test to the address they give)
+
+7) Warm up
+   New domains/mailboxes often land in spam for 1–2 weeks until reputation builds.
+   Ask users to mark “Not spam” once — helps Gmail/Outlook learn.

@@ -4,7 +4,7 @@
 
 ### 1. **Environment Configuration (.env)**
 ```env
-VITE_API_BASE_URL=https://ttshop.pro/code_source/backend/php
+VITE_API_BASE_URL=https://crm.ttshop.pro/code_source/backend/php
 ```
 ✅ All API calls from React will use this URL
 ✅ Removed hardcoding from source code
@@ -111,13 +111,13 @@ npm run preview    # (Optional) Test build locally
 
 ### Health Check
 ```bash
-curl https://ttshop.pro/code_source/backend/php/health.php
+curl https://crm.ttshop.pro/code_source/backend/php/health.php
 ```
 Expected: `{"success":true,"service":"protection-erp-api",...}`
 
 ### Login Test
 ```bash
-curl -X POST https://ttshop.pro/code_source/backend/php/auth_login.php \
+curl -X POST https://crm.ttshop.pro/code_source/backend/php/auth_login.php \
   -H "Content-Type: application/json" \
   -d '{"username":"AymenAdmin","password":"Admin@2026"}'
 ```

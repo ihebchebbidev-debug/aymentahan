@@ -66,7 +66,7 @@ npm run build
 # Step 2: Upload dist/ to server
 
 # Step 3: Test
-# Open: https://ttshop.pro/code_source/
+# Open: https://crm.ttshop.pro/code_source/
 ```
 
 ---
@@ -94,7 +94,7 @@ npm run preview              # Test production build locally
 
 | File | Purpose | Current Value |
 |------|---------|---------------|
-| `.env` | API endpoint URL | `https://ttshop.pro/code_source/backend/php` |
+| `.env` | API endpoint URL | `https://crm.ttshop.pro/code_source/backend/php` |
 | `.htaccess` | URL routing | Configured to route backend/php/ correctly |
 | `backend/php/config.php` | Database connection | `localhost` / `wordpress_18` / `ttshopvente` |
 | `package.json` | Dependencies | All configured ✅ |
@@ -179,10 +179,10 @@ Check files are in place:
 ### Step 5: Test (5 min)
 ```bash
 # Test API
-curl https://ttshop.pro/code_source/backend/php/health.php
+curl https://crm.ttshop.pro/code_source/backend/php/health.php
 
 # Test frontend
-Open: https://ttshop.pro/code_source/
+Open: https://crm.ttshop.pro/code_source/
 Login with: AymenAdmin / Admin@2026
 ```
 
@@ -246,7 +246,7 @@ For detailed troubleshooting, see **SETUP_DEPLOYMENT_GUIDE.md** → Troubleshoot
 
 2. **Test endpoints:**
    ```bash
-   curl https://ttshop.pro/code_source/backend/php/health.php
+   curl https://crm.ttshop.pro/code_source/backend/php/health.php
    ```
 
 3. **Check logs:**
