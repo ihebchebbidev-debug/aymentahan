@@ -232,126 +232,12 @@ if ($method === 'POST') {
         require_permission($db, $me, 'opportunity.revert');
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
-        $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
-        $s->execute([':id' => $oid]);
-        $o = $s->fetch();
-        if (!$o) fail('Opportunité introuvable', 404);
-        if (!empty($o['converted_to_contract'])) fail('Opportunité déjà transformée en contrat — réversion impossible', 409);
-        if (!empty($o['converted_to_migration'])) fail('Opportunité déjà transformée en migration — réversion impossible', 409);
 
-        $revertedProspectId = null;
-        $prospectBefore = [];
-        $prospectAfter = [];
-        $db->beginTransaction();
-        try {
-            $revertedProspectId = $o['prospect_id']
-                ? (string)$o['prospect_id']
-                : ('P-' . substr(bin2hex(random_bytes(6)), 0, 10));
-
-            $existingProspect = null;
-            if ($o['prospect_id']) {
-                $curProspect = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :pid LIMIT 1');
-                $curProspect->execute([':pid' => $revertedProspectId]);
-                $existingProspect = $curProspect->fetch();
-            }
-
-            if ($existingProspect) {
-                $prospectBefore = [
-                    'converted' => !empty($existingProspect['converted']) ? 1 : 0,
-                    'opportunity_id' => $existingProspect['opportunity_id'] ?? '',
-                    'status' => $existingProspect['status'] ?? '',
-                    'outcome' => $existingProspect['outcome'] ?? '',
-                    'lost_reason' => $existingProspect['lost_reason'] ?? '',
-                    'assigned_to' => $existingProspect['assigned_to'] ?? '',
-                    'created_at' => $existingProspect['created_at'] ?? '',
-                    'check_valeur' => $existingProspect['check_valeur'] ?? '',
-                    'converted_at' => $existingProspect['converted_at'] ?? '',
-                ];
-                $revertStatus = pipeline_pick_revert_lead_status($db);
-                $upd = $db->prepare("UPDATE crminternet_prospects
-                    SET converted = 0,
-                        opportunity_id = NULL,
-                        status = :st,
-                        outcome = 'pending',
-                        lost_reason = NULL,
-                        assigned_to = NULL,
-                        check_valeur = 'pending',
-                        converted_at = NULL,
-                        created_at = NOW(),
-                        reverted_at = NOW(),
-                        reverted_from = 'opportunity'
-                    WHERE id = :pid");
-                $upd->execute([':st' => $revertStatus, ':pid' => $revertedProspectId]);
-            } else {
-                $revertStatus = pipeline_pick_revert_lead_status($db);
-                $ins = $db->prepare("INSERT INTO crminternet_prospects
-                    (id, civility, last_name, first_name, phone, phone2, cin, birth_date,
-                     email, source, status, assigned_to, created_at, city, zone,
-                     gouvernorat, delegation, address, localisation_xy, code_postal,
-                     comment, comment2, outcome, lost_reason, check_valeur,
-                     converted, converted_at, opportunity_id, type_id,
-                     reverted_at, reverted_from)
-                    VALUES
-                    (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:src,:st,NULL,NOW(),:city,:zone,
-                     :gov,:del,:addr,:xy,:cp,:comment,:comment2,'pending',NULL,'pending',
-                     0,NULL,NULL,:tid,
-                     NOW(),'opportunity')");
-                $ins->execute([
-                    ':id' => $revertedProspectId,
-                    ':st' => $revertStatus,
-                    ':civ' => $o['civility'],
-                    ':ln' => $o['last_name'],
-                    ':fn' => $o['first_name'],
-                    ':ph' => $o['phone'],
-                    ':ph2' => $o['phone2'] ?? '',
-                    ':cin' => ($o['cin'] ?? '') !== '' ? $o['cin'] : null,
-                    ':bd' => $o['birth_date'] ?? null,
-                    ':em' => $o['email'],
-                    ':src' => $o['source'],
-                    ':city' => $o['city'],
-                    ':zone' => $o['delegation'] ?? '',
-                    ':gov' => $o['gouvernorat'] ?? ($o['city'] ?? ''),
-                    ':del' => $o['delegation'] ?? '',
-                    ':addr' => $o['address'] ?? '',
-                    ':xy' => ($o['localisation_xy'] ?? '') !== '' ? $o['localisation_xy'] : null,
-                    ':cp' => ($o['code_postal'] ?? '') !== '' ? $o['code_postal'] : null,
-                    ':comment' => $o['comment1'] ?? ($o['notes'] ?? null),
-                    ':comment2' => $o['comment2'] ?? null,
-                    ':tid' => $o['type_id'] ?? null,
-                ]);
-            }
-
-            $prospectAfter = [
-                'converted' => 0,
-                'opportunity_id' => '',
-                'status' => $revertStatus,
-                'outcome' => 'pending',
-                'lost_reason' => '',
-                'assigned_to' => '',
-                'check_valeur' => 'pending',
-                'converted_at' => '',
-                'created_at' => date('Y-m-d H:i:s'),
-            ];
-            // Re-clone attachments + contract_info from opportunity back to the prospect
-            // so any work done at the opportunity stage is preserved on the lead.
-            try { attachment_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId); } catch (Throwable $e) {}
-            try { contract_info_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId, $username); } catch (Throwable $e) {}
-            try { custom_field_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId); } catch (Throwable $e) {}
-
-            // Mark the opportunity as reverted (delete it; the prospect is the source of truth again).
-            $del = $db->prepare('DELETE FROM crminternet_opportunities WHERE id = :id');
-            $del->execute([':id' => $oid]);
-            $db->commit();
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur: ' . $e->getMessage(), 500);
+        $result = conversion_revert_opportunity_to_prospect($db, $oid, $me, ['source' => 'manual']);
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Réversion impossible', (int)($result['code'] ?? 500));
         }
-        log_field_changes($db, 'prospect', $revertedProspectId, $prospectBefore, $prospectAfter, $username);
-        log_field_changes($db, 'opportunity', $oid,
-            ['exists' => 1], ['exists' => 0, 'reverted_to_prospect' => $revertedProspectId], $username);
-        audit_log($db, $me, 'revert_lead', 'prospect', $revertedProspectId, ['opportunityId' => $oid, 'fresh' => true, 'assignedTo' => null]);
-        audit_log($db, $me, 'revert_lead', 'opportunity', $oid, ['prospectId' => $revertedProspectId]);
-        ok(['message' => 'Opportunité retournée vers les leads', 'prospectId' => $revertedProspectId]);
+        ok(['message' => $result['message'], 'prospectId' => $result['prospectId']]);
     }
 
     // ---- Convert opportunity -> contract --------------------------------
@@ -382,56 +268,26 @@ if ($method === 'POST') {
         require_convert_opportunity_to_migration($db, $me);
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
-        $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
-        $s->execute([':id' => $oid]);
-        $o = $s->fetch();
-        if (!$o) fail('Opportunité introuvable', 404);
-        if (!empty($o['converted_to_contract'])) fail('Opportunité déjà transformée en contrat', 409);
-        if (!empty($o['converted_to_migration'])) fail('Opportunité déjà transformée en migration', 409);
 
-        $mid = 'M-' . substr(bin2hex(random_bytes(6)), 0, 10);
-        $db->beginTransaction();
-        try {
-            conversion_insert_migration_from_opportunity($db, $mid, $o, [
-                'old_operator' => (string)($in['oldOperator'] ?? $in['old_operator'] ?? ''),
-                'new_operator' => (string)($in['newOperator'] ?? $in['new_operator'] ?? ''),
-                'porting_number' => (string)($in['portingNumber'] ?? $in['porting_number'] ?? ''),
-                'migration_type' => (string)($in['migrationType'] ?? $in['migration_type'] ?? ''),
-                'requested_date' => (string)($in['requestedDate'] ?? date('Y-m-d')),
-                'technical_status' => (string)($in['technicalStatus'] ?? 'En cours'),
-                'workflow_status' => (string)($in['workflowStatus'] ?? 'Pré-validé'),
-                'assigned_to' => (string)($in['assignedTo'] ?? ($o['assigned_to'] ?? '')),
-                'created_by' => $username,
-            ]);
-            $upd = $db->prepare('UPDATE crminternet_opportunities
-                SET converted_to_migration = 1, migration_id = :mid, converted_at = NOW()
-                WHERE id = :id');
-            $upd->execute([':mid' => $mid, ':id' => $oid]);
-
-            try { attachment_clone_lineage($db, 'migration', $mid, !empty($o['prospect_id']) ? (string)$o['prospect_id'] : null, $oid); } catch (Throwable $e) {}
-            try {
-                require_once __DIR__ . '/custom_field_helpers.php';
-                custom_field_clone_entity($db, 'opportunity', $oid, 'migration', $mid);
-                if (!empty($o['prospect_id'])) {
-                    custom_field_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'migration', $mid);
-                }
-            } catch (Throwable $e) {}
-            try {
-                $cloned = contract_info_clone_entity($db, 'opportunity', $oid, 'migration', $mid, $username);
-                if (!$cloned && !empty($o['prospect_id'])) {
-                    contract_info_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'migration', $mid, $username);
-                }
-            } catch (Throwable $e) {}
-
-            $db->commit();
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur: ' . $e->getMessage(), 500);
+        $result = conversion_opportunity_to_migration($db, $oid, $me, [
+            'old_operator'     => (string)($in['oldOperator'] ?? $in['old_operator'] ?? ''),
+            'new_operator'     => (string)($in['newOperator'] ?? $in['new_operator'] ?? ''),
+            'porting_number'   => (string)($in['portingNumber'] ?? $in['porting_number'] ?? ''),
+            'migration_type'   => (string)($in['migrationType'] ?? $in['migration_type'] ?? ''),
+            'requested_date'   => (string)($in['requestedDate'] ?? date('Y-m-d')),
+            'technical_status' => (string)($in['technicalStatus'] ?? 'En cours'),
+            'workflow_status'  => (string)($in['workflowStatus'] ?? 'Pré-validé'),
+            'assigned_to'      => (string)($in['assignedTo'] ?? ''),
+            'source'           => 'manual',
+        ]);
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Conversion impossible', (int)($result['code'] ?? 500));
         }
-        log_field_changes($db, 'opportunity', $oid,
-            ['converted_to_migration' => 0], ['converted_to_migration' => 1, 'migration_id' => $mid], $username);
-        audit_log($db, $me, 'convert_migration', 'opportunity', $oid, ['migrationId' => $mid]);
-        ok(['migrationId' => $mid, 'message' => 'Opportunité convertie en migration']);
+        ok([
+            'migrationId' => $result['migrationId'],
+            'message'     => $result['message'] ?? 'Opportunité convertie en migration',
+            'created'     => $result['created'] ?? true,
+        ]);
     }
 
     // ---- Create opportunity from scratch (rare) -------------------------

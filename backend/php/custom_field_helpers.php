@@ -8,6 +8,8 @@
 // =====================================================================
 
 function custom_fields_ensure_table(PDO $db): void {
+    // DDL (CREATE TABLE) implicitly commits MySQL transactions — never run mid-conversion.
+    if ($db->inTransaction()) return;
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS crminternet_custom_field_values (
             id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -214,9 +214,9 @@ if ($method === 'POST') {
             } catch (Throwable $e) { /* best-effort */ }
 
             $db->prepare('DELETE FROM crminternet_migrations WHERE id = :id')->execute([':id' => $mid]);
-            $db->commit();
+            conv_tx_commit($db);
         } catch (Throwable $e) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             fail('Erreur revert: ' . $e->getMessage(), 500);
         }
 

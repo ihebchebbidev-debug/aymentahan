@@ -106,24 +106,71 @@ function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, str
                 'source' => 'pipeline:' . $stageName,
                 'checkAgent' => true,
             ]);
-            return ['action' => $action] + $r + ['executed' => !empty($r['ok']) && !empty($r['created'])];
+            return pipeline_auto_action_result($action, $r, 'opportunityId');
 
         case 'convert_contract':
+            if ($entity === 'lead') {
+                if (!user_has_permission($db, $me, 'opportunity.convert')) {
+                    return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+                }
+                $r = conversion_mark_won_to_contract($db, $entityId, $me, [
+                    'source' => 'pipeline:' . $stageName,
+                    'checkAgent' => true,
+                ]);
+                return pipeline_auto_action_result($action, $r, 'contractId');
+            }
+            if ($entity === 'opportunity') {
+                if (!user_has_permission($db, $me, 'opportunity.convert')) {
+                    return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+                }
+                $r = conversion_opportunity_to_contract($db, $entityId, $me, [
+                    'source' => 'pipeline:' . $stageName,
+                ]);
+                return pipeline_auto_action_result($action, $r, 'contractId');
+            }
+            return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
+
+        case 'revert_lead':
             if ($entity !== 'opportunity') {
                 return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
             }
-            if (!user_has_permission($db, $me, 'opportunity.convert')) {
-                return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+            if (!user_has_permission($db, $me, 'opportunity.revert')) {
+                return ['action' => $action, 'error' => 'Permission opportunity.revert requise'];
             }
-            $r = conversion_opportunity_to_contract($db, $entityId, $me, [
+            $r = conversion_revert_opportunity_to_prospect($db, $entityId, $me, [
                 'source' => 'pipeline:' . $stageName,
             ]);
-            return ['action' => $action] + $r + ['executed' => !empty($r['ok']) && !empty($r['created'])];
+            return pipeline_auto_action_result($action, $r, 'prospectId');
+
+        case 'revert_opportunity':
+            if ($entity !== 'contract') {
+                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
+            }
+            if (!user_has_permission($db, $me, 'contract.revert')) {
+                return ['action' => $action, 'error' => 'Permission contract.revert requise'];
+            }
+            $r = conversion_revert_contract_to_opportunity($db, $entityId, $me, [
+                'source' => 'pipeline:' . $stageName,
+            ]);
+            return pipeline_auto_action_result($action, $r, 'opportunityId');
 
         default:
-            // revert_lead / revert_opportunity — not executed here yet
-            return ['action' => $action, 'stage' => $stageName, 'entity' => $entity, 'id' => $entityId];
+            return ['action' => $action, 'stage' => $stageName, 'entity' => $entity, 'id' => $entityId, 'skipped' => true];
     }
+}
+
+/** Normalize conversion helper result for pipeline auto-action API responses. */
+function pipeline_auto_action_result(string $action, array $r, string $idKey): array {
+    $created = $r['created'] ?? true;
+    $executed = !empty($r['ok']) && $created !== false;
+    $out = ['action' => $action] + $r + ['executed' => $executed];
+    if (!empty($r[$idKey])) {
+        $out[$idKey] = $r[$idKey];
+    }
+    if (!empty($r['error']) && empty($r['ok'])) {
+        $out['error'] = $r['error'];
+    }
+    return $out;
 }
 
 /**

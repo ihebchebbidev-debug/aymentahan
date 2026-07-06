@@ -20,6 +20,19 @@ if (!function_exists('conv_v')) {
     }
 }
 
+/** Safe commit/rollback — DDL in clone helpers can implicitly end MySQL transactions. */
+function conv_tx_commit(PDO $db): void {
+    if ($db->inTransaction()) {
+        $db->commit();
+    }
+}
+
+function conv_tx_rollback(PDO $db): void {
+    if ($db->inTransaction()) {
+        $db->rollBack();
+    }
+}
+
 /**
  * Insère une opportunité construite à partir d'un prospect (snapshot complet).
  * Les éventuelles surcharges (titre, montant, probabilité, stage, créateur)
@@ -351,11 +364,11 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
         $lock->execute([':id' => $pid]);
         $row = $lock->fetch();
         if (!$row) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             return ['ok' => false, 'error' => 'Prospect introuvable', 'code' => 404];
         }
         if (!empty($row['converted']) && !empty($row['opportunity_id'])) {
-            $db->commit();
+            conv_tx_commit($db);
             return [
                 'ok' => true,
                 'opportunityId' => (string) $row['opportunity_id'],
@@ -399,15 +412,15 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
             'UPDATE crminternet_prospects SET converted = 1, converted_at = NOW(), opportunity_id = :oid WHERE id = :id'
         )->execute([':oid' => $oid, ':id' => $pid]);
 
-        try { custom_field_clone_entity($db, 'prospect', $pid, 'opportunity', $oid); } catch (Throwable $e) {}
-        try { attachment_clone_entity($db, 'prospect', $pid, 'opportunity', $oid); } catch (Throwable $e) {}
-        try { contract_info_clone_entity($db, 'prospect', $pid, 'opportunity', $oid, $username); } catch (Throwable $e) {}
-
-        $db->commit();
+        conv_tx_commit($db);
     } catch (Throwable $e) {
-        $db->rollBack();
+        conv_tx_rollback($db);
         return ['ok' => false, 'error' => 'Erreur conversion: ' . $e->getMessage(), 'code' => 500];
     }
+
+    try { custom_field_clone_entity($db, 'prospect', $pid, 'opportunity', $oid); } catch (Throwable $e) {}
+    try { attachment_clone_entity($db, 'prospect', $pid, 'opportunity', $oid); } catch (Throwable $e) {}
+    try { contract_info_clone_entity($db, 'prospect', $pid, 'opportunity', $oid, $username); } catch (Throwable $e) {}
 
     $source = (string) ($opts['source'] ?? 'manual');
     log_field_changes(
@@ -492,11 +505,11 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
         $lock->execute([':id' => $oid]);
         $o = $lock->fetch();
         if (!$o) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             return ['ok' => false, 'error' => 'Opportunité introuvable', 'code' => 404];
         }
         if (!empty($o['converted_to_contract']) && !empty($o['contract_id'])) {
-            $db->commit();
+            conv_tx_commit($db);
             return [
                 'ok' => true,
                 'contractId' => (string) $o['contract_id'],
@@ -505,7 +518,7 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             ];
         }
         if (!empty($o['converted_to_migration'])) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             return ['ok' => false, 'error' => 'Opportunité déjà transformée en migration', 'code' => 409];
         }
 
@@ -522,26 +535,26 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             'UPDATE crminternet_opportunities SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW() WHERE id = :id'
         )->execute([':cid' => $cid, ':id' => $oid]);
 
-        $prospectId = !empty($o['prospect_id']) ? (string) $o['prospect_id'] : null;
-        try { attachment_clone_lineage($db, 'contract', $cid, $prospectId, $oid); } catch (Throwable $e) {}
-        try {
-            custom_field_clone_entity($db, 'opportunity', $oid, 'contract', $cid);
-            if ($prospectId) {
-                custom_field_clone_entity($db, 'prospect', $prospectId, 'contract', $cid);
-            }
-        } catch (Throwable $e) {}
-        try {
-            $cloned = contract_info_clone_entity($db, 'opportunity', $oid, 'contract', $cid, $username);
-            if (!$cloned && $prospectId) {
-                contract_info_clone_entity($db, 'prospect', $prospectId, 'contract', $cid, $username);
-            }
-        } catch (Throwable $e) {}
-
-        $db->commit();
+        conv_tx_commit($db);
     } catch (Throwable $e) {
-        $db->rollBack();
+        conv_tx_rollback($db);
         return ['ok' => false, 'error' => 'Erreur: ' . $e->getMessage(), 'code' => 500];
     }
+
+    $prospectId = !empty($o['prospect_id']) ? (string) $o['prospect_id'] : null;
+    try { attachment_clone_lineage($db, 'contract', $cid, $prospectId, $oid); } catch (Throwable $e) {}
+    try {
+        custom_field_clone_entity($db, 'opportunity', $oid, 'contract', $cid);
+        if ($prospectId) {
+            custom_field_clone_entity($db, 'prospect', $prospectId, 'contract', $cid);
+        }
+    } catch (Throwable $e) {}
+    try {
+        $cloned = contract_info_clone_entity($db, 'opportunity', $oid, 'contract', $cid, $username);
+        if (!$cloned && $prospectId) {
+            contract_info_clone_entity($db, 'prospect', $prospectId, 'contract', $cid, $username);
+        }
+    } catch (Throwable $e) {}
 
     $source = (string) ($opts['source'] ?? 'manual');
     log_field_changes(
@@ -590,12 +603,12 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
         $lock->execute([':id' => $pid]);
         $p = $lock->fetch();
         if (!$p) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             return ['ok' => false, 'error' => 'Prospect introuvable', 'code' => 404];
         }
 
         if (!empty($p['opportunity_id'])) {
-            $db->rollBack();
+            conv_tx_rollback($db);
             return [
                 'ok' => false,
                 'error' => 'Lead déjà converti en opportunité — passez par le pipeline opportunité ou révertissez d\'abord',
@@ -604,19 +617,21 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
             ];
         }
 
-        if (($p['outcome'] ?? '') === 'won') {
-            $existing = $db->prepare('SELECT id FROM crminternet_contracts WHERE prospect_id = :p LIMIT 1');
-            $existing->execute([':p' => $pid]);
-            $existingId = $existing->fetchColumn();
-            if ($existingId) {
-                $db->commit();
-                return [
-                    'ok' => true,
-                    'contractId' => (string) $existingId,
-                    'created' => false,
-                    'message' => 'Contrat déjà créé pour ce lead',
-                ];
+        $existing = $db->prepare('SELECT id FROM crminternet_contracts WHERE prospect_id = :p LIMIT 1');
+        $existing->execute([':p' => $pid]);
+        $existingId = $existing->fetchColumn();
+        if ($existingId) {
+            if (($p['outcome'] ?? '') !== 'won') {
+                $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu' WHERE id = :id")
+                   ->execute([':id' => $pid]);
             }
+            conv_tx_commit($db);
+            return [
+                'ok' => true,
+                'contractId' => (string) $existingId,
+                'created' => false,
+                'message' => 'Contrat déjà créé pour ce lead',
+            ];
         }
 
         $partner = (string) ($opts['partner'] ?? 'NEOLIANE');
@@ -634,15 +649,15 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
             'assigned_to'    => $p['assigned_to'] ?? '—',
         ]);
 
-        try { attachment_clone_entity($db, 'prospect', $pid, 'contract', $cid); } catch (Throwable $e) {}
-        try { custom_field_clone_entity($db, 'prospect', $pid, 'contract', $cid); } catch (Throwable $e) {}
-        try { contract_info_clone_entity($db, 'prospect', $pid, 'contract', $cid, $username); } catch (Throwable $e) {}
-
-        $db->commit();
+        conv_tx_commit($db);
     } catch (Throwable $e) {
-        $db->rollBack();
+        conv_tx_rollback($db);
         return ['ok' => false, 'error' => 'Erreur: ' . $e->getMessage(), 'code' => 500];
     }
+
+    try { attachment_clone_entity($db, 'prospect', $pid, 'contract', $cid); } catch (Throwable $e) {}
+    try { custom_field_clone_entity($db, 'prospect', $pid, 'contract', $cid); } catch (Throwable $e) {}
+    try { contract_info_clone_entity($db, 'prospect', $pid, 'contract', $cid, $username); } catch (Throwable $e) {}
 
     log_field_changes(
         $db,
@@ -664,5 +679,552 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
         'contractId' => $cid,
         'created' => true,
         'message' => 'Contrat créé',
+    ];
+}
+
+/**
+ * Map opportunity/contract row → prospect identity columns (revert / restore).
+ */
+function conversion_prospect_snapshot_from_row(array $src): array
+{
+    $cin = $src['cin'] ?? null;
+    if ($cin === '') {
+        $cin = null;
+    }
+    $xy = $src['localisation_xy'] ?? null;
+    if ($xy === '') {
+        $xy = null;
+    }
+    $cp = $src['code_postal'] ?? null;
+    if ($cp === '') {
+        $cp = null;
+    }
+
+    return [
+        'civility'        => $src['civility'] ?? 'M',
+        'last_name'       => $src['last_name'] ?? '',
+        'first_name'      => $src['first_name'] ?? '',
+        'phone'           => $src['phone'] ?? '',
+        'phone2'          => $src['phone2'] ?? '',
+        'animateur'       => $src['animateur'] ?? null,
+        'ancien_ligne'    => $src['ancien_ligne'] ?? null,
+        'cin'             => $cin,
+        'birth_date'      => $src['birth_date'] ?? null,
+        'email'           => $src['email'] ?? '',
+        'source'          => $src['source'] ?? '',
+        'city'            => $src['city'] ?? '',
+        'zone'            => $src['zone'] ?? ($src['delegation'] ?? ''),
+        'gouvernorat'     => $src['gouvernorat'] ?? ($src['city'] ?? ''),
+        'delegation'      => $src['delegation'] ?? '',
+        'address'         => $src['address'] ?? '',
+        'localisation_xy' => $xy,
+        'code_postal'     => $cp,
+        'comment'         => $src['comment1'] ?? ($src['comment'] ?? ($src['notes'] ?? null)),
+        'comment2'        => $src['comment2'] ?? null,
+        'type_id'         => $src['type_id'] ?? null,
+    ];
+}
+
+/** Restore full prospect identity + revert flags from a CRM row snapshot. */
+function conversion_update_prospect_on_revert(
+    PDO $db,
+    string $pid,
+    array $src,
+    string $revertStatus,
+    string $revertedFrom
+): void {
+    $s = conversion_prospect_snapshot_from_row($src);
+    $sql = "UPDATE crminternet_prospects SET
+        civility = :civ, last_name = :ln, first_name = :fn,
+        phone = :ph, phone2 = :ph2, animateur = :anim, ancien_ligne = :anc,
+        cin = :cin, birth_date = :bd, email = :em, source = :src,
+        city = :ci, zone = :zn, gouvernorat = :gv, delegation = :dl,
+        address = :ad, localisation_xy = :gps, code_postal = :cp,
+        comment = :c1, comment2 = :c2, type_id = :tid,
+        converted = 0, opportunity_id = NULL, status = :st, outcome = 'pending',
+        lost_reason = NULL, assigned_to = NULL, check_valeur = 'pending',
+        converted_at = NULL, created_at = NOW(),
+        reverted_at = NOW(), reverted_from = :rf
+        WHERE id = :pid";
+    $db->prepare($sql)->execute([
+        ':civ'  => $s['civility'],
+        ':ln'   => $s['last_name'],
+        ':fn'   => $s['first_name'],
+        ':ph'   => $s['phone'],
+        ':ph2'  => $s['phone2'],
+        ':anim' => $s['animateur'],
+        ':anc'  => $s['ancien_ligne'],
+        ':cin'  => $s['cin'],
+        ':bd'   => $s['birth_date'],
+        ':em'   => $s['email'],
+        ':src'  => $s['source'],
+        ':ci'   => $s['city'],
+        ':zn'   => $s['zone'],
+        ':gv'   => $s['gouvernorat'],
+        ':dl'   => $s['delegation'],
+        ':ad'   => $s['address'],
+        ':gps'  => $s['localisation_xy'],
+        ':cp'   => $s['code_postal'],
+        ':c1'   => $s['comment'],
+        ':c2'   => $s['comment2'],
+        ':tid'  => $s['type_id'],
+        ':st'   => $revertStatus,
+        ':rf'   => $revertedFrom,
+        ':pid'  => $pid,
+    ]);
+}
+
+/** Insert a fresh prospect row from opportunity/contract snapshot on revert. */
+function conversion_insert_prospect_on_revert(
+    PDO $db,
+    string $pid,
+    array $src,
+    string $revertStatus,
+    string $revertedFrom
+): void {
+    $s = conversion_prospect_snapshot_from_row($src);
+    $sql = "INSERT INTO crminternet_prospects
+        (id, civility, last_name, first_name, phone, phone2, animateur, ancien_ligne,
+         cin, birth_date, email, source, status, assigned_to, created_at,
+         city, zone, gouvernorat, delegation, address, localisation_xy, code_postal,
+         comment, comment2, outcome, lost_reason, check_valeur,
+         converted, converted_at, opportunity_id, type_id, reverted_at, reverted_from)
+        VALUES
+        (:id,:civ,:ln,:fn,:ph,:ph2,:anim,:anc,:cin,:bd,:em,:src,:st,NULL,NOW(),
+         :ci,:zn,:gv,:dl,:ad,:gps,:cp,:c1,:c2,'pending',NULL,'pending',
+         0,NULL,NULL,:tid,NOW(),:rf)";
+    $db->prepare($sql)->execute([
+        ':id'   => $pid,
+        ':civ'  => $s['civility'],
+        ':ln'   => $s['last_name'],
+        ':fn'   => $s['first_name'],
+        ':ph'   => $s['phone'],
+        ':ph2'  => $s['phone2'],
+        ':anim' => $s['animateur'],
+        ':anc'  => $s['ancien_ligne'],
+        ':cin'  => $s['cin'],
+        ':bd'   => $s['birth_date'],
+        ':em'   => $s['email'],
+        ':src'  => $s['source'],
+        ':st'   => $revertStatus,
+        ':ci'   => $s['city'],
+        ':zn'   => $s['zone'],
+        ':gv'   => $s['gouvernorat'],
+        ':dl'   => $s['delegation'],
+        ':ad'   => $s['address'],
+        ':gps'  => $s['localisation_xy'],
+        ':cp'   => $s['code_postal'],
+        ':c1'   => $s['comment'],
+        ':c2'   => $s['comment2'],
+        ':tid'  => $s['type_id'],
+        ':rf'   => $revertedFrom,
+    ]);
+}
+
+/** Restore opportunity identity from contract row and clear terminal flags. */
+function conversion_restore_opportunity_from_contract(PDO $db, string $oid, array $c): void
+{
+    $sql = "UPDATE crminternet_opportunities SET
+        prospect_id = :pid, civility = :civ, last_name = :ln, first_name = :fn,
+        phone = :ph, phone2 = :ph2, animateur = :anim, ancien_ligne = :anc,
+        cin = :cin, birth_date = :bd, email = :em,
+        city = :ci, gouvernorat = :gv, delegation = :dl, zone = :zn,
+        address = :ad, localisation_xy = :gps, code_postal = :cp,
+        comment1 = :c1, comment2 = :c2, source = :src, type_id = :tid, lead_status = :lst,
+        amount = :amt,
+        converted_to_contract = 0, contract_id = NULL, converted_at = NULL, reverted_at = NOW()
+        WHERE id = :oid";
+    $cin = ($c['cin'] ?? '') !== '' ? $c['cin'] : null;
+    $db->prepare($sql)->execute([
+        ':pid'  => $c['prospect_id'] ?? null,
+        ':civ'  => $c['civility'] ?? 'M',
+        ':ln'   => $c['last_name'] ?? '',
+        ':fn'   => $c['first_name'] ?? '',
+        ':ph'   => $c['phone'] ?? '',
+        ':ph2'  => $c['phone2'] ?? '',
+        ':anim' => $c['animateur'] ?? null,
+        ':anc'  => $c['ancien_ligne'] ?? null,
+        ':cin'  => $cin,
+        ':bd'   => $c['birth_date'] ?? null,
+        ':em'   => $c['email'] ?? '',
+        ':ci'   => $c['city'] ?? '',
+        ':gv'   => $c['gouvernorat'] ?? '',
+        ':dl'   => $c['delegation'] ?? '',
+        ':zn'   => $c['zone'] ?? ($c['delegation'] ?? ''),
+        ':ad'   => $c['address'] ?? '',
+        ':gps'  => ($c['localisation_xy'] ?? '') !== '' ? $c['localisation_xy'] : null,
+        ':cp'   => ($c['code_postal'] ?? '') !== '' ? $c['code_postal'] : null,
+        ':c1'   => $c['comment1'] ?? null,
+        ':c2'   => $c['comment2'] ?? null,
+        ':src'  => $c['source'] ?? '',
+        ':tid'  => $c['type_id'] ?? null,
+        ':lst'  => $c['lead_status'] ?? null,
+        ':amt'  => (float) ($c['premium'] ?? 0),
+        ':oid'  => $oid,
+    ]);
+}
+
+/**
+ * Opportunity → migration (terminal peer to contract).
+ * Returns ['ok'=>bool, 'migrationId'=>?, 'created'=>bool, ...].
+ */
+function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, array $opts = []): array
+{
+    require_once __DIR__ . '/attachment_helpers.php';
+    require_once __DIR__ . '/custom_field_helpers.php';
+    require_once __DIR__ . '/contract_info_helpers.php';
+
+    $username = (string) ($me['username'] ?? '');
+    $role = (string) ($me['role'] ?? '');
+    $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
+
+    if (($opts['checkAgent'] ?? true) && $isAgent) {
+        $own = $db->prepare('SELECT assigned_to FROM crminternet_opportunities WHERE id = :id');
+        $own->execute([':id' => $oid]);
+        if ((string) $own->fetchColumn() !== $username) {
+            return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
+        }
+    }
+
+    $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
+    $s->execute([':id' => $oid]);
+    $o = $s->fetch();
+    if (!$o) {
+        return ['ok' => false, 'error' => 'Opportunité introuvable', 'code' => 404];
+    }
+    if (!empty($o['converted_to_contract'])) {
+        return ['ok' => false, 'error' => 'Opportunité déjà transformée en contrat', 'code' => 409];
+    }
+    if (!empty($o['converted_to_migration']) && !empty($o['migration_id'])) {
+        return [
+            'ok' => true,
+            'migrationId' => (string) $o['migration_id'],
+            'created' => false,
+            'message' => 'Déjà converti en migration',
+        ];
+    }
+
+    $mid = (string) ($opts['migrationId'] ?? ('M-' . substr(bin2hex(random_bytes(6)), 0, 10)));
+    $prospectId = !empty($o['prospect_id']) ? (string) $o['prospect_id'] : null;
+
+    $db->beginTransaction();
+    try {
+        $lock = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id FOR UPDATE');
+        $lock->execute([':id' => $oid]);
+        $o = $lock->fetch();
+        if (!$o) {
+            conv_tx_rollback($db);
+            return ['ok' => false, 'error' => 'Opportunité introuvable', 'code' => 404];
+        }
+        if (!empty($o['converted_to_contract'])) {
+            conv_tx_rollback($db);
+            return ['ok' => false, 'error' => 'Opportunité déjà transformée en contrat', 'code' => 409];
+        }
+        if (!empty($o['converted_to_migration']) && !empty($o['migration_id'])) {
+            conv_tx_commit($db);
+            return [
+                'ok' => true,
+                'migrationId' => (string) $o['migration_id'],
+                'created' => false,
+                'message' => 'Déjà converti en migration',
+            ];
+        }
+
+        conversion_insert_migration_from_opportunity($db, $mid, $o, [
+            'old_operator'     => (string) ($opts['old_operator'] ?? ''),
+            'new_operator'     => (string) ($opts['new_operator'] ?? ''),
+            'porting_number'   => (string) ($opts['porting_number'] ?? ''),
+            'migration_type'   => (string) ($opts['migration_type'] ?? ''),
+            'requested_date'   => (string) ($opts['requested_date'] ?? date('Y-m-d')),
+            'technical_status' => (string) ($opts['technical_status'] ?? 'En cours'),
+            'workflow_status'  => (string) ($opts['workflow_status'] ?? 'Pré-validé'),
+            'assigned_to'      => (string) ($opts['assigned_to'] ?? ($o['assigned_to'] ?? '')),
+            'created_by'       => $username,
+        ]);
+        $db->prepare(
+            'UPDATE crminternet_opportunities
+             SET converted_to_migration = 1, migration_id = :mid, converted_at = NOW()
+             WHERE id = :id'
+        )->execute([':mid' => $mid, ':id' => $oid]);
+
+        conv_tx_commit($db);
+    } catch (Throwable $e) {
+        conv_tx_rollback($db);
+        return ['ok' => false, 'error' => 'Erreur: ' . $e->getMessage(), 'code' => 500];
+    }
+
+    try {
+        attachment_clone_lineage($db, 'migration', $mid, $prospectId, $oid);
+    } catch (Throwable $e) {}
+    try {
+        custom_field_clone_entity($db, 'opportunity', $oid, 'migration', $mid);
+        if ($prospectId) {
+            custom_field_clone_entity($db, 'prospect', $prospectId, 'migration', $mid);
+        }
+    } catch (Throwable $e) {}
+    try {
+        $cloned = contract_info_clone_entity($db, 'opportunity', $oid, 'migration', $mid, $username);
+        if (!$cloned && $prospectId) {
+            contract_info_clone_entity($db, 'prospect', $prospectId, 'migration', $mid, $username);
+        }
+    } catch (Throwable $e) {}
+
+    $source = (string) ($opts['source'] ?? 'manual');
+    log_field_changes(
+        $db,
+        'opportunity',
+        $oid,
+        ['converted_to_migration' => 0],
+        ['converted_to_migration' => 1, 'migration_id' => $mid, 'via' => $source],
+        $username
+    );
+    audit_log($db, $me, 'convert_migration', 'opportunity', $oid, ['migrationId' => $mid, 'source' => $source]);
+
+    return [
+        'ok' => true,
+        'migrationId' => $mid,
+        'created' => true,
+        'message' => 'Opportunité convertie en migration',
+    ];
+}
+
+/**
+ * Revert opportunity → prospect (manual or pipeline auto-action).
+ */
+function conversion_revert_opportunity_to_prospect(PDO $db, string $oid, array $me, array $opts = []): array
+{
+    require_once __DIR__ . '/pipeline_helpers.php';
+    require_once __DIR__ . '/attachment_helpers.php';
+    require_once __DIR__ . '/custom_field_helpers.php';
+    require_once __DIR__ . '/contract_info_helpers.php';
+
+    $username = (string) ($me['username'] ?? '');
+
+    $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
+    $s->execute([':id' => $oid]);
+    $o = $s->fetch();
+    if (!$o) {
+        return ['ok' => false, 'error' => 'Opportunité introuvable', 'code' => 404];
+    }
+    if (!empty($o['converted_to_contract'])) {
+        return ['ok' => false, 'error' => 'Opportunité déjà transformée en contrat — réversion impossible', 'code' => 409];
+    }
+    if (!empty($o['converted_to_migration'])) {
+        return ['ok' => false, 'error' => 'Opportunité déjà transformée en migration — réversion impossible', 'code' => 409];
+    }
+
+    $revertedProspectId = $o['prospect_id']
+        ? (string) $o['prospect_id']
+        : ('P-' . substr(bin2hex(random_bytes(6)), 0, 10));
+    $revertStatus = pipeline_pick_revert_lead_status($db);
+    $existingProspect = null;
+
+    $db->beginTransaction();
+    try {
+        if ($o['prospect_id']) {
+            $cur = $db->prepare('SELECT 1 FROM crminternet_prospects WHERE id = :pid LIMIT 1');
+            $cur->execute([':pid' => $revertedProspectId]);
+            $existingProspect = $cur->fetchColumn();
+        }
+        if ($existingProspect) {
+            conversion_update_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity');
+        } else {
+            conversion_insert_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity');
+        }
+        try { attachment_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId); } catch (Throwable $e) {}
+        try { contract_info_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId, $username); } catch (Throwable $e) {}
+        try { custom_field_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId); } catch (Throwable $e) {}
+        $db->prepare('DELETE FROM crminternet_opportunities WHERE id = :id')->execute([':id' => $oid]);
+        conv_tx_commit($db);
+    } catch (Throwable $e) {
+        conv_tx_rollback($db);
+        return ['ok' => false, 'error' => 'Erreur: ' . $e->getMessage(), 'code' => 500];
+    }
+
+    $source = (string) ($opts['source'] ?? 'manual');
+    log_field_changes($db, 'prospect', $revertedProspectId, ['converted' => 1], ['converted' => 0, 'via' => $source], $username);
+    log_field_changes($db, 'opportunity', $oid, ['exists' => 1], ['exists' => 0, 'reverted_to_prospect' => $revertedProspectId], $username);
+    audit_log($db, $me, 'revert_lead', 'prospect', $revertedProspectId, ['opportunityId' => $oid, 'source' => $source]);
+    audit_log($db, $me, 'revert_lead', 'opportunity', $oid, ['prospectId' => $revertedProspectId]);
+
+    return [
+        'ok' => true,
+        'prospectId' => $revertedProspectId,
+        'message' => 'Opportunité retournée vers les leads',
+    ];
+}
+
+/**
+ * Revert contract → prospect (and drop linked opportunity if any).
+ */
+function conversion_revert_contract_to_prospect(PDO $db, string $cid, array $me, array $opts = []): array
+{
+    require_once __DIR__ . '/pipeline_helpers.php';
+    require_once __DIR__ . '/attachment_helpers.php';
+    require_once __DIR__ . '/custom_field_helpers.php';
+    require_once __DIR__ . '/contract_info_helpers.php';
+
+    $username = (string) ($me['username'] ?? '');
+    $role = (string) ($me['role'] ?? '');
+    $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
+
+    $cur = $db->prepare('SELECT * FROM crminternet_contracts WHERE id = :id');
+    $cur->execute([':id' => $cid]);
+    $row = $cur->fetch();
+    if (!$row) {
+        return ['ok' => false, 'error' => 'Contrat introuvable', 'code' => 404];
+    }
+    if (($opts['checkAgent'] ?? true) && $isAgent && ($row['assigned_to'] ?? null) !== $username) {
+        return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
+    }
+
+    $prospectId = !empty($row['prospect_id']) ? (string) $row['prospect_id'] : null;
+    $sourceOpportunityId = !empty($row['opportunity_id']) ? (string) $row['opportunity_id'] : null;
+    $sourceOpportunity = null;
+    if ($sourceOpportunityId) {
+        $oq = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
+        $oq->execute([':id' => $sourceOpportunityId]);
+        $sourceOpportunity = $oq->fetch() ?: null;
+        if (!$prospectId && $sourceOpportunity && !empty($sourceOpportunity['prospect_id'])) {
+            $prospectId = (string) $sourceOpportunity['prospect_id'];
+        }
+    }
+
+    $revertStatus = pipeline_pick_revert_lead_status($db);
+    $identitySrc = $sourceOpportunity ?: $row;
+
+    $db->beginTransaction();
+    try {
+        $existingProspect = null;
+        if ($prospectId) {
+            $pq = $db->prepare('SELECT 1 FROM crminternet_prospects WHERE id = :pid LIMIT 1');
+            $pq->execute([':pid' => $prospectId]);
+            $existingProspect = $pq->fetchColumn();
+        }
+        if (!$prospectId || !$existingProspect) {
+            $prospectId = $prospectId ?: ('P-' . substr(bin2hex(random_bytes(6)), 0, 10));
+            conversion_insert_prospect_on_revert($db, $prospectId, $identitySrc, $revertStatus, 'contract');
+        } else {
+            conversion_update_prospect_on_revert($db, $prospectId, $identitySrc, $revertStatus, 'contract');
+        }
+        try { attachment_clone_entity($db, 'contract', $cid, 'prospect', $prospectId); } catch (Throwable $e) {}
+        try { contract_info_clone_entity($db, 'contract', $cid, 'prospect', $prospectId, $username); } catch (Throwable $e) {}
+        try { custom_field_clone_entity($db, 'contract', $cid, 'prospect', $prospectId); } catch (Throwable $e) {}
+        if ($sourceOpportunityId) {
+            try { attachment_clone_entity($db, 'opportunity', $sourceOpportunityId, 'prospect', $prospectId); } catch (Throwable $e) {}
+            try { contract_info_clone_entity($db, 'opportunity', $sourceOpportunityId, 'prospect', $prospectId, $username); } catch (Throwable $e) {}
+            try { custom_field_clone_entity($db, 'opportunity', $sourceOpportunityId, 'prospect', $prospectId); } catch (Throwable $e) {}
+            $db->prepare('DELETE FROM crminternet_opportunities WHERE id = :id')->execute([':id' => $sourceOpportunityId]);
+        }
+        $db->prepare('DELETE FROM crminternet_contracts WHERE id = :id')->execute([':id' => $cid]);
+        conv_tx_commit($db);
+    } catch (Throwable $e) {
+        conv_tx_rollback($db);
+        return ['ok' => false, 'error' => 'Erreur revert: ' . $e->getMessage(), 'code' => 500];
+    }
+
+    $source = (string) ($opts['source'] ?? 'manual');
+    log_field_changes($db, 'contract', $cid, ['exists' => 1], ['exists' => 0, 'prospect_id' => $prospectId, 'via' => $source], $username);
+    if ($sourceOpportunityId) {
+        log_field_changes($db, 'opportunity', $sourceOpportunityId, ['exists' => 1], ['exists' => 0, 'prospect_id' => $prospectId], $username);
+    }
+    audit_log($db, $me, 'revert_lead', 'contract', $cid, ['prospectId' => $prospectId, 'opportunityId' => $sourceOpportunityId]);
+    audit_log($db, $me, 'revert_lead', 'prospect', $prospectId, ['contractId' => $cid, 'opportunityId' => $sourceOpportunityId]);
+
+    return [
+        'ok' => true,
+        'prospectId' => $prospectId,
+        'opportunityId' => $sourceOpportunityId,
+        'message' => 'Contrat retourné en lead',
+    ];
+}
+
+/**
+ * Revert contract → opportunity (reactivate or recreate full snapshot).
+ */
+function conversion_revert_contract_to_opportunity(PDO $db, string $cid, array $me, array $opts = []): array
+{
+    require_once __DIR__ . '/pipeline_helpers.php';
+    require_once __DIR__ . '/attachment_helpers.php';
+    require_once __DIR__ . '/custom_field_helpers.php';
+    require_once __DIR__ . '/contract_info_helpers.php';
+
+    $username = (string) ($me['username'] ?? '');
+    $role = (string) ($me['role'] ?? '');
+    $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
+
+    $cur = $db->prepare('SELECT * FROM crminternet_contracts WHERE id = :id');
+    $cur->execute([':id' => $cid]);
+    $row = $cur->fetch();
+    if (!$row) {
+        return ['ok' => false, 'error' => 'Contrat introuvable', 'code' => 404];
+    }
+    if (($opts['checkAgent'] ?? true) && $isAgent && ($row['assigned_to'] ?? null) !== $username) {
+        return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
+    }
+
+    $opportunityId = !empty($row['opportunity_id']) ? (string) $row['opportunity_id'] : null;
+    $created = false;
+
+    $db->beginTransaction();
+    try {
+        if ($opportunityId) {
+            conversion_restore_opportunity_from_contract($db, $opportunityId, $row);
+        } else {
+            $opportunityId = 'O-' . substr(bin2hex(random_bytes(6)), 0, 10);
+            $initialName = conversion_pick_initial_opportunity_stage($db);
+            conversion_insert_opportunity_from_prospect($db, $opportunityId, [
+                'id'              => $row['prospect_id'] ?? null,
+                'civility'        => $row['civility'] ?? 'M',
+                'last_name'       => $row['last_name'] ?? '',
+                'first_name'      => $row['first_name'] ?? '',
+                'phone'           => $row['phone'] ?? '',
+                'phone2'          => $row['phone2'] ?? '',
+                'animateur'       => $row['animateur'] ?? null,
+                'ancien_ligne'    => $row['ancien_ligne'] ?? null,
+                'cin'             => $row['cin'] ?? null,
+                'birth_date'      => $row['birth_date'] ?? null,
+                'email'           => $row['email'] ?? '',
+                'city'            => $row['city'] ?? '',
+                'gouvernorat'     => $row['gouvernorat'] ?? '',
+                'delegation'      => $row['delegation'] ?? '',
+                'zone'            => $row['zone'] ?? '',
+                'address'         => $row['address'] ?? '',
+                'localisation_xy' => $row['localisation_xy'] ?? null,
+                'code_postal'     => $row['code_postal'] ?? null,
+                'comment'         => $row['comment1'] ?? null,
+                'comment2'        => $row['comment2'] ?? null,
+                'source'          => $row['source'] ?? '',
+                'type_id'         => $row['type_id'] ?? null,
+                'status'          => $row['lead_status'] ?? null,
+                'assigned_to'     => $row['assigned_to'] ?? '',
+            ], [
+                'title'       => trim(($row['last_name'] ?? '') . ' ' . ($row['first_name'] ?? '')),
+                'stage'       => $initialName,
+                'amount'      => (float) ($row['premium'] ?? 0),
+                'assigned_to' => $row['assigned_to'] ?? $username,
+                'created_by'  => $username,
+            ]);
+            $created = true;
+        }
+        try { attachment_clone_entity($db, 'contract', $cid, 'opportunity', $opportunityId); } catch (Throwable $e) {}
+        try { contract_info_clone_entity($db, 'contract', $cid, 'opportunity', $opportunityId, $username); } catch (Throwable $e) {}
+        try { custom_field_clone_entity($db, 'contract', $cid, 'opportunity', $opportunityId); } catch (Throwable $e) {}
+        $db->prepare('DELETE FROM crminternet_contracts WHERE id = :id')->execute([':id' => $cid]);
+        conv_tx_commit($db);
+    } catch (Throwable $e) {
+        conv_tx_rollback($db);
+        return ['ok' => false, 'error' => 'Erreur revert: ' . $e->getMessage(), 'code' => 500];
+    }
+
+    $source = (string) ($opts['source'] ?? 'manual');
+    log_field_changes($db, 'contract', $cid, ['exists' => 1], ['exists' => 0, 'opportunity_id' => $opportunityId, 'via' => $source], $username);
+    audit_log($db, $me, 'contract.revert', 'contract', $cid, ['opportunityId' => $opportunityId, 'source' => $source]);
+
+    return [
+        'ok' => true,
+        'opportunityId' => $opportunityId,
+        'created' => $created,
+        'message' => 'Contrat retourné en opportunité',
     ];
 }

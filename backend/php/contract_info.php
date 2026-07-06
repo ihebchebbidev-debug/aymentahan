@@ -24,7 +24,7 @@ function ensure_contract_info_schema(PDO $db): void {
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS crminternet_contract_info (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            entity_type ENUM('prospect','opportunity','contract') NOT NULL,
+            entity_type ENUM('prospect','opportunity','contract','migration') NOT NULL,
             entity_id VARCHAR(40) NOT NULL,
             type_conn VARCHAR(255) NOT NULL DEFAULT '',
             reference_tt VARCHAR(120) NOT NULL DEFAULT '',
