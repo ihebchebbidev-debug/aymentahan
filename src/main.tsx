@@ -15,7 +15,7 @@ if (typeof window !== "undefined") {
   const isChunkError = (msg: unknown): boolean => {
     if (!msg) return false;
     const s = typeof msg === "string" ? msg : (msg as any)?.message ?? String(msg);
-    return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk [\w-]+ failed|error loading dynamically imported module/i.test(s);
+    return /Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk [\w-]+ failed|error loading dynamically imported module|reading 'component'/i.test(s);
   };
   const tryReload = (reason: string) => {
     if (hasUnsavedForms()) {

@@ -52,9 +52,17 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    // Relative asset paths so the app works at any server sub-path (e.g. /crminternet/)
-    // and doesn't break when files are previewed locally.
     assetsDir: "assets",
+    // Entry at site root so lazy chunks resolve as /assets/*.js (not /assets/assets/*).
+    rollupOptions: {
+      output: {
+        entryFileNames: "[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+      },
+    },
   },
-  base: "./",
+  // Absolute base from site root — required for SPA reload on deep links.
+  // Sub-path deploys: set VITE_BASE=/code_source/ in .env.production before build.
+  base: (process.env.VITE_BASE || "/").replace(/\/?$/, "/"),
 });
