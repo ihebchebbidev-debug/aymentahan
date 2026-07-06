@@ -5,22 +5,25 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Paperclip, Upload, Download, Trash2, FileText, Image as ImageIcon, FileArchive, File as FileIcon, Loader2, Search, X, Eye, ChevronLeft, ChevronRight } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Paperclip, Upload, Download, Trash2, FileText, Image as ImageIcon, FileArchive, File as FileIcon, Loader2, Search, X, Eye } from "lucide-react";
 import { api, apiUpload, authenticatedApiUrl, API_ENABLED } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { entityEditPerm } from "@/lib/entityPerms";
 import { toast } from "sonner";
 import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  AttachmentPreviewDialog,
+  isAttachmentPreviewable,
+  previewItemFromFile,
+  revokePreviewItem,
+  type AttachmentPreviewItem,
+} from "@/components/AttachmentPreviewDialog";
 import {
   CategorizedAttachmentSlots,
   ATTACHMENT_CATEGORIES,
   type AttachmentCategoryKey,
   type CategorizedSlotState,
+  type CategoryLinkedAttachment,
   withCategoryPrefix,
   categoryLabelOf,
   detectCategoryFromFilename,
@@ -49,6 +52,8 @@ export type Attachment = {
   url: string;
   uploadedBy: string;
   createdAt: string;
+  _readOnly?: boolean;
+  _originLabel?: string;
 };
 
 function fmtSize(b: number) {
@@ -91,8 +96,9 @@ export function AttachmentsCard({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDel, setConfirmDel] = useState<Attachment | null>(null);
-  const [preview, setPreview] = useState<Attachment | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const [preview, setPreview] = useState<AttachmentPreviewItem | null>(null);
+  const [previewCategory, setPreviewCategory] = useState<AttachmentCategoryKey | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -108,6 +114,42 @@ export function AttachmentsCard({
   const [slots, setSlots] = useState<Record<string, CategorizedSlotState>>({});
 
   const hasTarget = Boolean(entity && entityId && String(entityId).trim() !== "" && String(entityId) !== "0" && String(entityId) !== "undefined" && String(entityId) !== "null");
+
+  const canModifyAttachment = useCallback((a: Attachment) => {
+    return canEdit && !a._readOnly && a.entity === entity && String(a.entityId) === String(entityId);
+  }, [canEdit, entity, entityId]);
+
+  const attachmentToPreview = useCallback((a: Attachment): AttachmentPreviewItem => ({
+    id: a.id,
+    filename: a.filename,
+    mimeType: a.mimeType,
+    sizeBytes: a.sizeBytes,
+    previewUrl: authenticatedApiUrl(a.url, isAttachmentPreviewable(a.mimeType) ? { inline: 1 } : undefined),
+    downloadUrl: authenticatedApiUrl(a.url),
+    readOnly: !canModifyAttachment(a),
+  }), [canModifyAttachment]);
+
+  const attachmentByCategory = useMemo(() => {
+    const map: Partial<Record<AttachmentCategoryKey, Attachment>> = {};
+    for (const a of items) {
+      const key = detectCategoryFromFilename(a.filename);
+      if (key && !map[key]) map[key] = a;
+    }
+    return map;
+  }, [items]);
+
+  const linkedAttachmentsForSlots = useMemo(() => {
+    const out: Partial<Record<AttachmentCategoryKey, CategoryLinkedAttachment>> = {};
+    for (const [key, a] of Object.entries(attachmentByCategory) as [AttachmentCategoryKey, Attachment][]) {
+      out[key] = {
+        id: a.id,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        previewUrl: authenticatedApiUrl(a.url, { inline: 1 }),
+      };
+    }
+    return out;
+  }, [attachmentByCategory]);
 
   const load = useCallback(async () => {
     if (!API_ENABLED) return;
@@ -153,7 +195,7 @@ export function AttachmentsCard({
         if (seenFile.has(fp)) continue;
         seenId.add(a.id);
         seenFile.add(fp);
-        merged.push(a);
+        merged.push(a as Attachment);
       }
       setItems(merged);
       // Reflect categorized files (CIN Recto/Verso, etc.) from this entity or lineage extras.
@@ -269,19 +311,109 @@ export function AttachmentsCard({
     }
   };
 
-  const remove = async (a: Attachment) => {
+  const remove = async (a: Attachment, opts?: { closePreview?: boolean }) => {
     setDeletingId(a.id);
     try {
       await api(`/attachments.php?id=${encodeURIComponent(a.id)}`, { method: "DELETE" });
       setItems((prev) => prev.filter((x) => x.id !== a.id));
+      const catKey = detectCategoryFromFilename(a.filename);
+      if (catKey) {
+        setSlots((s) => { const c = { ...s }; delete c[catKey]; return c; });
+      }
       onRemoved?.({ filename: a.filename, sizeBytes: a.sizeBytes });
       toast.success("Pièce jointe supprimée", { description: a.filename });
+      if (opts?.closePreview) setPreview(null);
     } catch (e: any) {
       toast.error("Suppression impossible", { description: e?.message });
     } finally {
       setDeletingId(null);
-      setConfirmDel(null);
     }
+  };
+
+  const prepareUploadFile = async (f: File): Promise<File | null> => {
+    const mime = (f.type || "").toLowerCase();
+    const isPdf = mime === "application/pdf";
+    const isImg = mime.startsWith("image/");
+    if (!isPdf && !isImg) {
+      toast.error(`${f.name}: format refusé (PDF ou image uniquement)`);
+      return null;
+    }
+    let toUpload = f;
+    if (isImg && f.size > MAX_ATTACHMENT_BYTES && isCompressibleImage(f)) {
+      try {
+        toUpload = await compressImageToBudget(f);
+      } catch { /* keep original */ }
+    }
+    if (toUpload.size > MAX_ATTACHMENT_BYTES) {
+      toast.error(`${f.name}: fichier trop volumineux (max 100 Ko${isImg ? " après compression" : ""})`);
+      return null;
+    }
+    return toUpload;
+  };
+
+  const replaceAttachment = async (previewItem: AttachmentPreviewItem, file: File, categoryKey?: AttachmentCategoryKey | null) => {
+    const existing = items.find((x) => x.id === previewItem.id);
+    setReplacing(true);
+    try {
+      const toUpload = await prepareUploadFile(file);
+      if (!toUpload) return;
+
+      const cat = categoryKey ?? (existing ? detectCategoryFromFilename(existing.filename) : null);
+      const labelled = cat ? withCategoryPrefix(toUpload, categoryLabelOf(cat)) : toUpload;
+
+      if (existing && canModifyAttachment(existing)) {
+        await api(`/attachments.php?id=${encodeURIComponent(existing.id)}`, { method: "DELETE" });
+      }
+
+      await apiUpload("/attachments.php", { entity, entity_id: entityId, file: labelled });
+      onAdded?.({ filename: labelled.name, sizeBytes: labelled.size });
+      toast.success("Fichier remplacé");
+      await load();
+      if (cat) {
+        setSlots((s) => ({ ...s, [cat]: { file: null, status: "done", message: labelled.name.replace(/^\[[^\]]+\]\s*/, "") } }));
+      }
+      setPreview(null);
+    } catch (e: any) {
+      toast.error("Remplacement impossible", { description: e?.message });
+    } finally {
+      setReplacing(false);
+    }
+  };
+
+  const openPreviewForAttachment = (a: Attachment) => {
+    setPreviewCategory(detectCategoryFromFilename(a.filename));
+    setPreview(attachmentToPreview(a));
+  };
+
+  const openPreviewForCategory = (key: AttachmentCategoryKey) => {
+    const linked = attachmentByCategory[key];
+    if (linked) {
+      setPreviewCategory(key);
+      setPreview(attachmentToPreview(linked));
+      return;
+    }
+    const slot = slots[key];
+    if (slot?.file) {
+      setPreviewCategory(key);
+      setPreview(previewItemFromFile(slot.file, `slot-${key}`));
+    }
+  };
+
+  const handlePreviewRemove = async (item: AttachmentPreviewItem) => {
+    const existing = items.find((x) => x.id === item.id);
+    if (existing && canModifyAttachment(existing)) {
+      await remove(existing, { closePreview: true });
+      return;
+    }
+    if (previewCategory && slots[previewCategory]?.file) {
+      setSlots((s) => { const c = { ...s }; delete c[previewCategory!]; return c; });
+      revokePreviewItem(item);
+      setPreview(null);
+    }
+  };
+
+  const handlePreviewReplace = async (item: AttachmentPreviewItem, file: File) => {
+    await replaceAttachment(item, file, previewCategory);
   };
 
   // Apply filters
@@ -312,7 +444,7 @@ export function AttachmentsCard({
     setSearch(""); setTypeFilter("all"); setSizeFilter("all"); setDateFrom(""); setDateTo("");
   };
 
-  // Display order — same grouping used in the JSX list. Preview prev/next walks this order.
+  // Display order — same grouping used in the JSX list.
   const orderedFiltered = useMemo(() => {
     const buckets = new Map<string, Attachment[]>();
     ATTACHMENT_CATEGORIES.forEach((c) => buckets.set(c.key, []));
@@ -326,28 +458,10 @@ export function AttachmentsCard({
     return out;
   }, [filtered]);
 
-  const previewableOrdered = useMemo(
-    () => orderedFiltered.filter((a) => a.mimeType?.startsWith("image/") || a.mimeType === "application/pdf"),
-    [orderedFiltered]
+  const previewItems = useMemo(
+    () => orderedFiltered.map(attachmentToPreview),
+    [orderedFiltered, attachmentToPreview]
   );
-
-  const previewIndex = preview ? previewableOrdered.findIndex((x) => x.id === preview.id) : -1;
-  const goPreview = useCallback((delta: number) => {
-    if (previewIndex < 0 || previewableOrdered.length === 0) return;
-    const next = (previewIndex + delta + previewableOrdered.length) % previewableOrdered.length;
-    setPreview(previewableOrdered[next]);
-  }, [previewIndex, previewableOrdered]);
-
-  // Keyboard arrow navigation while preview is open.
-  useEffect(() => {
-    if (!preview) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") { e.preventDefault(); goPreview(1); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); goPreview(-1); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [preview, goPreview]);
 
 
   return (
@@ -367,15 +481,15 @@ export function AttachmentsCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Categorized slots — CIN Recto, CIN Verso, Contrat TT, TOPNET, CGV */}
-        {canEdit && (
         <CategorizedAttachmentSlots
           slots={slots}
-          disabled={!API_ENABLED || !hasTarget}
-          hint={!hasTarget ? "Enregistrez d'abord la fiche pour activer l'envoi par catégorie." : undefined}
+          linkedAttachments={linkedAttachmentsForSlots}
+          disabled={!canEdit || !API_ENABLED || !hasTarget}
+          hint={!hasTarget ? "Enregistrez d'abord la fiche pour activer l'envoi par catégorie." : !canEdit ? "Lecture seule — cliquez sur un document pour l'aperçu." : undefined}
           onPick={(key, file) => void uploadCategorized(key, file)}
-          onClear={(key) => setSlots((s) => { const c = { ...s }; delete c[key]; return c; })}
+          onClear={canEdit ? (key) => setSlots((s) => { const c = { ...s }; delete c[key]; return c; }) : undefined}
+          onView={(key) => openPreviewForCategory(key)}
         />
-        )}
 
         {/* Dropzone / picker (autres documents libres) */}
         {canEdit ? (
@@ -511,57 +625,56 @@ export function AttachmentsCard({
                       <div className="divide-y divide-border">
                         {g.items.map((a) => {
                           const isImg = a.mimeType?.startsWith("image/");
-                          const isPdf = a.mimeType === "application/pdf";
-                          const previewable = isImg || isPdf;
-                          const fileUrl = authenticatedApiUrl(a.url);
-                          const previewUrl = authenticatedApiUrl(a.url, previewable ? { inline: 1 } : undefined);
+                          const previewUrl = authenticatedApiUrl(a.url, isImg ? { inline: 1 } : undefined);
+                          const modifiable = canModifyAttachment(a);
                           return (
-                            <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/20">
-                              <button
-                                type="button"
-                                onClick={() => previewable && setPreview(a)}
-                                disabled={!previewable}
-                                className="h-9 w-9 rounded-md bg-accent/40 flex items-center justify-center shrink-0 hover:bg-accent disabled:cursor-default disabled:hover:bg-accent/40"
-                                aria-label={previewable ? `Aperçu ${a.filename}` : a.filename}
-                              >
+                            <div
+                              key={a.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => openPreviewForAttachment(a)}
+                              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPreviewForAttachment(a); } }}
+                              className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/20 cursor-pointer"
+                            >
+                              <div className="h-9 w-9 rounded-md bg-accent/40 flex items-center justify-center shrink-0 overflow-hidden">
                                 {isImg ? (
                                   <img src={previewUrl} alt="" className="h-9 w-9 object-cover rounded-md" />
                                 ) : (
                                   <FileTypeIcon mime={a.mimeType} />
                                 )}
-                              </button>
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate" title={a.filename}>{cleanName(a.filename)}</div>
                                 <div className="text-[11px] text-muted-foreground truncate">
                                   {fmtSize(a.sizeBytes)} · @{a.uploadedBy} · {new Date(a.createdAt).toLocaleString("fr-FR")}
+                                  {a._originLabel ? ` · ${a._originLabel}` : ""}
                                 </div>
                               </div>
-                              {previewable && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => setPreview(a)}
-                                  aria-label={`Aperçu ${a.filename}`}
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => { e.stopPropagation(); openPreviewForAttachment(a); }}
+                                aria-label={`Aperçu ${a.filename}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
                               <a
-                                href={fileUrl}
+                                href={authenticatedApiUrl(a.url)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
                                 aria-label={`Télécharger ${a.filename}`}
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <Download className="h-4 w-4" />
                               </a>
-                              {canEdit && (
+                              {modifiable && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                                onClick={() => setConfirmDel(a)}
+                                onClick={(e) => { e.stopPropagation(); void remove(a); }}
                                 disabled={deletingId === a.id}
                                 aria-label={`Supprimer ${a.filename}`}
                               >
@@ -580,95 +693,24 @@ export function AttachmentsCard({
         )}
       </CardContent>
 
-      {/* Preview modal */}
-      <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
-        <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden">
-          <DialogHeader className="px-4 py-3 border-b">
-            <DialogTitle className="text-sm truncate pr-8">
-              {preview ? preview.filename.replace(/^\[[^\]]+\]\s*/, "") : ""}
-              {previewableOrdered.length > 1 && previewIndex >= 0 && (
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  ({previewIndex + 1} / {previewableOrdered.length})
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          {preview && (
-            <div className="relative bg-muted/30 flex items-center justify-center min-h-[60vh] max-h-[80vh]">
-              {preview.mimeType?.startsWith("image/") ? (
-                <img src={authenticatedApiUrl(preview.url, { inline: 1 })} alt={preview.filename} className="max-h-[80vh] max-w-full object-contain" />
-              ) : preview.mimeType === "application/pdf" ? (
-                <iframe src={authenticatedApiUrl(preview.url, { inline: 1 })} title={preview.filename} className="w-full h-[80vh] bg-white" />
-              ) : (
-                <div className="p-8 text-sm text-muted-foreground">Aperçu indisponible pour ce format.</div>
-              )}
-              {previewableOrdered.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => goPreview(-1)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-background/80 hover:bg-background border border-border shadow-sm flex items-center justify-center"
-                    aria-label="Fichier précédent"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => goPreview(1)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-background/80 hover:bg-background border border-border shadow-sm flex items-center justify-center"
-                    aria-label="Fichier suivant"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {preview && (
-            <div className="flex items-center justify-between gap-2 px-4 py-3 border-t">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => goPreview(-1)} disabled={previewableOrdered.length < 2}>
-                  <ChevronLeft className="h-4 w-4 mr-1" />Précédent
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => goPreview(1)} disabled={previewableOrdered.length < 2}>
-                  Suivant<ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild>
-                  <a href={authenticatedApiUrl(preview.url)} target="_blank" rel="noreferrer">
-                    <Download className="h-4 w-4 mr-1.5" />Télécharger
-                  </a>
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setPreview(null)}>Fermer</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!confirmDel} onOpenChange={(o) => { if (!o) setConfirmDel(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette pièce jointe ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmDel ? (
-                <>Le fichier <span className="font-medium text-foreground">{confirmDel.filename}</span> ({fmtSize(confirmDel.sizeBytes)}) sera définitivement supprimé. Cette action est irréversible.</>
-              ) : null}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!deletingId}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={!!deletingId}
-              onClick={(e) => { e.preventDefault(); if (confirmDel) void remove(confirmDel); }}
-            >
-              {deletingId ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Suppression…</> : "Supprimer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AttachmentPreviewDialog
+        item={preview}
+        open={!!preview}
+        onOpenChange={(o) => {
+          if (!o && preview?.previewUrl.startsWith("blob:")) revokePreviewItem(preview);
+          if (!o) { setPreview(null); setPreviewCategory(null); }
+        }}
+        items={previewItems}
+        onNavigate={(item) => {
+          setPreviewCategory(detectCategoryFromFilename(item.filename));
+          setPreview(item);
+        }}
+        canEdit={canEdit}
+        removing={!!deletingId}
+        replacing={replacing}
+        onRemove={handlePreviewRemove}
+        onReplaceFile={canEdit ? handlePreviewReplace : undefined}
+      />
     </Card>
   );
 }

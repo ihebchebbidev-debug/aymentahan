@@ -25,6 +25,12 @@ import {
   withCategoryPrefix,
   categoryLabelOf,
 } from "@/components/CategorizedAttachmentSlots";
+import {
+  StagedAttachmentPreviewDialog,
+  findStagedContextByPreviewId,
+  useStagedAttachmentPreview,
+  useStagedPreviewItems,
+} from "@/lib/stagedAttachmentPreview";
 
 import { RequirePerm } from "@/components/RequirePerm";
 
@@ -107,6 +113,9 @@ function NewProspectPage() {
   const [staging, setStaging] = useState(false);
   const [slots, setSlots] = useState<Record<string, CategorizedSlotState>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { preview, context, openFromFile, close, setPreview } = useStagedAttachmentPreview();
+  const [replacingPreview, setReplacingPreview] = useState(false);
+  const stagedPreviewItems = useStagedPreviewItems(slots, files);
 
   const isDirty = useMemo(
     () =>
@@ -441,6 +450,10 @@ function NewProspectPage() {
               slots={slots}
               onPick={(key, file) => void stageSlot(key, file)}
               onClear={(key) => setSlots((s) => { const c = { ...s }; delete c[key]; return c; })}
+              onView={(key) => {
+                const f = slots[key]?.file;
+                if (f && slots[key]?.status === "done") openFromFile(f, { kind: "slot", key });
+              }}
             />
 
             <div>
@@ -461,10 +474,17 @@ function NewProspectPage() {
             {files.length > 0 && (
               <div className="mt-2 space-y-1">
                 {files.map((sf, i) => (
-                  <div key={i} className={`flex items-center gap-2 text-xs rounded-md border px-2 py-1.5 ${
-                    sf.status === "ready" ? "bg-success/5 border-success/20"
+                  <div
+                    key={i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { if (sf.status === "ready") openFromFile(sf.toUpload, { kind: "file", index: i }); }}
+                    onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && sf.status === "ready") { e.preventDefault(); openFromFile(sf.toUpload, { kind: "file", index: i }); } }}
+                    className={`flex items-center gap-2 text-xs rounded-md border px-2 py-1.5 cursor-pointer ${
+                    sf.status === "ready" ? "bg-success/5 border-success/20 hover:bg-success/10"
                       : "bg-destructive/5 border-destructive/20 text-destructive"
-                  }`}>
+                  }`}
+                  >
                     {sf.original.type.startsWith("image/") ? <ImageIcon className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}
                     <span className="truncate flex-1">{sf.original.name}</span>
                     <span className="text-[10px] opacity-70">
@@ -473,7 +493,7 @@ function NewProspectPage() {
                     </span>
                     {sf.reason && <span className="text-[10px] italic">{sf.reason}</span>}
                     <Button type="button" variant="ghost" size="icon" className="h-5 w-5"
-                      onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}>
+                      onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, j) => j !== i)); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -482,6 +502,39 @@ function NewProspectPage() {
             )}
             </div>
           </section>
+
+          <StagedAttachmentPreviewDialog
+            preview={preview}
+            context={context}
+            items={stagedPreviewItems}
+            replacing={replacingPreview}
+            onClose={close}
+            onNavigate={(item) => {
+              const ctx = findStagedContextByPreviewId(item.id, slots);
+              if (!ctx) return;
+              if (ctx.kind === "slot" && slots[ctx.key]?.file) openFromFile(slots[ctx.key]!.file!, ctx, item.id);
+              else if (ctx.kind === "file" && files[ctx.index]?.status === "ready") openFromFile(files[ctx.index].toUpload, ctx, item.id);
+              else setPreview(item);
+            }}
+            onRemove={(ctx) => {
+              if (ctx.kind === "slot") setSlots((s) => { const c = { ...s }; delete c[ctx.key]; return c; });
+              else setFiles((prev) => prev.filter((_, j) => j !== ctx.index));
+              close();
+            }}
+            onReplaceFile={async (ctx, file) => {
+              setReplacingPreview(true);
+              try {
+                if (ctx.kind === "slot") await stageSlot(ctx.key, file);
+                else {
+                  const staged = await stageFile(file);
+                  setFiles((prev) => prev.map((f, j) => (j === ctx.index ? staged : f)));
+                }
+                close();
+              } finally {
+                setReplacingPreview(false);
+              }
+            }}
+          />
 
           <div className="flex justify-end gap-2 pt-2 border-t">
             <Button variant="outline" asChild disabled={saving}>

@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, X, FileText, Image as ImageIcon, Loader2, Check } from "lucide-react";
+import { Upload, X, FileText, Image as ImageIcon, Loader2, Check, Eye } from "lucide-react";
 
 export const ATTACHMENT_CATEGORIES = [
   { key: "cin_recto", label: "CIN Recto" },
@@ -19,16 +19,29 @@ export type CategorizedSlotState = {
   message?: string;
 };
 
+export type CategoryLinkedAttachment = {
+  id: string;
+  filename: string;
+  mimeType: string;
+  previewUrl: string;
+};
+
 export function CategorizedAttachmentSlots({
   slots,
   onPick,
   onClear,
+  onView,
+  linkedAttachments,
   disabled,
   hint,
 }: {
   slots: Record<string, CategorizedSlotState | undefined>;
   onPick: (categoryKey: AttachmentCategoryKey, file: File) => void | Promise<void>;
   onClear?: (categoryKey: AttachmentCategoryKey) => void;
+  /** Open preview modal for a category (uploaded server file or local staged file). */
+  onView?: (categoryKey: AttachmentCategoryKey) => void;
+  /** Server-side attachment already stored for each category. */
+  linkedAttachments?: Partial<Record<AttachmentCategoryKey, CategoryLinkedAttachment>>;
   disabled?: boolean;
   hint?: string;
 }) {
@@ -36,7 +49,7 @@ export function CategorizedAttachmentSlots({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium">Pièces jointes — par catégorie</Label>
-        <span className="text-[10px] text-muted-foreground">Aucun champ obligatoire</span>
+        <span className="text-[10px] text-muted-foreground">Cliquez pour prévisualiser</span>
       </div>
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -45,9 +58,11 @@ export function CategorizedAttachmentSlots({
             key={cat.key}
             label={cat.label}
             state={slots[cat.key]}
+            linked={linkedAttachments?.[cat.key]}
             disabled={disabled}
             onPick={(f) => onPick(cat.key, f)}
             onClear={onClear ? () => onClear(cat.key) : undefined}
+            onView={onView ? () => onView(cat.key) : undefined}
           />
         ))}
       </div>
@@ -58,20 +73,30 @@ export function CategorizedAttachmentSlots({
 function SlotCard({
   label,
   state,
+  linked,
   disabled,
   onPick,
   onClear,
+  onView,
 }: {
   label: string;
   state?: CategorizedSlotState;
+  linked?: CategoryLinkedAttachment;
   disabled?: boolean;
   onPick: (file: File) => void;
   onClear?: () => void;
+  onView?: () => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const file = state?.file;
   const status = state?.status ?? "idle";
-  const isImg = file?.type.startsWith("image/");
+  const isImg = file?.type.startsWith("image/") || linked?.mimeType?.startsWith("image/");
+  const hasContent = status === "done" || !!file;
+  const displayName = file?.name ?? linked?.filename?.replace(/^\[[^\]]+\]\s*/, "") ?? state?.message ?? label;
+
+  const openPreview = () => {
+    if (hasContent && onView) onView();
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-3 space-y-1.5">
@@ -93,17 +118,26 @@ function SlotCard({
         }}
       />
       {!file && status === "done" ? (
-        <div className="flex items-center gap-1.5 text-[11px] rounded-md border border-success/30 bg-success/5 px-2 py-1.5 text-success">
-          <Check className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate flex-1" title={state?.message ?? label}>
-            {state?.message ?? "Déjà téléversé"}
-          </span>
-          {onClear && (
-            <Button type="button" variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground" onClick={onClear}>
-              <X className="h-3 w-3" />
-            </Button>
+        <button
+          type="button"
+          disabled={!onView}
+          onClick={openPreview}
+          className={`w-full flex items-center gap-1.5 text-[11px] rounded-md border px-2 py-1.5 text-left transition-colors ${
+            onView
+              ? "border-success/30 bg-success/5 text-success hover:bg-success/10 cursor-pointer"
+              : "border-success/30 bg-success/5 text-success"
+          }`}
+        >
+          {linked && isImg ? (
+            <img src={linked.previewUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+          ) : (
+            <Check className="h-3.5 w-3.5 shrink-0" />
           )}
-        </div>
+          <span className="truncate flex-1" title={displayName}>
+            {displayName}
+          </span>
+          {onView && <Eye className="h-3.5 w-3.5 shrink-0 opacity-70" />}
+        </button>
       ) : !file ? (
         <Button
           type="button"
@@ -117,27 +151,37 @@ function SlotCard({
           Choisir un fichier
         </Button>
       ) : (
-        <div
-          className={`flex items-center gap-1.5 text-[11px] rounded-md border px-2 py-1.5 ${
+        <button
+          type="button"
+          disabled={!onView}
+          onClick={openPreview}
+          className={`w-full flex items-center gap-1.5 text-[11px] rounded-md border px-2 py-1.5 text-left ${
             status === "error"
               ? "bg-destructive/5 border-destructive/30 text-destructive"
-              : "bg-muted/30"
+              : onView
+                ? "bg-muted/30 hover:bg-muted/50 cursor-pointer"
+                : "bg-muted/30"
           }`}
         >
           {isImg ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
           <span className="truncate flex-1" title={file.name}>{file.name}</span>
           <span className="text-[10px] opacity-70">{Math.round(file.size / 1024)} Ko</span>
+          {onView && <Eye className="h-3.5 w-3.5 shrink-0 opacity-70" />}
           {onClear && status !== "uploading" && (
-            <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={onClear}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 shrink-0"
+              onClick={(e) => { e.stopPropagation(); onClear(); }}
+            >
               <X className="h-3 w-3" />
             </Button>
           )}
-        </div>
+        </button>
       )}
-      {state?.message && (
-        <p className={`text-[10px] ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}>
-          {state.message}
-        </p>
+      {state?.message && status === "error" && (
+        <p className="text-[10px] text-destructive">{state.message}</p>
       )}
     </div>
   );
@@ -152,7 +196,6 @@ export function withCategoryPrefix(file: File, categoryLabel: string): File {
   try {
     return new File([file], prefixed, { type: file.type, lastModified: file.lastModified });
   } catch {
-    // Some environments (older Safari) may not support File constructor — fallback.
     return file;
   }
 }
@@ -161,9 +204,6 @@ export function categoryLabelOf(key: AttachmentCategoryKey): string {
   return ATTACHMENT_CATEGORIES.find((c) => c.key === key)?.label ?? key;
 }
 
-/**
- * Detect a category from a stored filename (matches "[Label] …" prefix).
- */
 const LEGACY_CATEGORY_PREFIXES: Array<{ prefix: string; key: AttachmentCategoryKey }> = [
   { prefix: "_cin_recto__", key: "cin_recto" },
   { prefix: "_cin_verso__", key: "cin_verso" },
