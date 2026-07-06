@@ -12,6 +12,31 @@ function ensure_lead_stages_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_lead_stages ADD COLUMN is_lost TINYINT(1) NOT NULL DEFAULT 0",
         "ALTER TABLE crminternet_lead_stages ADD COLUMN auto_action VARCHAR(40) NOT NULL DEFAULT 'none'",
     ] as $sql) { try { $db->exec($sql); } catch (Throwable $e) {} }
+    ensure_lead_stages_reinject_statuses($db);
+}
+
+/** Idempotent — adds suivi statuses for lead re-injection workflow. */
+function ensure_lead_stages_reinject_statuses(PDO $db): void {
+    $rows = [
+        ['A réinjecter', 'warning', 15],
+        ['Réinjecté', 'success', 16],
+    ];
+    $chk = $db->prepare('SELECT 1 FROM crminternet_lead_stages WHERE name = :n LIMIT 1');
+    $ins = $db->prepare('INSERT INTO crminternet_lead_stages
+        (id, name, color, position, is_initial, is_won, is_lost, auto_action)
+        VALUES (:id, :n, :c, :p, 0, 0, 0, \'none\')');
+    foreach ($rows as [$name, $color, $pos]) {
+        try {
+            $chk->execute([':n' => $name]);
+            if ($chk->fetchColumn()) continue;
+            $ins->execute([
+                ':id' => 'S-' . substr(bin2hex(random_bytes(4)), 0, 8),
+                ':n' => $name,
+                ':c' => $color,
+                ':p' => $pos,
+            ]);
+        } catch (Throwable $e) { /* best effort */ }
+    }
 }
 ensure_lead_stages_runtime_schema($db);
 

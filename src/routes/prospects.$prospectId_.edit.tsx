@@ -12,7 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
 import { api } from "@/lib/api";
-import type { ProspectType } from "@/lib/types";
+import { LEAD_STATUSES, type ProspectType } from "@/lib/types";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
@@ -41,10 +41,7 @@ function GuardedEditProspectPage() {
 
 
 const SOURCES = ["Terrain", "Facebook", "Base de donné", "Technicien", "Autre"];
-const STATUSES = [
-  "Ok","Att cin","Att confirmation","Rappel","refuse","migration","Basculement",
-  "Ing","Nrp","Pas de rep","Pas intersse","Déjà connecté","Autr dde encor","Autre",
-];
+const STATUSES = LEAD_STATUSES;
 
 function EditProspectPage() {
   const { prospectId } = Route.useParams();

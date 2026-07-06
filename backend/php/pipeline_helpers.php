@@ -31,6 +31,19 @@ function pipeline_load_stages(PDO $db, string $entity): array {
     return $cache[$entity] = ['list' => $rows, 'byId' => $byId, 'byName' => $byName];
 }
 
+/** Resolve a stage row by name (case-insensitive fallback). */
+function pipeline_stage_by_name(array $stages, string $name): ?array {
+    if ($name === '') return null;
+    if (isset($stages['byName'][$name])) return $stages['byName'][$name];
+    $lower = mb_strtolower($name);
+    foreach ($stages['list'] as $s) {
+        if (mb_strtolower((string) ($s['name'] ?? '')) === $lower) {
+            return $s;
+        }
+    }
+    return null;
+}
+
 /**
  * Asserts that a stage transition is allowed for the given pipeline.
  * If no transitions are configured, all moves are permitted (open mode).
@@ -48,8 +61,10 @@ function pipeline_assert_transition(PDO $db, string $entity, string $currentStag
     }
 
     $stages = pipeline_load_stages($db, $entity);
-    $fromId = $stages['byName'][$currentStageName]['id'] ?? null;
-    $toId   = $stages['byName'][$newStageName]['id']     ?? null;
+    $fromRow = pipeline_stage_by_name($stages, $currentStageName);
+    $toRow   = pipeline_stage_by_name($stages, $newStageName);
+    $fromId = $fromRow['id'] ?? null;
+    $toId   = $toRow['id'] ?? null;
 
     if (!$fromId || !$toId) return; // unknown stage names — allow
 
@@ -67,17 +82,48 @@ function pipeline_assert_transition(PDO $db, string $entity, string $currentStag
 
 /**
  * Executes the auto_action defined on the destination stage (if any).
- * Returns a short description of what ran, or null if nothing to do.
+ * Runs server-side conversions (lead→opportunity, opportunity→contract).
  */
-function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, string $stageName, array $_me): ?array {
+function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, string $stageName, array $me): ?array {
     $stages = pipeline_load_stages($db, $entity);
-    $stage  = $stages['byName'][$stageName] ?? null;
+    $stage  = pipeline_stage_by_name($stages, $stageName);
     if (!$stage) return null;
 
     $action = $stage['auto_action'] ?? 'none';
     if ($action === 'none' || $action === '') return null;
 
-    return ['action' => $action, 'stage' => $stageName, 'entity' => $entity, 'id' => $entityId];
+    require_once __DIR__ . '/conversion_helpers.php';
+
+    switch ($action) {
+        case 'convert_opportunity':
+            if ($entity !== 'lead') {
+                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
+            }
+            if (!user_has_permission($db, $me, 'opportunity.convert')) {
+                return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+            }
+            $r = conversion_prospect_to_opportunity($db, $entityId, $me, [
+                'source' => 'pipeline:' . $stageName,
+                'checkAgent' => true,
+            ]);
+            return ['action' => $action] + $r + ['executed' => !empty($r['ok']) && !empty($r['created'])];
+
+        case 'convert_contract':
+            if ($entity !== 'opportunity') {
+                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
+            }
+            if (!user_has_permission($db, $me, 'opportunity.convert')) {
+                return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+            }
+            $r = conversion_opportunity_to_contract($db, $entityId, $me, [
+                'source' => 'pipeline:' . $stageName,
+            ]);
+            return ['action' => $action] + $r + ['executed' => !empty($r['ok']) && !empty($r['created'])];
+
+        default:
+            // revert_lead / revert_opportunity — not executed here yet
+            return ['action' => $action, 'stage' => $stageName, 'entity' => $entity, 'id' => $entityId];
+    }
 }
 
 /**

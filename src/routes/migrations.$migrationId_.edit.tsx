@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import type { Migration, PipelineStage, ProspectType } from "@/lib/types";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
@@ -49,6 +50,7 @@ function EditMigrationPage() {
   const { migrationId } = Route.useParams();
   const navigate = useNavigate();
   const { users } = useErp();
+  const { sync } = useCrmListSync();
   const stages: PipelineStage[] = useMigrationStages();
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [migration, setMigration] = useState<Migration | null>(null);
@@ -200,6 +202,7 @@ function EditMigrationPage() {
         notes: notes.trim() || null,
         assignedTo: assignedTo === "__none__" ? "" : assignedTo,
       });
+      await sync(["migrations"]);
       toast.success("Migration mise à jour");
       navigate({ to: "/migrations/$migrationId", params: { migrationId: migration.id } });
     } catch (e: unknown) {

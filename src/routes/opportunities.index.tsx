@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { api, API_ENABLED } from "@/lib/api";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { useApiQuery, useQuery, useQueryClient } from "@/lib/queryClient";
 import { fetchAllOpportunities } from "@/lib/opportunitiesApi";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +30,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
@@ -54,6 +56,7 @@ const PAGE_SIZE = 50;
 function OpportunitiesPage() {
   const { user, hasPermission } = useAuth();
   const { users, refresh } = useErp();
+  const { toContract, toMigration, revertOpportunity, afterOpportunityAuto, afterBulkOpportunityAuto } = useCrmListSync();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { stage: filterStage } = Route.useSearch();
@@ -169,8 +172,14 @@ function OpportunitiesPage() {
   // -------- Mutations --------
   const updateStage = async (id: string, stage: string) => {
     try {
-      await api("/opportunities.php", { method: "PATCH", body: { id, stage } });
-      toast.success("Statut mis à jour"); reload();
+      const r = await api<{ auto?: { executed?: boolean; contractId?: string; created?: boolean; error?: string } }>(
+        "/opportunities.php",
+        { method: "PATCH", body: { id, stage } },
+      );
+      reload();
+      await afterOpportunityAuto(r.auto);
+      toast.success("Statut mis à jour");
+      if (r.auto?.error) toast.warning("Action automatique non exécutée", { description: r.auto.error });
     } catch (e: any) { toast.error(e?.message); }
   };
   const revert = async (id: string) => {
@@ -181,6 +190,7 @@ function OpportunitiesPage() {
       // lead reappears in /prospects without a manual hard-refresh.
       reload();
       try { await refresh?.(); } catch {}
+      await revertOpportunity();
       const restoredAt = new Date().toISOString();
       try {
         sessionStorage.setItem("crm:reverted-prospect", JSON.stringify({ prospectId: r.prospectId, opportunityId: id, restoredAt }));
@@ -197,10 +207,8 @@ function OpportunitiesPage() {
       const r = await api<{ contractId: string }>("/opportunities.php",
         { method: "POST", body: { action: "convert_to_contract", id } });
       toast.success("Contrat créé");
-      // Invalidate both lists so the new contract appears and the opportunity
-      // disappears from the active opportunities list when navigating back.
-      qc.invalidateQueries({ queryKey: ["contracts"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
+      await toContract();
+      try { await refresh?.(); } catch {}
       navigate({ to: "/contracts/$contractId", params: { contractId: r.contractId } });
     } catch (e: any) { toast.error(e?.message); }
   };
@@ -210,8 +218,8 @@ function OpportunitiesPage() {
       const r = await api<{ migrationId: string }>("/opportunities.php",
         { method: "POST", body: { action: "convert_to_migration", id } });
       toast.success("Migration créée");
-      qc.invalidateQueries({ queryKey: ["migrations"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
+      await toMigration();
+      try { await refresh?.(); } catch {}
       navigate({ to: "/migrations/$migrationId", params: { migrationId: r.migrationId } });
     } catch (e: any) { toast.error(e?.message); }
   };
@@ -552,11 +560,21 @@ function OpportunitiesPage() {
                     setBulkBusy(true);
                     try {
                       let ok = 0;
+                      const autos: Parameters<typeof afterBulkOpportunityAuto>[0] = [];
                       for (const id of ids) {
-                        try { await api("/opportunities.php", { method: "PATCH", body: { id, stage: val } }); ok++; } catch { /* ignore */ }
+                        try {
+                          const r = await api<{ auto?: { executed?: boolean; contractId?: string; migrationId?: string; created?: boolean } }>(
+                            "/opportunities.php",
+                            { method: "PATCH", body: { id, stage: val } },
+                          );
+                          if (r.auto) autos.push(r.auto);
+                          ok++;
+                        } catch { /* ignore */ }
                       }
                       toast.success(`${ok}/${ids.length} étape(s) mises à jour`);
-                      setSelected(new Set()); reload();
+                      setSelected(new Set());
+                      reload();
+                      await afterBulkOpportunityAuto(autos);
                     } finally { setBulkBusy(false); }
                   }}
                 >
@@ -689,7 +707,16 @@ function OpportunitiesPage() {
             </DialogTitle>
           </DialogHeader>
           {attachOpp && (
-            <AttachmentsCard entity="opportunity" entityId={attachOpp.id} />
+            <AttachmentsCard
+              entity="opportunity"
+              entityId={attachOpp.id}
+              extraSources={buildAttachmentExtraSources({
+                primaryEntity: "opportunity",
+                primaryId: attachOpp.id,
+                prospectId: attachOpp.prospectId ?? null,
+                opportunityId: attachOpp.id,
+              })}
+            />
           )}
         </DialogContent>
       </Dialog>

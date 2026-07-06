@@ -10,6 +10,7 @@ import { PermissionDeniedDialogProvider } from "@/components/PermissionDeniedDia
 import { RouteProgressBar } from "@/components/RouteProgressBar";
 import { VersionWatcher } from "@/components/VersionWatcher";
 import { createAppQueryClient } from "@/lib/queryClient";
+import { bindAppQueryClient } from "@/lib/appQueryClient";
 import { setForbiddenHandler } from "@/lib/api";
 import { notifyMissingPermission, inferPermissionFromUrl } from "@/lib/permissionGuard";
 
@@ -43,9 +44,10 @@ export const Route = createRootRoute({
 function RootComponent() {
   // One QueryClient per browser session (per request on SSR — avoids leaking caches).
   const [queryClient] = useState(() => createAppQueryClient());
-  // Wire global 403 → French permission toast. Single source of truth: any
-  // backend refusal becomes a clear "Permission refusée + contactez l'admin"
-  // message, never the raw "Forbidden".
+  useEffect(() => {
+    bindAppQueryClient(queryClient);
+  }, [queryClient]);
+  // Wire global 403 → French permission toast.
   useEffect(() => {
     setForbiddenHandler(({ url }) => {
       const inferred = inferPermissionFromUrl(url);

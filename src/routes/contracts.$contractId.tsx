@@ -29,6 +29,7 @@ import { exportCSV, exportJSON, exportXLSX, printPage } from "@/lib/exportUtils"
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
@@ -39,6 +40,7 @@ import { LeadHistoryCard } from "@/components/LeadHistoryCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { LayoutGrid, Paperclip, ListChecks, Sparkles, RotateCcw } from "lucide-react";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { LastModifiedInfo } from "@/components/LastModifiedInfo";
 
 export const Route = createFileRoute("/contracts/$contractId")({
@@ -133,6 +135,7 @@ function ContractDetailsPage() {
 function ContractDetailsView({ contract }: { contract: import("@/lib/types").Contract }) {
   const navigate = useNavigate();
   const { prospects, users, events: calendarEvents, updateContractBilling, updateContractPremium, getContractActivity, logActivity, refresh } = useErp();
+  const { revertContract } = useCrmListSync();
   const { user, hasPermission } = useAuth();
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
   const isAdmin = user?.role === "Administrateur";
@@ -149,21 +152,6 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
       .catch(() => {});
   }, []);
   const stageByName = useMemo(() => Object.fromEntries(stages.map((s) => [s.name, s])), [stages]);
-
-  if (isAgent && contract.assignedTo !== user?.username) {
-    return (
-      <AppLayout skeleton="detail">
-        <div className="p-10 text-center">
-          <h2 className="text-xl font-semibold">Accès restreint</h2>
-          <p className="text-sm text-muted-foreground mt-2">Ce contrat n'est pas dans votre portefeuille.</p>
-          <Button className="mt-4" onClick={() => navigate({ to: "/contracts" })}>
-            <ArrowLeft className="h-4 w-4 mr-1.5" /> Retour aux contrats
-          </Button>
-        </div>
-      </AppLayout>
-    );
-  }
-
 
   const linkedProspect = useMemo(
     () => prospects.find((p) => p.lastName === contract.lastName && p.firstName === contract.firstName),
@@ -230,7 +218,21 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
     }
     // Sort by date asc
     return items.sort((a, b) => (a.date === "—" ? 1 : b.date === "—" ? -1 : a.date.localeCompare(b.date)));
-  }, [contract, linkedProspect]);
+  }, [contract, linkedProspect, calendarEvents]);
+
+  if (isAgent && contract.assignedTo !== user?.username) {
+    return (
+      <AppLayout skeleton="detail">
+        <div className="p-10 text-center">
+          <h2 className="text-xl font-semibold">Accès restreint</h2>
+          <p className="text-sm text-muted-foreground mt-2">Ce contrat n'est pas dans votre portefeuille.</p>
+          <Button className="mt-4" onClick={() => navigate({ to: "/contracts" })}>
+            <ArrowLeft className="h-4 w-4 mr-1.5" /> Retour aux contrats
+          </Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   const handleExportCSV = () => {
     exportCSV(`contrat-${contract.id}.csv`, [
@@ -294,7 +296,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                       body: { action: "revert_to_opportunity", id: contract.id },
                     });
                     toast.success("Contrat retourné en opportunité");
-                    await refresh();
+                    await revertContract();
                     navigate({ to: "/opportunities" });
                   } catch (e: any) { toast.error(e?.message ?? "Échec"); setReverting(null); }
                 }}
@@ -318,7 +320,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                       body: { action: "revert_to_prospect", id: contract.id },
                     });
                     toast.success("Contrat retourné en lead");
-                    await refresh();
+                    await revertContract();
                     navigate({ to: "/prospects" });
                   } catch (e: any) { toast.error(e?.message ?? "Échec"); setReverting(null); }
                 }}
@@ -487,10 +489,12 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
               <AttachmentsCard
                 entity="contract"
                 entityId={contract.id}
-                extraSources={[
-                  ...((contract as any).prospectId ? [{ entity: "prospect" as const, entityId: (contract as any).prospectId as string, label: "Prospect" }] : []),
-                  ...(contract.opportunityId ? [{ entity: "opportunity" as const, entityId: contract.opportunityId, label: "Opportunité" }] : []),
-                ]}
+                extraSources={buildAttachmentExtraSources({
+                  primaryEntity: "contract",
+                  primaryId: contract.id,
+                  prospectId: (contract as any).prospectId ?? null,
+                  opportunityId: contract.opportunityId ?? null,
+                })}
                 onAdded={(a) => logActivity(contract.id, "attachment_added", "", `${a.filename} (${(a.sizeBytes/1024).toFixed(1)} Ko)`)}
                 onRemoved={(a) => logActivity(contract.id, "attachment_removed", `${a.filename} (${(a.sizeBytes/1024).toFixed(1)} Ko)`, "")}
               />

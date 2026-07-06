@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
@@ -28,10 +29,10 @@ import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { CinDuplicatesCard } from "@/components/CinDuplicatesCard";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
 import { api, API_ENABLED } from "@/lib/api";
-import { useQueryClient } from "@/lib/queryClient";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { PipelineStage } from "@/lib/types";
+import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import type { ProspectType } from "@/lib/types";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
@@ -48,13 +49,14 @@ export const Route = createFileRoute("/prospects/$prospectId")({
 const STATUS_FALLBACK = [
   "Ok","Att cin","Att confirmation","Rappel","refuse","migration","Basculement",
   "Ing","Nrp","Pas de rep","Pas intersse","Déjà connecté","Autr dde encor","Autre",
+  "A réinjecter","Réinjecté",
 ];
 
 function ProspectDetailPage() {
   const { prospectId } = Route.useParams();
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const { prospects, users, updateProspect } = useErp();
+  const { prospectToOpportunity, afterProspectAuto } = useCrmListSync();
+  const { prospects, users, updateProspect, refresh } = useErp();
   const { user, hasPermission } = useAuth();
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
   const canConvert = hasPermission("opportunity.convert");
@@ -68,15 +70,25 @@ function ProspectDetailPage() {
   const canAssign = canEdit || hasPermission("prospect.assign");
 
   const prospect = useMemo(() => prospects.find((p) => p.id === prospectId), [prospects, prospectId]);
-  const agent = useMemo(() => users.find((u) => u.username === prospect?.assignedTo), [users, prospect]);
 
   const [comment, setComment] = useState(prospect?.comment ?? "");
   const [comment2, setComment2] = useState(prospect?.comment2 ?? "");
-
-
-  const [leadStages, setLeadStages] = useState<PipelineStage[]>([]);
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [restoredMeta, setRestoredMeta] = useState<{ prospectId: string; opportunityId?: string | null; restoredAt?: string } | null>(null);
+
+  const linkedOpportunityId = prospect?.opportunityId ?? restoredMeta?.opportunityId ?? null;
+  const attachmentExtras = useMemo(
+    () => buildAttachmentExtraSources({
+      primaryEntity: "prospect",
+      primaryId: prospectId,
+      prospectId,
+      opportunityId: linkedOpportunityId,
+    }),
+    [prospectId, linkedOpportunityId],
+  );
+  const agent = useMemo(() => users.find((u) => u.username === prospect?.assignedTo), [users, prospect]);
+
+  const catalogStatusNames = useLeadStatusNames();
   useEffect(() => { setComment(prospect?.comment ?? ""); setComment2(prospect?.comment2 ?? ""); }, [prospect?.comment, prospect?.comment2]);
   useEffect(() => {
     try {
@@ -90,14 +102,11 @@ function ProspectDetailPage() {
   }, [prospectId]);
   useEffect(() => {
     if (!API_ENABLED) return;
-    api<{ stages: PipelineStage[] }>("/stages.php")
-      .then((r) => setLeadStages([...(r.stages ?? [])].sort((a, b) => a.position - b.position)))
-      .catch(() => {});
     api<{ types: ProspectType[] }>("/prospect_types.php")
       .then((r) => setTypes((r.types ?? []).slice().sort((a, b) => a.position - b.position)))
       .catch(() => {});
   }, []);
-  const STATUS_OPTIONS = leadStages.length ? leadStages.map((s) => s.name) : STATUS_FALLBACK;
+  const STATUS_OPTIONS = catalogStatusNames.length ? catalogStatusNames : STATUS_FALLBACK;
   const currentTypeName = (types.find((t) => t.id === prospect?.typeId)?.name ?? "").trim().toLowerCase();
   const isStreetType = currentTypeName === "street";
   const showAncienLigne = currentTypeName === "résiliation" || currentTypeName === "resiliation" || currentTypeName === "migration";
@@ -138,8 +147,25 @@ function ProspectDetailPage() {
     toast.success("Commentaires enregistrés");
   };
   const changeStatus = async (status: string) => {
-    await updateProspect(prospect.id, { status });
-    toast.success("Statut mis à jour", { description: status });
+    try {
+      const r = await api<{ auto?: { executed?: boolean; contractId?: string; opportunityId?: string; error?: string; created?: boolean } }>(
+        "/prospects.php",
+        { method: "PATCH", body: { id: prospect.id, status } },
+      );
+      await refresh?.();
+      await afterProspectAuto(r.auto);
+      toast.success("Statut mis à jour", { description: status });
+      const auto = r.auto;
+      if (auto?.executed && auto.opportunityId && auto.created !== false) {
+        toast.success("Opportunité créée automatiquement", { description: auto.opportunityId });
+      } else if (auto?.executed && auto.contractId && auto.created !== false) {
+        toast.success("Contrat créé automatiquement", { description: auto.contractId });
+      } else if (auto?.error) {
+        toast.warning("Action automatique non exécutée", { description: auto.error });
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Échec mise à jour statut");
+    }
   };
   const changeAssignee = async (assignedTo: string) => {
     await updateProspect(prospect.id, { assignedTo: assignedTo === "__none__" ? null : assignedTo });
@@ -168,9 +194,9 @@ function ProspectDetailPage() {
         body: { action: "convert_to_opportunity", id: prospect.id },
       });
       toast.success("Opportunité créée", { description: r.opportunityId });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
-      qc.invalidateQueries({ queryKey: ["prospects"] });
-      navigate({ to: "/opportunities" });
+      await prospectToOpportunity();
+      try { await refresh?.(); } catch {}
+      navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: r.opportunityId } });
     } catch (e: any) {
       toast.error(e?.message ?? "Conversion impossible");
     }
@@ -191,7 +217,7 @@ function ProspectDetailPage() {
                 </Link>
               </Button>
             )}
-            {canConvert && (
+            {canConvert && prospect.outcome !== "won" && (
               <Button
                 size="sm"
                 variant="outline"
@@ -263,7 +289,7 @@ function ProspectDetailPage() {
                       <Select value={prospect.status} onValueChange={changeStatus} disabled={!canChangeStatus}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {STATUS_FALLBACK.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -315,7 +341,11 @@ function ProspectDetailPage() {
             </TabsContent>
 
             <TabsContent value="attachments" className="mt-0">
-              <AttachmentsCard entity="prospect" entityId={prospect.id} />
+              <AttachmentsCard
+                entity="prospect"
+                entityId={prospect.id}
+                extraSources={attachmentExtras}
+              />
             </TabsContent>
 
             <TabsContent value="custom" className="mt-0">

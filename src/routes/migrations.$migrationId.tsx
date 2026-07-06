@@ -23,6 +23,7 @@ import type { Migration, PipelineStage } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
@@ -34,6 +35,7 @@ import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { useErp } from "@/lib/erpStore";
 import { exportCSV, exportJSON, printPage } from "@/lib/exportUtils";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 
 export const Route = createFileRoute("/migrations/$migrationId")({
   head: ({ params }) => ({
@@ -184,6 +186,7 @@ function MigrationDetailsView({
   refresh?: () => Promise<void>;
   navigate: ReturnType<typeof useNavigate>;
 }) {
+  const { revertMigration, sync } = useCrmListSync();
   const stageByName = useMemo(() => Object.fromEntries(stages.map((s) => [s.name, s])), [stages]);
   const agent = useMemo(() => users.find((u) => u.username === m.assignedTo), [users, m.assignedTo]);
   const linkedProspect = useMemo(
@@ -198,6 +201,7 @@ function MigrationDetailsView({
       setBusy(true);
       await api("/migrations.php", { method: "PATCH", body: { id: m.id, ...body } });
       await onReload();
+      await sync(["migrations"]);
       toast.success("Enregistré");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Échec");
@@ -292,7 +296,7 @@ function MigrationDetailsView({
                       body: { action: "revert_to_opportunity", id: m.id },
                     });
                     toast.success("Migration retournée en opportunité");
-                    await refresh?.();
+                    await revertMigration();
                     navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: r.opportunityId } });
                   } catch (e: unknown) {
                     toast.error(e instanceof Error ? e.message : "Échec");
@@ -465,10 +469,12 @@ function MigrationDetailsView({
               <AttachmentsCard
                 entity="migration"
                 entityId={m.id}
-                extraSources={[
-                  ...(m.prospectId ? [{ entity: "prospect" as const, entityId: m.prospectId, label: "Prospect" }] : []),
-                  ...(m.opportunityId ? [{ entity: "opportunity" as const, entityId: m.opportunityId, label: "Opportunité" }] : []),
-                ]}
+                extraSources={buildAttachmentExtraSources({
+                  primaryEntity: "migration",
+                  primaryId: m.id,
+                  prospectId: m.prospectId ?? null,
+                  opportunityId: m.opportunityId ?? null,
+                })}
               />
             </TabsContent>
 

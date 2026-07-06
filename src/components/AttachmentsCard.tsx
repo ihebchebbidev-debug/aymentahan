@@ -156,6 +156,22 @@ export function AttachmentsCard({
         merged.push(a);
       }
       setItems(merged);
+      // Reflect categorized files (CIN Recto/Verso, etc.) from this entity or lineage extras.
+      setSlots((prev) => {
+        const next = { ...prev };
+        for (const a of merged) {
+          const key = detectCategoryFromFilename(a.filename);
+          if (!key || next[key]?.status === "uploading") continue;
+          if (!next[key] || next[key]?.status !== "done") {
+            next[key] = {
+              file: null,
+              status: "done",
+              message: a.filename.replace(/^\[[^\]]+\]\s*/, "") || a.filename,
+            };
+          }
+        }
+        return next;
+      });
     } catch (e: any) {
       const msg = String(e?.message ?? "");
       const status = Number(e?.status ?? 0);

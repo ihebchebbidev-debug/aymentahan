@@ -208,70 +208,23 @@ if ($method === 'POST') {
         require_permission($db, $me, 'opportunity.convert');
         $pid = (string)($in['prospectId'] ?? '');
         if ($pid === '') fail('prospectId requis', 422);
-        $s = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :id');
-        $s->execute([':id' => $pid]);
-        $p = $s->fetch();
-        if (!$p) fail('Prospect introuvable', 404);
-        if (!empty($p['converted'])) fail('Ce lead est déjà converti', 409);
-        if ($isAgent && ($p['assigned_to'] ?? '') !== $username && ($p['assigned_to'] ?? '') !== '') {
-            fail('Accès refusé', 403);
-        }
-        $oid = 'O-' . substr(bin2hex(random_bytes(6)), 0, 10);
-        $title       = trim((string)($in['title'] ?? ($p['last_name'] . ' ' . $p['first_name'])));
-        $amount      = (float)($in['amount'] ?? 0);
-        $probability = max(0, min(100, (int)($in['probability'] ?? 50)));
-        // Use the admin-configured initial opportunity stage instead of a
-        // hardcoded legacy name (e.g. "Qualification") that no longer exists
-        // after the stages table was edited.
-        $oppStages   = pipeline_load_stages($db, 'opportunity');
-        $initialName = 'nouveau';
-        foreach ($oppStages['list'] as $st) {
-            if (!empty($st['is_initial'])) { $initialName = $st['name']; break; }
-        }
-        if (empty($oppStages['list'])) $initialName = 'nouveau';
-        elseif (!isset($oppStages['byName'][$initialName])) {
-            $initialName = $oppStages['list'][0]['name'];
-        }
-        $stage       = (string)($in['stage'] ?? $initialName);
-        if (!isset($oppStages['byName'][$stage])) $stage = $initialName;
-        $closeDate   = $in['expectedCloseDate'] ?? null;
-        $notes       = (string)($in['notes'] ?? '');
 
-        $db->beginTransaction();
-        try {
-            $ins = $db->prepare("INSERT INTO crminternet_opportunities
-                (id, prospect_id, civility, last_name, first_name, phone, email, city, source,
-                 title, stage, amount, probability, expected_close_date, assigned_to, notes,
-                 created_by, type_id)
-                VALUES (:id,:pid,:civ,:ln,:fn,:ph,:em,:ci,:src,:title,:stg,:amt,:pr,:cd,:at,:nt,:cb,:tid)");
-            $ins->execute([
-                ':id' => $oid, ':pid' => $pid,
-                ':civ'=> $p['civility'], ':ln' => $p['last_name'], ':fn' => $p['first_name'],
-                ':ph' => $p['phone'], ':em' => $p['email'], ':ci' => $p['city'], ':src' => $p['source'],
-                ':title' => $title, ':stg' => $stage, ':amt' => $amount, ':pr' => $probability,
-                ':cd' => $closeDate ?: null,
-                ':at' => $p['assigned_to'] ?: $username,
-                ':nt' => $notes, ':cb' => $username,
-                ':tid'=> $p['type_id'] ?? null,
-            ]);
-            // Mark the prospect as converted (hidden from leads list, kept for history).
-            $upd = $db->prepare('UPDATE crminternet_prospects
-                SET converted = 1, converted_at = NOW(), opportunity_id = :oid
-                WHERE id = :pid');
-            $upd->execute([':oid' => $oid, ':pid' => $pid]);
-            // Propagate "Information contrat" (Détails Techniques) saved on the
-            // prospect over to the new opportunity so the data follows the lead.
-            try { contract_info_clone_entity($db, 'prospect', $pid, 'opportunity', $oid, $username); } catch (Throwable $e) {}
-            $db->commit();
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur: ' . $e->getMessage(), 500);
+        $result = conversion_prospect_to_opportunity($db, $pid, $me, [
+            'title'       => trim((string)($in['title'] ?? '')),
+            'amount'      => (float)($in['amount'] ?? 0),
+            'probability' => max(0, min(100, (int)($in['probability'] ?? 50))),
+            'stage'       => (string)($in['stage'] ?? ''),
+            'notes'       => (string)($in['notes'] ?? ''),
+            'source'      => 'convert_from_prospect',
+        ]);
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Conversion impossible', (int)($result['code'] ?? 500));
         }
-        log_field_changes($db, 'prospect', $pid,
-            ['converted' => 0], ['converted' => 1], $username);
-        log_field_changes($db, 'opportunity', $oid,
-            [], ['stage' => $stage, 'created_from_prospect' => $pid], $username);
-        ok(['opportunityId' => $oid, 'message' => 'Lead converti en opportunité']);
+        ok([
+            'opportunityId' => $result['opportunityId'],
+            'message'       => $result['message'] ?? 'Lead converti en opportunité',
+            'created'       => $result['created'] ?? true,
+        ]);
     }
 
     // ---- Revert opportunity -> prospect ---------------------------------
@@ -406,74 +359,22 @@ if ($method === 'POST') {
         require_permission($db, $me, 'opportunity.convert');
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
-        $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
-        $s->execute([':id' => $oid]);
-        $o = $s->fetch();
-        if (!$o) fail('Opportunité introuvable', 404);
-        if (!empty($o['converted_to_contract'])) fail('Opportunité déjà transformée en contrat', 409);
-        if (!empty($o['converted_to_migration'])) fail('Opportunité déjà transformée en migration', 409);
 
-        $partner       = (string)($in['partner'] ?? 'NEOLIANE');
-        $cabinet       = (string)($in['cabinet'] ?? 'Cabinet Paris 1');
-        $signatureDate = (string)($in['signatureDate'] ?? date('Y-m-d'));
-        $effectiveDate = (string)($in['effectiveDate'] ?? $signatureDate);
-        $premium       = (float)($in['premium'] ?? $o['amount']);
-
-        $cid = 'C-' . substr(bin2hex(random_bytes(6)), 0, 10);
-        $db->beginTransaction();
-        try {
-            require_once __DIR__ . '/conversion_helpers.php';
-            // Snapshot complet de l'opportunité (civilité, animateur, ancien
-            // ligne, identité, adresse, GPS, observations, statut, type…) +
-            // référence directe au prospect_id pour traçabilité bout-en-bout.
-            conversion_insert_contract_from_opportunity($db, $cid, $o, [
-                'partner'        => $partner,
-                'cabinet'        => $cabinet,
-                'signature_date' => $signatureDate,
-                'effective_date' => $effectiveDate,
-                'premium'        => $premium,
-                'billing_status' => 'Pré-validé',
-                // Contrat créé sans agent assigné (à attribuer manuellement).
-                'assigned_to'    => '',
-            ]);
-            $upd = $db->prepare('UPDATE crminternet_opportunities
-                SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW()
-                WHERE id = :id');
-            $upd->execute([':cid' => $cid, ':id' => $oid]);
-
-            // Clone attachments: opportunity -> contract, plus original prospect (if any) -> contract.
-            try { attachment_clone_entity($db, 'opportunity', $oid, 'contract', $cid); } catch (Throwable $e) {}
-            if (!empty($o['prospect_id'])) {
-                try { attachment_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'contract', $cid); } catch (Throwable $e) {}
-            }
-
-            // Propagate custom field values: opportunity → contract, then merge
-            // in any values from the original prospect (without overwriting).
-            try {
-                require_once __DIR__ . '/custom_field_helpers.php';
-                custom_field_clone_entity($db, 'opportunity', $oid, 'contract', $cid);
-                if (!empty($o['prospect_id'])) {
-                    custom_field_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'contract', $cid);
-                }
-            } catch (Throwable $e) {}
-
-            // Propagate "Information contrat" (Détails Techniques): try the
-            // opportunity row first, then fall back to the original prospect.
-            try {
-                $cloned = contract_info_clone_entity($db, 'opportunity', $oid, 'contract', $cid, $username);
-                if (!$cloned && !empty($o['prospect_id'])) {
-                    contract_info_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'contract', $cid, $username);
-                }
-            } catch (Throwable $e) {}
-
-            $db->commit();
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur: ' . $e->getMessage(), 500);
+        $result = conversion_opportunity_to_contract($db, $oid, $me, [
+            'partner'        => (string)($in['partner'] ?? 'NEOLIANE'),
+            'cabinet'        => (string)($in['cabinet'] ?? 'Cabinet Paris 1'),
+            'signature_date' => (string)($in['signatureDate'] ?? date('Y-m-d')),
+            'effective_date' => (string)($in['effectiveDate'] ?? ($in['signatureDate'] ?? date('Y-m-d'))),
+            'source'         => 'manual',
+        ] + (array_key_exists('premium', $in) ? ['premium' => (float)$in['premium']] : []));
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Conversion impossible', (int)($result['code'] ?? 500));
         }
-        log_field_changes($db, 'opportunity', $oid,
-            ['converted_to_contract' => 0], ['converted_to_contract' => 1, 'contract_id' => $cid], $username);
-        ok(['contractId' => $cid, 'message' => 'Opportunité convertie en contrat']);
+        ok([
+            'contractId' => $result['contractId'],
+            'message'    => $result['message'] ?? 'Opportunité convertie en contrat',
+            'created'    => $result['created'] ?? true,
+        ]);
     }
 
     // ---- Convert opportunity -> migration (terminal peer to contract) ----
@@ -507,10 +408,7 @@ if ($method === 'POST') {
                 WHERE id = :id');
             $upd->execute([':mid' => $mid, ':id' => $oid]);
 
-            try { attachment_clone_entity($db, 'opportunity', $oid, 'migration', $mid); } catch (Throwable $e) {}
-            if (!empty($o['prospect_id'])) {
-                try { attachment_clone_entity($db, 'prospect', (string)$o['prospect_id'], 'migration', $mid); } catch (Throwable $e) {}
-            }
+            try { attachment_clone_lineage($db, 'migration', $mid, !empty($o['prospect_id']) ? (string)$o['prospect_id'] : null, $oid); } catch (Throwable $e) {}
             try {
                 require_once __DIR__ . '/custom_field_helpers.php';
                 custom_field_clone_entity($db, 'opportunity', $oid, 'migration', $mid);

@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { api } from "@/lib/api";
 import type { Opportunity, PipelineStage, ProspectType } from "@/lib/types";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
@@ -48,6 +49,7 @@ function EditOpportunityPage() {
   const { opportunityId } = Route.useParams();
   const navigate = useNavigate();
   const { users } = useErp();
+  const { afterOpportunityAuto, sync } = useCrmListSync();
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,8 +185,21 @@ function EditOpportunityPage() {
         assignedTo: assignedTo === "__none__" ? null : assignedTo,
         notes,
       };
-      await api("/opportunities.php", { method: "PATCH", body });
+      const r = await api<{ auto?: { executed?: boolean; contractId?: string; migrationId?: string; error?: string; created?: boolean } }>(
+        "/opportunities.php",
+        { method: "PATCH", body },
+      );
+      await afterOpportunityAuto(r.auto);
+      await sync(["opportunities"]);
       toast.success("Opportunité mise à jour");
+      const auto = r.auto;
+      if (auto?.executed && auto.contractId && auto.created !== false) {
+        toast.success("Contrat créé automatiquement", { description: auto.contractId });
+      } else if (auto?.executed && auto.migrationId && auto.created !== false) {
+        toast.success("Migration créée automatiquement", { description: auto.migrationId });
+      } else if (auto?.error) {
+        toast.warning("Action automatique non exécutée", { description: auto.error });
+      }
       navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: opp.id } });
     } catch (e: any) {
       toast.error(e?.message ?? "Échec de la mise à jour");

@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
@@ -23,7 +24,7 @@ import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
 import { LeadHistoryCard } from "@/components/LeadHistoryCard";
 import { api, API_ENABLED } from "@/lib/api";
-import { useQueryClient } from "@/lib/queryClient";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Opportunity, PipelineStage } from "@/lib/types";
@@ -44,7 +45,7 @@ function OpportunityDetailPage() {
   const { opportunityId } = Route.useParams();
   const navigate = useNavigate();
   const { users, refresh } = useErp();
-  const qc = useQueryClient();
+  const { toContract, toMigration, revertOpportunity, afterOpportunityAuto } = useCrmListSync();
   const { user, hasPermission } = useAuth();
   const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("opportunity.edit");
@@ -104,9 +105,19 @@ function OpportunityDetailPage() {
   const patch = async (body: Record<string, any>) => {
     try {
       setBusy(true);
-      await api("/opportunities.php", { method: "PATCH", body: { id: opp.id, ...body } });
+      const r = await api<{ auto?: { executed?: boolean; contractId?: string; opportunityId?: string; error?: string; created?: boolean } }>(
+        "/opportunities.php",
+        { method: "PATCH", body: { id: opp.id, ...body } },
+      );
       await reload();
+      await afterOpportunityAuto(r.auto);
       toast.success("Mise à jour enregistrée");
+      const auto = r.auto;
+      if (auto?.executed && auto.contractId && auto.created !== false) {
+        toast.success("Contrat créé automatiquement", { description: auto.contractId });
+      } else if (auto?.error) {
+        toast.warning("Action automatique non exécutée", { description: auto.error });
+      }
     } catch (e: any) { toast.error(e?.message ?? "Échec"); }
     finally { setBusy(false); }
   };
@@ -121,9 +132,8 @@ function OpportunityDetailPage() {
       setBusy(true);
       const r = await api<{ contractId: string }>("/opportunities.php", { method: "POST", body: { action: "convert_to_contract", id: opp.id } });
       toast.success("Contrat créé", { description: r.contractId });
+      await toContract();
       try { await refresh?.(); } catch {}
-      qc.invalidateQueries({ queryKey: ["contracts"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
       navigate({ to: "/contracts/$contractId", params: { contractId: r.contractId } });
     } catch (e: any) { toast.error(e?.message ?? "Échec"); }
     finally { setBusy(false); }
@@ -139,8 +149,8 @@ function OpportunityDetailPage() {
       setBusy(true);
       const r = await api<{ migrationId: string }>("/opportunities.php", { method: "POST", body: { action: "convert_to_migration", id: opp.id } });
       toast.success("Migration créée", { description: r.migrationId });
-      qc.invalidateQueries({ queryKey: ["migrations"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
+      await toMigration();
+      try { await refresh?.(); } catch {}
       navigate({ to: "/migrations/$migrationId", params: { migrationId: r.migrationId } });
     } catch (e: any) { toast.error(e?.message ?? "Échec"); }
     finally { setBusy(false); }
@@ -151,8 +161,8 @@ function OpportunityDetailPage() {
     try {
       setBusy(true);
       const r = await api<{ prospectId?: string | null }>("/opportunities.php", { method: "POST", body: { action: "revert_to_prospect", id: opp.id } });
-      // Refresh ERP store so the un-converted prospect shows back up in /prospects.
       try { await refresh?.(); } catch {}
+      await revertOpportunity();
       const restoredAt = new Date().toISOString();
       try {
         sessionStorage.setItem("crm:reverted-prospect", JSON.stringify({ prospectId: r.prospectId, opportunityId: opp.id, restoredAt }));
@@ -318,7 +328,12 @@ function OpportunityDetailPage() {
               <AttachmentsCard
                 entity="opportunity"
                 entityId={opp.id}
-                extraSources={opp.prospectId ? [{ entity: "prospect", entityId: opp.prospectId, label: "Prospect" }] : []}
+                extraSources={buildAttachmentExtraSources({
+                  primaryEntity: "opportunity",
+                  primaryId: opp.id,
+                  prospectId: opp.prospectId ?? null,
+                  opportunityId: opp.id,
+                })}
               />
             </TabsContent>
 

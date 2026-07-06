@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowLeft, History, Printer, ClipboardList, Target, FileText, Eye, ChevronUp, Phone, Mail, MapPin, Calendar, User, Building2, CreditCard, Hash } from "lucide-react";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { api, API_ENABLED } from "@/lib/api";
-import { useQueryClient } from "@/lib/queryClient";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { useEffect, useMemo, useState } from "react";
 import type { Opportunity, Prospect } from "@/lib/types";
 import { printPage } from "@/lib/exportUtils";
@@ -34,11 +35,10 @@ function JourneyPage() {
   const { prospectId } = Route.useParams();
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
-  const { prospects, contracts } = useErp();
-  const qc = useQueryClient();
+  const { prospects, contracts, refresh } = useErp();
+  const { prospectToOpportunity, toContract, toMigration } = useCrmListSync();
   const canView =
     !!user && (hasPermission("lead.history"));
-  if (user && !canView) return <Navigate to="/" />;
 
   const storeProspect = useMemo(() => prospects.find((p) => p.id === prospectId), [prospects, prospectId]);
   const [remoteProspect, setRemoteProspect] = useState<Prospect | null>(null);
@@ -64,8 +64,13 @@ function JourneyPage() {
   }, [prospect?.opportunityId]);
 
   const contract = useMemo(
-    () => contracts.find((c) => c.opportunityId === (opp?.id ?? prospect?.opportunityId)) ?? null,
-    [contracts, opp?.id, prospect?.opportunityId],
+    () =>
+      contracts.find(
+        (c) =>
+          c.opportunityId === (opp?.id ?? prospect?.opportunityId) ||
+          (c as { prospectId?: string }).prospectId === prospectId,
+      ) ?? null,
+    [contracts, opp?.id, prospect?.opportunityId, prospectId],
   );
 
   const convertToOpportunity = async () => {
@@ -78,8 +83,8 @@ function JourneyPage() {
         method: "POST", body: { action: "convert_to_opportunity", id: prospect.id },
       });
       toast.success("Opportunité créée", { description: r.opportunityId });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
-      qc.invalidateQueries({ queryKey: ["prospects"] });
+      await prospectToOpportunity();
+      await refresh?.();
       navigate({ to: "/opportunities" });
     } catch (e: any) { toast.error(e?.message ?? "Conversion impossible"); }
     finally { setConverting(false); }
@@ -98,8 +103,8 @@ function JourneyPage() {
         method: "POST", body: { action: "convert_to_contract", id: opp.id },
       });
       toast.success("Contrat créé", { description: r.contractId });
-      qc.invalidateQueries({ queryKey: ["contracts"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
+      await toContract();
+      await refresh?.();
       navigate({ to: "/contracts/$contractId", params: { contractId: r.contractId } });
     } catch (e: any) { toast.error(e?.message ?? "Conversion impossible"); }
     finally { setConverting(false); }
@@ -118,14 +123,16 @@ function JourneyPage() {
         method: "POST", body: { action: "convert_to_migration", id: opp.id },
       });
       toast.success("Migration créée", { description: r.migrationId });
-      qc.invalidateQueries({ queryKey: ["migrations"] });
-      qc.invalidateQueries({ queryKey: ["opportunities"] });
+      await toMigration();
+      await refresh?.();
       navigate({ to: "/migrations/$migrationId", params: { migrationId: r.migrationId } });
     } catch (e: any) { toast.error(e?.message ?? "Conversion impossible"); }
     finally { setConverting(false); }
   };
 
   const oppTerminal = !!(opp?.convertedToContract || opp?.convertedToMigration);
+
+  if (user && !canView) return <Navigate to="/" />;
 
   return (
     <AppLayout>
@@ -304,7 +311,16 @@ function JourneyPage() {
               <CardDescription className="text-xs">Documents attachés au prospect</CardDescription>
             </CardHeader>
             <CardContent>
-              <AttachmentsCard entity="prospect" entityId={prospect.id} />
+              <AttachmentsCard
+                entity="prospect"
+                entityId={prospect.id}
+                extraSources={buildAttachmentExtraSources({
+                  primaryEntity: "prospect",
+                  primaryId: prospect.id,
+                  prospectId: prospect.id,
+                  opportunityId: opp?.id ?? prospect.opportunityId ?? null,
+                })}
+              />
             </CardContent>
           </Card>
           {contract && (
@@ -316,7 +332,16 @@ function JourneyPage() {
                 <CardDescription className="text-xs">Documents attachés au contrat</CardDescription>
               </CardHeader>
               <CardContent>
-                <AttachmentsCard entity="contract" entityId={contract.id} />
+                <AttachmentsCard
+                  entity="contract"
+                  entityId={contract.id}
+                  extraSources={buildAttachmentExtraSources({
+                    primaryEntity: "contract",
+                    primaryId: contract.id,
+                    prospectId: prospect.id,
+                    opportunityId: opp?.id ?? prospect.opportunityId ?? null,
+                  })}
+                />
               </CardContent>
             </Card>
           )}

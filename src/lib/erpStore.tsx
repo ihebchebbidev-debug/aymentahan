@@ -3,6 +3,8 @@ import type { Prospect, AppUser, Contract, CalEvent } from "./types";
 
 import { formatAmount } from "./currency";
 import { api, API_ENABLED } from "./api";
+import { CRM_SYNC, syncAfterProspectAuto } from "./crmListRefresh";
+import { getAppQueryClient } from "./appQueryClient";
 import { useAuth } from "./auth";
 import { fetchContracts } from "./contractsApi";
 import { fetchAllPaginated } from "./paginatedFetch";
@@ -247,7 +249,10 @@ export function ErpProvider({ children }: { children: ReactNode }) {
   const refreshContracts = useCallback(async () => {
     if (!API_ENABLED || !isLogged) return;
     try {
-      setContracts(await fetchContracts());
+      const data = await fetchContracts();
+      setContracts(data);
+      const qc = getAppQueryClient();
+      if (qc) qc.setQueryData(["contracts"], data);
     } catch (e) { console.warn("refreshContracts", e); }
   }, [isLogged]);
 
@@ -298,7 +303,11 @@ export function ErpProvider({ children }: { children: ReactNode }) {
         .then((p) => setProspects(p))
         .catch(handleErr).finally(markReady),
       fetchContracts()
-        .then((contracts) => setContracts(contracts))
+        .then((contracts) => {
+          setContracts(contracts);
+          const qc = getAppQueryClient();
+          if (qc) qc.setQueryData(["contracts"], contracts);
+        })
         .catch(handleErr).finally(markReady),
       api<{ users: AppUser[] }>("/users.php")
         .then((u) => setServerUsers(u.users ?? []))
@@ -358,10 +367,11 @@ export function ErpProvider({ children }: { children: ReactNode }) {
       await api("/prospects.php", { method: "POST", body: { action: "mark_won", id: prospectId, premium, partner } });
       // mark_won creates a contract → refresh both, in parallel.
       await Promise.all([refreshProspects(), refreshContracts()]);
+      await CRM_SYNC.markWon({ refresh, qc: getAppQueryClient() });
       return;
     }
     setProspects((prev) => prev.map((p) =>
-      p.id === prospectId ? { ...p, outcome: "won", status: "Vente" } : p,
+      p.id === prospectId ? { ...p, outcome: "won", status: "Vendu" } : p,
     ));
     setContracts((prev) => {
       const p = prospects.find((x) => x.id === prospectId);
@@ -461,8 +471,12 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     if (API_ENABLED) {
       setProspects((prev) => prev.map((p) => p.id === id ? { ...p, ...patch } : p));
       try {
-        await api("/prospects.php", { method: "PATCH", body: { id, ...patch } });
+        const r = await api<{ auto?: { executed?: boolean; opportunityId?: string; contractId?: string; created?: boolean } }>(
+          "/prospects.php",
+          { method: "PATCH", body: { id, ...patch } },
+        );
         await refreshProspects();
+        await syncAfterProspectAuto(r.auto, { refresh, qc: getAppQueryClient() });
       } catch (e) { await refreshProspects(); throw e; }
       return;
     }
@@ -574,6 +588,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
       const r = await api<ImportResult>("/prospects.php", { method: "POST", body: { rows } });
       setProspects((prev) => mergeImportedProspectRows(prev, rows, r.ids ?? []));
       await refreshProspects();
+      await CRM_SYNC.newProspect({ refresh, qc: getAppQueryClient() });
       return {
         added: r.added,
         updated: r.updated,
@@ -600,6 +615,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     if (API_ENABLED) {
       const r = await api<ImportResult>("/contracts.php", { method: "POST", body: { rows } });
       await refresh();
+      await CRM_SYNC.toContract({ refresh, qc: getAppQueryClient() });
       return { added: r.added, updated: r.updated, skipped: r.skipped };
     }
     const today = new Date().toISOString().slice(0, 10);

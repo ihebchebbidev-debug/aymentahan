@@ -165,8 +165,8 @@ type ActivityRow = {
 };
 
 type LeadActionRow = {
-  id: string; type: string; note?: string | null;
-  user?: string | null; createdAt: string;
+  id: string; type: string; comment?: string | null;
+  agentUsername?: string | null; createdAt: string;
 };
 
 async function fetchAudit(entity: JourneyEntity, id: string): Promise<JourneyEvent[]> {
@@ -225,17 +225,21 @@ async function fetchLeadActions(prospectId: string): Promise<JourneyEvent[]> {
   if (!API_ENABLED) return [];
   try {
     const r = await api<{ actions: LeadActionRow[] }>(
-      `/lead_actions.php?prospect_id=${encodeURIComponent(prospectId)}&limit=${DEFAULT_PER_PAGE}`,
+      `/lead_actions.php?prospectId=${encodeURIComponent(prospectId)}&limit=${DEFAULT_PER_PAGE}`,
     );
+    const TYPE_LABELS: Record<string, string> = {
+      appel: "Appel", visite: "Visite", relance: "Relance", note: "Note",
+      terrain: "Terrain", reseaux: "Réseaux", technicien: "Technicien",
+    };
     return (r.actions ?? []).map((a) => ({
       id: `la-${a.id}`,
       timestamp: a.createdAt,
       kind: "action",
       entity: "prospect",
       entityId: prospectId,
-      user: a.user ?? null, userRole: null,
-      title: a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : "Action",
-      description: a.note ?? null,
+      user: a.agentUsername ?? null, userRole: null,
+      title: TYPE_LABELS[a.type] ?? (a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : "Action"),
+      description: a.comment ?? null,
       meta: { type: a.type },
     } satisfies JourneyEvent));
   } catch { return []; }

@@ -26,11 +26,14 @@ import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useProspectTypes } from "@/hooks/use-prospect-types";
+import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import type { Prospect, ProspectType } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
 const PROSPECT_IMPORT_FIELDS: ImportField[] = [
@@ -90,10 +93,13 @@ const statusColor: Record<string, string> = {
   "Pas de rep": "bg-muted text-muted-foreground border-border",
   "Autr dde encor": "bg-info/15 text-info border-info/20",
   "Autre": "bg-muted text-muted-foreground border-border",
+  "A réinjecter": "bg-warning/15 text-warning-foreground border-warning/20",
+  "Réinjecté": "bg-success/15 text-success border-success/20",
 };
 
 function ProspectsPage() {
   const { prospects: allProspects, users, importProspects, updateProspect, deleteProspect, refresh } = useErp();
+  const { afterBulkProspectAuto } = useCrmListSync();
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { typeId: filterTypeId } = Route.useSearch();
@@ -197,13 +203,15 @@ function ProspectsPage() {
       return next;
     });
 
+  const leadStatusNames = useLeadStatusNames();
+
   // -------- Dynamic options --------
   const statusOptions = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(leadStatusNames);
     for (const p of prospects) if (p.status) set.add(p.status);
     if (statut !== ALL && statut) set.add(statut);
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
-  }, [prospects, statut]);
+  }, [prospects, statut, leadStatusNames]);
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
     for (const p of prospects) if (p.source) set.add(p.source);
@@ -332,17 +340,6 @@ function ProspectsPage() {
     () => (selected.size > 0 ? filtered.filter((p) => selected.has(p.id)) : filtered),
     [filtered, selected],
   );
-  const buildVisibleCsvRows = () => {
-    const cols = [...baseColumns, ...customColumns];
-    return csvScope.map((p) => {
-      const row: Record<string, unknown> = {};
-      for (const c of cols) {
-        const header = typeof c.header === "string" ? c.header : String(c.key);
-        row[header] = c.accessor ? (c.accessor(p) as unknown) ?? "" : "";
-      }
-      return row;
-    });
-  };
 
   // Stats (mirrors contracts: 3 KPI tiles).
   const stats = useMemo(() => ({
@@ -418,6 +415,18 @@ function ProspectsPage() {
       cell: (p) => <span className="text-muted-foreground text-sm">{formatCustomValue(d, customValuesById[p.id]?.[d.key])}</span>,
       hideBelow: "lg",
     }));
+
+  const buildVisibleCsvRows = () => {
+    const cols = [...baseColumns, ...customColumns];
+    return csvScope.map((p) => {
+      const row: Record<string, unknown> = {};
+      for (const c of cols) {
+        const header = typeof c.header === "string" ? c.header : String(c.key);
+        row[header] = c.accessor ? (c.accessor(p) as unknown) ?? "" : "";
+      }
+      return row;
+    });
+  };
 
   const hasActiveFilter =
     search || statut !== ALL || source !== ALL || assigne !== ALL ||
@@ -716,8 +725,9 @@ function ProspectsPage() {
                   if (!API_ENABLED) return;
                   setBulkBusy(true);
                   try {
-                    const r = await api<{ updated: number }>("/prospects.php?action=bulk", { method: "POST", body: { op: "status", ids: Array.from(selected), status: val } });
+                    const r = await api<{ updated: number; auto?: Record<string, { executed?: boolean; opportunityId?: string; contractId?: string; created?: boolean }> }>("/prospects.php", { method: "POST", body: { action: "bulk", op: "status", ids: Array.from(selected), status: val } });
                     toast.success(`${r.updated} statut(s) mis à jour`); setSelected(new Set()); await refresh();
+                    await afterBulkProspectAuto(r.auto);
                   } catch (e: any) { toast.error(e?.message); }
                   finally { setBulkBusy(false); }
                 }}
@@ -736,7 +746,7 @@ function ProspectsPage() {
                   setBulkBusy(true);
                   try {
                     const count = selected.size;
-                    const r = await api<{ updated: number }>("/prospects.php?action=bulk", { method: "POST", body: { op: "assign", ids: Array.from(selected), assignedTo: val } });
+                    const r = await api<{ updated: number }>("/prospects.php", { method: "POST", body: { action: "bulk", op: "assign", ids: Array.from(selected), assignedTo: val } });
                     toast.success(`${r.updated}/${count} prospect(s) réassigné(s) à ${val}`);
                     setSelected(new Set()); await refresh();
                   } catch (e: any) { toast.error(e?.message ?? "Échec de la réassignation"); }
@@ -754,7 +764,7 @@ function ProspectsPage() {
                   const tid = val === "__none__" ? null : val;
                   setBulkBusy(true);
                   try {
-                    const r = await api<{ updated: number }>("/prospects.php?action=bulk", { method: "POST", body: { op: "type", ids: Array.from(selected), typeId: tid } });
+                    const r = await api<{ updated: number }>("/prospects.php", { method: "POST", body: { action: "bulk", op: "type", ids: Array.from(selected), typeId: tid } });
                     toast.success(`${r.updated} type(s) mis à jour`); setSelected(new Set()); await refresh();
                   } catch (e: any) { toast.error(e?.message); }
                   finally { setBulkBusy(false); }
@@ -799,7 +809,7 @@ function ProspectsPage() {
                         const slice = ids.slice(i, i + CHUNK);
                         let chunkOk = 0;
                         try {
-                          const r = await api<{ deleted: number }>("/prospects.php?action=bulk", { method: "POST", body: { op: "delete", ids: slice } });
+                          const r = await api<{ deleted: number }>("/prospects.php", { method: "POST", body: { action: "bulk", op: "delete", ids: slice } });
                           chunkOk = r?.deleted ?? 0;
                         } catch { /* fall through to per-row for this chunk */ }
                         if (chunkOk < slice.length) {
@@ -919,7 +929,16 @@ function ProspectsPage() {
             </DialogTitle>
           </DialogHeader>
           {attachProspect && (
-            <AttachmentsCard entity="prospect" entityId={attachProspect.id} />
+            <AttachmentsCard
+              entity="prospect"
+              entityId={attachProspect.id}
+              extraSources={buildAttachmentExtraSources({
+                primaryEntity: "prospect",
+                primaryId: attachProspect.id,
+                prospectId: attachProspect.id,
+                opportunityId: attachProspect.opportunityId ?? null,
+              })}
+            />
           )}
         </DialogContent>
       </Dialog>

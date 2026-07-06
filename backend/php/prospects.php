@@ -222,7 +222,7 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     // Create OR claim depending on action
     $in = json_input();
-    $action = $in['action'] ?? 'create';
+    $action = $in['action'] ?? ($_GET['action'] ?? 'create');
 
     if ($action === 'claim') {
         $pid = $in['id'] ?? '';
@@ -240,132 +240,46 @@ if ($method === 'POST') {
     }
 
     if ($action === 'mark_won') {
+        require_permission($db, $me, 'opportunity.convert');
         $pid     = $in['id'] ?? '';
         $premium = (float)($in['premium'] ?? 950);
         $partner = trim($in['partner'] ?? 'NEOLIANE');
         if (!$pid) fail('id requis', 422);
 
-        if ($isAgent) {
-            $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
-            $own->execute([':id' => $pid]);
-            $owner = $own->fetchColumn();
-            if ($owner !== $me['username']) fail('Accès refusé', 403);
+        require_once __DIR__ . '/conversion_helpers.php';
+        $result = conversion_mark_won_to_contract($db, (string) $pid, $me, [
+            'premium' => $premium,
+            'partner' => $partner,
+        ]);
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Erreur mark_won', (int) ($result['code'] ?? 500));
         }
-
-        $db->beginTransaction();
-        try {
-            $s = $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu' WHERE id = :id");
-            $s->execute([':id' => $pid]);
-            log_field_changes($db, 'prospect', $pid, ['outcome' => 'pending', 'status' => ''], ['outcome' => 'won', 'status' => 'Vendu'], $me['username']);
-
-            $row = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :id');
-            $row->execute([':id' => $pid]);
-            $p = $row->fetch();
-            if (!$p) { $db->rollBack(); fail('Prospect introuvable', 404); }
-
-            $cid = 'C-' . substr(bin2hex(random_bytes(6)), 0, 10);
-            require_once __DIR__ . '/conversion_helpers.php';
-            // mark_won = lead → contrat (raccourci). Snapshot complet.
-            conversion_insert_contract_from_prospect($db, $cid, $p, [
-                'partner'        => $partner,
-                'cabinet'        => 'Cabinet Paris 1',
-                'premium'        => $premium,
-                'billing_status' => 'Pré-validé',
-                'assigned_to'    => $p['assigned_to'] ?? '—',
-            ]);
-            try { attachment_clone_entity($db, 'prospect', $pid, 'contract', $cid); } catch (Throwable $e) {}
-            // Propagate custom fields + "Information contrat" prospect → contract (raccourci mark_won).
-            try {
-                require_once __DIR__ . '/custom_field_helpers.php';
-                custom_field_clone_entity($db, 'prospect', $pid, 'contract', $cid);
-            } catch (Throwable $e) {}
-            try {
-                require_once __DIR__ . '/contract_info_helpers.php';
-                contract_info_clone_entity($db, 'prospect', $pid, 'contract', $cid, $me['username'] ?? '');
-            } catch (Throwable $e) {}
-            $db->commit();
-            $owner = $p['assigned_to'] ?? '';
-            if ($owner) notify_user($db, $owner, 'Vente confirmée', "Contrat $cid créé pour {$p['first_name']} {$p['last_name']}", "/contracts/$cid");
-            audit_log($db, $me, 'prospect.mark_won', 'prospect', $pid, ['contractId' => $cid, 'premium' => $premium]);
-            ok(['message' => 'Contrat créé', 'contractId' => $cid]);
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur: ' . $e->getMessage(), 500);
-        }
+        ok([
+            'message'    => $result['message'] ?? 'Contrat créé',
+            'contractId' => $result['contractId'],
+            'created'    => $result['created'] ?? true,
+        ]);
     }
 
     if ($action === 'convert_to_opportunity') {
-        // Manual conversion Prospect → Opportunity (mirrors the auto-action
-        // wired on lead-stage transitions, but callable on demand).
+        require_permission($db, $me, 'opportunity.convert');
         $pid = $in['id'] ?? '';
         if (!$pid) fail('id requis', 422);
 
-        if ($isAgent) {
-            $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
-            $own->execute([':id' => $pid]);
-            $owner = $own->fetchColumn();
-            if ($owner !== $me['username']) fail('Accès refusé', 403);
+        require_once __DIR__ . '/conversion_helpers.php';
+        $result = conversion_prospect_to_opportunity($db, (string) $pid, $me, [
+            'amount'      => (float) ($in['amount'] ?? 0),
+            'probability' => (int) ($in['probability'] ?? 50),
+            'source'      => 'manual',
+        ]);
+        if (empty($result['ok'])) {
+            fail($result['error'] ?? 'Conversion impossible', (int) ($result['code'] ?? 500));
         }
-
-        $p = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :id');
-        $p->execute([':id' => $pid]);
-        $row = $p->fetch();
-        if (!$row) fail('Prospect introuvable', 404);
-        if (!empty($row['converted']) && !empty($row['opportunity_id'])) {
-            ok(['message' => 'Déjà converti', 'opportunityId' => $row['opportunity_id']]);
-        }
-
-        $oppStages = pipeline_load_stages($db, 'opportunity');
-        $initial = null;
-        foreach ($oppStages['list'] as $s) { if (!empty($s['is_initial'])) { $initial = $s; break; } }
-        $initialName = $initial['name'] ?? ($oppStages['list'][0]['name'] ?? 'Qualification');
-
-        $oid = 'O-' . substr(bin2hex(random_bytes(6)), 0, 10);
-        $db->beginTransaction();
-        try {
-            require_once __DIR__ . '/conversion_helpers.php';
-            // Snapshot complet du prospect : civilité, contacts, animateur,
-            // ancien_ligne, identité, adresse, GPS, observations, statut, type…
-            // sont copiés tels quels dans l'opportunité (exigence client :
-            // 100% des infos prospect doivent rester visibles côté opportunité).
-            conversion_insert_opportunity_from_prospect($db, $oid, $row, [
-                'stage'        => $initialName,
-                'amount'       => (float)($in['amount'] ?? 0),
-                'probability'  => (int)($in['probability'] ?? 50),
-                'assigned_to'  => $row['assigned_to'] ?: $me['username'],
-                'created_by'   => $me['username'],
-            ]);
-            $db->prepare('UPDATE crminternet_prospects SET converted = 1, converted_at = NOW(), opportunity_id = :oid WHERE id = :id')
-               ->execute([':oid'=>$oid, ':id'=>$pid]);
-
-            // Propagate custom field values prospect → opportunity so they
-            // follow the customer through the pipeline.
-            try {
-                require_once __DIR__ . '/custom_field_helpers.php';
-                custom_field_clone_entity($db, 'prospect', $pid, 'opportunity', $oid);
-            } catch (Throwable $e) { /* best effort */ }
-
-            // Clone attachments (CIN Recto/Verso, Contrat TT, etc.) so they follow the lead.
-            try { attachment_clone_entity($db, 'prospect', $pid, 'opportunity', $oid); } catch (Throwable $e) { /* best effort */ }
-
-            // Propagate "Information contrat / Détails Techniques" prospect → opportunity.
-            try {
-                require_once __DIR__ . '/contract_info_helpers.php';
-                contract_info_clone_entity($db, 'prospect', $pid, 'opportunity', $oid, $me['username'] ?? '');
-            } catch (Throwable $e) { /* best effort */ }
-
-            $db->commit();
-        } catch (Throwable $e) {
-            $db->rollBack();
-            fail('Erreur conversion: '.$e->getMessage(), 500);
-        }
-
-        log_field_changes($db, 'prospect', $pid, ['converted'=>0, 'opportunity_id'=>''], ['converted'=>1, 'opportunity_id'=>$oid, 'manual'=>'lead→opportunity'], $me['username']);
-        log_field_changes($db, 'opportunity', $oid, ['exists'=>0], ['exists'=>1, 'created_from'=>'lead:'.$pid, 'stage'=>$initialName], $me['username']);
-        audit_log($db, $me, 'prospect.convert_to_opportunity', 'prospect', $pid, ['opportunityId'=>$oid]);
-        $owner = $row['assigned_to'] ?? '';
-        if ($owner) notify_user($db, $owner, 'Lead converti', "Opportunité $oid créée pour {$row['first_name']} {$row['last_name']}", "/opportunities");
-        ok(['message'=>'Opportunité créée', 'opportunityId'=>$oid]);
+        ok([
+            'message'       => $result['message'] ?? 'Opportunité créée',
+            'opportunityId' => $result['opportunityId'],
+            'created'       => $result['created'] ?? true,
+        ]);
     }
 
     if ($action === 'mark_lost') {
@@ -484,9 +398,20 @@ if ($method === 'POST') {
             foreach ($ids as $pid) {
                 log_field_changes($db, 'prospect', (string)$pid, ['exists' => 1], ['exists' => 0, 'reason' => 'bulk_delete'], $me['username']);
             }
-            $sql = "DELETE FROM crminternet_prospects WHERE id IN ($place)";
-            $st = $db->prepare($sql);
-            $st->execute($ids);
+            $db->beginTransaction();
+            try {
+                foreach ($ids as $pid) {
+                    try { $db->prepare('UPDATE crminternet_opportunities SET prospect_id = NULL WHERE prospect_id = :pid')->execute([':pid' => $pid]); } catch (Throwable $e) {}
+                    try { $db->prepare('UPDATE crminternet_contracts SET prospect_id = NULL WHERE prospect_id = :pid')->execute([':pid' => $pid]); } catch (Throwable $e) {}
+                }
+                $sql = "DELETE FROM crminternet_prospects WHERE id IN ($place)";
+                $st = $db->prepare($sql);
+                $st->execute($ids);
+                $db->commit();
+            } catch (Throwable $e) {
+                $db->rollBack();
+                fail('Erreur suppression: ' . $e->getMessage(), 500);
+            }
             audit_log($db, $me, 'prospect.bulk_delete', 'prospect', implode(',', array_slice($ids,0,10)), ['count' => $st->rowCount()]);
             ok(['deleted' => $st->rowCount()]);
         }

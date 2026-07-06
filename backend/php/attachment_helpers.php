@@ -56,6 +56,83 @@ if (!function_exists('attachment_clone_entity')) {
     }
 }
 
+/**
+ * Clone attachments from all upstream entities (prospect, then opportunity)
+ * onto a target record (contract, migration, etc.).
+ */
+if (!function_exists('attachment_clone_lineage')) {
+    function attachment_clone_lineage(
+        PDO $db,
+        string $toEntity,
+        string $toId,
+        ?string $prospectId,
+        ?string $opportunityId = null
+    ): int {
+        $copied = 0;
+        if ($prospectId !== null && $prospectId !== '') {
+            $copied += attachment_clone_entity($db, 'prospect', $prospectId, $toEntity, $toId);
+        }
+        if ($opportunityId !== null && $opportunityId !== '' && $opportunityId !== $toId) {
+            $copied += attachment_clone_entity($db, 'opportunity', $opportunityId, $toEntity, $toId);
+        }
+        return $copied;
+    }
+}
+
+/**
+ * Sanitize uploaded filename while preserving "[CIN Recto] …" category prefixes.
+ */
+if (!function_exists('attachment_sanitize_filename')) {
+    function attachment_sanitize_filename(string $name): string
+    {
+        $name = basename(str_replace("\0", '', $name));
+        if ($name === '') {
+            return 'file';
+        }
+        if (preg_match('/^(\[[^\]]+\]\s*)(.+)$/', $name, $m)) {
+            $prefix = preg_replace('/[^\[\]A-Za-z0-9 _-]/', '_', $m[1]);
+            $rest = preg_replace('/[^A-Za-z0-9._-]/', '_', $m[2]);
+            $out = $prefix . ($rest !== '' ? $rest : 'file');
+            return $out !== '' ? $out : 'file';
+        }
+        $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', $name);
+        return $safe !== '' ? $safe : 'file';
+    }
+}
+
+/**
+ * Fix filenames mangled by the old sanitizer (_CIN_Recto__… → [CIN Recto] …).
+ */
+if (!function_exists('attachment_repair_legacy_category_filenames')) {
+    function attachment_repair_legacy_category_filenames(PDO $db): int
+    {
+        $map = [
+            '_CIN_Recto__' => '[CIN Recto] ',
+            '_CIN_Verso__' => '[CIN Verso] ',
+            '_Contrat_TT__' => '[Contrat TT] ',
+            '_Contrat_TOPNET__' => '[Contrat TOPNET] ',
+            '_CGV__' => '[CGV] ',
+        ];
+        $fixed = 0;
+        $upd = $db->prepare('UPDATE crminternet_attachments SET filename = :fn WHERE id = :id');
+        foreach ($db->query('SELECT id, filename FROM crminternet_attachments') as $row) {
+            $fn = (string) ($row['filename'] ?? '');
+            foreach ($map as $bad => $good) {
+                if (strncmp($fn, $bad, strlen($bad)) !== 0) {
+                    continue;
+                }
+                $upd->execute([
+                    ':fn' => $good . substr($fn, strlen($bad)),
+                    ':id' => (string) $row['id'],
+                ]);
+                $fixed++;
+                break;
+            }
+        }
+        return $fixed;
+    }
+}
+
 if (!function_exists('attachment_storage_path_in_use')) {
     /**
      * Renvoie true si une autre row (id != $excludeId) référence le même

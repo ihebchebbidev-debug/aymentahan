@@ -92,7 +92,19 @@ function SlotCard({
           if (ref.current) ref.current.value = "";
         }}
       />
-      {!file ? (
+      {!file && status === "done" ? (
+        <div className="flex items-center gap-1.5 text-[11px] rounded-md border border-success/30 bg-success/5 px-2 py-1.5 text-success">
+          <Check className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate flex-1" title={state?.message ?? label}>
+            {state?.message ?? "Déjà téléversé"}
+          </span>
+          {onClear && (
+            <Button type="button" variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground" onClick={onClear}>
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      ) : !file ? (
         <Button
           type="button"
           variant="outline"
@@ -152,10 +164,24 @@ export function categoryLabelOf(key: AttachmentCategoryKey): string {
 /**
  * Detect a category from a stored filename (matches "[Label] …" prefix).
  */
+const LEGACY_CATEGORY_PREFIXES: Array<{ prefix: string; key: AttachmentCategoryKey }> = [
+  { prefix: "_cin_recto__", key: "cin_recto" },
+  { prefix: "_cin_verso__", key: "cin_verso" },
+  { prefix: "_contrat_tt__", key: "contrat_tt" },
+  { prefix: "_contrat_topnet__", key: "contrat_topnet" },
+  { prefix: "_cgv__", key: "cgv" },
+];
+
 export function detectCategoryFromFilename(filename: string): AttachmentCategoryKey | null {
   const m = filename.match(/^\[([^\]]+)\]\s*/);
-  if (!m) return null;
-  const label = m[1].trim().toLowerCase();
-  const found = ATTACHMENT_CATEGORIES.find((c) => c.label.toLowerCase() === label);
-  return found?.key ?? null;
+  if (m) {
+    const label = m[1].trim().toLowerCase();
+    const found = ATTACHMENT_CATEGORIES.find((c) => c.label.toLowerCase() === label);
+    return found?.key ?? null;
+  }
+  const lower = filename.toLowerCase();
+  for (const legacy of LEGACY_CATEGORY_PREFIXES) {
+    if (lower.startsWith(legacy.prefix)) return legacy.key;
+  }
+  return null;
 }

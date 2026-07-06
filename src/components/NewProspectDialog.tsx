@@ -14,7 +14,7 @@ import {
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { api, apiUpload, API_ENABLED } from "@/lib/api";
-import type { ProspectType } from "@/lib/types";
+import { LEAD_STATUSES, type ProspectType } from "@/lib/types";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
@@ -31,10 +31,7 @@ import {
 } from "./CategorizedAttachmentSlots";
 
 const SOURCES = ["Terrain", "Facebook", "Autre"];
-const STATUSES = [
-  "Ok","Att cin","Att confirmation","Rappel","refuse","migration","Basculement",
-  "Ing","Nrp","Pas de rep","Pas intersse","Déjà connecté","Autr dde encor","Autre",
-];
+const STATUSES = LEAD_STATUSES;
 
 type DupMatch = {
   id: string; lastName: string; firstName: string;

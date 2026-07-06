@@ -82,7 +82,7 @@ if ($method === 'POST') {
         fail('Type de fichier non autorisé (PDF ou image uniquement)', 415);
     }
 
-    $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $f['name']);
+    $safeName = attachment_sanitize_filename((string) $f['name']);
     $id = 'AT-' . substr(bin2hex(random_bytes(6)), 0, 10);
     $sub = $GLOBALS['UPLOAD_DIR'] . '/' . $entity;
     if (!is_dir($sub)) @mkdir($sub, 0775, true);

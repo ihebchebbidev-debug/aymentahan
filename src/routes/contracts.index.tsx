@@ -39,6 +39,7 @@ import type { PipelineStage } from "@/lib/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
 function buildImportFields(currencySymbol: string): ImportField[] {
@@ -727,7 +728,16 @@ function ContractsPage() {
             </DialogTitle>
           </DialogHeader>
           {attachContract && (
-            <AttachmentsCard entity="contract" entityId={attachContract.id} />
+            <AttachmentsCard
+              entity="contract"
+              entityId={attachContract.id}
+              extraSources={buildAttachmentExtraSources({
+                primaryEntity: "contract",
+                primaryId: attachContract.id,
+                prospectId: (attachContract as any).prospectId ?? null,
+                opportunityId: attachContract.opportunityId ?? null,
+              })}
+            />
           )}
         </DialogContent>
       </Dialog>
