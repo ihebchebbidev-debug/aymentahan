@@ -22,6 +22,8 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
 import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
+import { normalizeGouvernorat } from "@/lib/tunisiaGovernorates";
+import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import {
   CategorizedAttachmentSlots,
   type AttachmentCategoryKey,
@@ -206,7 +208,7 @@ export function NewProspectDialog() {
         cin: cin.trim() || undefined,
         birthDate: birthDate || null,
         email: email.trim(),
-        gouvernorat: gouvernorat.trim().toUpperCase(),
+        gouvernorat: normalizeGouvernorat(gouvernorat),
         delegation: delegation.trim(),
         address: address.trim(),
         localisationXy: normalizeLocalisationXy(localisationXy) || null,
@@ -330,7 +332,7 @@ export function NewProspectDialog() {
           </div>
           <div className="space-y-1.5">
             <Label>Gouvernorat</Label>
-            <Input value={gouvernorat} onChange={(e) => setGouvernorat(e.target.value)} placeholder="TUNIS" />
+            <GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} />
           </div>
           <div className="space-y-1.5">
             <Label>Délégation</Label>

@@ -33,6 +33,39 @@ function conv_tx_rollback(PDO $db): void {
     }
 }
 
+/** Cached column existence check (legacy prod schemas may differ). */
+function conv_table_has_column(PDO $db, string $table, string $column): bool {
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (!array_key_exists($key, $cache)) {
+        $s = $db->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+        );
+        $s->execute([$table, $column]);
+        $cache[$key] = (bool) $s->fetchColumn();
+    }
+    return $cache[$key];
+}
+
+/** Unique contract reference — required when crminternet_contracts.reference is UNIQUE NOT NULL. */
+function conv_contract_reference_value(string $contractId, ?string $explicit = null): string {
+    $ref = trim((string) ($explicit ?? ''));
+    return $ref !== '' ? substr($ref, 0, 100) : $contractId;
+}
+
+/** Fix rows that were inserted before reference was populated (empty string duplicates). */
+function conv_backfill_contract_references(PDO $db): void {
+    if (!conv_table_has_column($db, 'crminternet_contracts', 'reference')) {
+        return;
+    }
+    try {
+        $db->exec("UPDATE crminternet_contracts SET reference = id WHERE reference = '' OR reference IS NULL");
+    } catch (Throwable $e) {
+        /* best-effort */
+    }
+}
+
 /**
  * Insère une opportunité construite à partir d'un prospect (snapshot complet).
  * Les éventuelles surcharges (titre, montant, probabilité, stage, créateur)
@@ -99,21 +132,24 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
  */
 function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array $o, array $extra = []): void {
     $today = date('Y-m-d');
+    $hasRef = conv_table_has_column($db, 'crminternet_contracts', 'reference');
+    $refSql = $hasRef ? ', reference' : '';
+    $refVal = $hasRef ? ', :ref' : '';
     $sql = "INSERT INTO crminternet_contracts
         (id, opportunity_id, prospect_id, civility, last_name, first_name,
          phone, phone2, animateur, ancien_ligne, cin, birth_date, email,
          city, gouvernorat, delegation, zone, address, localisation_xy, code_postal,
          comment1, comment2, source, type_id, lead_status,
          partner, cabinet, signature_date, effective_date,
-         premium, billing_status, stage_id, assigned_to)
+         premium, billing_status, stage_id, assigned_to{$refSql})
         VALUES
         (:id, :oid, :pid, :civ, :ln, :fn,
          :ph, :ph2, :anim, :anc, :cin, :bd, :em,
          :ci, :gv, :dl, :zn, :ad, :gps, :cp,
          :c1, :c2, :src, :tid, :lst,
          :pa, :ca, :sd, :ed,
-         :pr, :bs, :sid, :at)";
-    $db->prepare($sql)->execute([
+         :pr, :bs, :sid, :at{$refVal})";
+    $params = [
         ':id'   => $cid,
         ':oid'  => $o['id'] ?? null,
         ':pid'  => $o['prospect_id'] ?? null,
@@ -147,7 +183,11 @@ function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array
         ':bs'   => $extra['billing_status'] ?? 'Pré-validé',
         ':sid'  => $extra['stage_id']     ?? null,
         ':at'   => $extra['assigned_to']  ?? ($o['assigned_to'] ?? ''),
-    ]);
+    ];
+    if ($hasRef) {
+        $params[':ref'] = conv_contract_reference_value($cid, $extra['reference'] ?? null);
+    }
+    $db->prepare($sql)->execute($params);
 }
 
 /**
@@ -471,6 +511,8 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
     require_once __DIR__ . '/contract_info_helpers.php';
 
     $username = (string) ($me['username'] ?? '');
+
+    conv_backfill_contract_references($db);
 
     $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
     $s->execute([':id' => $oid]);

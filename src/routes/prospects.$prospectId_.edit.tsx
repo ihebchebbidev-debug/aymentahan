@@ -17,6 +17,8 @@ import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
+import { normalizeGouvernorat } from "@/lib/tunisiaGovernorates";
+import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import { useUnsavedForm } from "@/lib/unsavedForm";
 
 import { RequirePerm } from "@/components/RequirePerm";
@@ -179,7 +181,7 @@ function EditProspectPage() {
         cin: cin.trim(),
         birthDate: birthDate || null,
         email: email.trim(),
-        gouvernorat: gouvernorat.trim().toUpperCase(),
+        gouvernorat: normalizeGouvernorat(gouvernorat),
         delegation: delegation.trim(),
         city: city.trim(),
         zone: zone.trim(),

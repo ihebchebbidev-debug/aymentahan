@@ -6,6 +6,7 @@
 // so the user can still type a value.
 import type { FilterFieldSchema } from "@/components/FilterPresetPicker";
 import type { FilterPresetScope } from "@/lib/filterPresets";
+import { TUNISIA_GOVERNORATE_VALUES } from "@/lib/tunisiaGovernorates";
 
 // --- helpers ---------------------------------------------------------------
 function uniqStr(rows: ReadonlyArray<Record<string, unknown>>, key: string): string[] {
@@ -34,6 +35,13 @@ function realField(
   const vals = [...set].sort(sortFr);
   if (vals.length === 0) return { key, label, type: "text" };
   return { key, label, type: "select", options: vals.map((v) => ({ value: v, label: v })) };
+}
+
+/** Gouvernorat : toujours les 24 valeurs officielles + valeurs déjà en base. */
+function gouvernoratField(
+  rows: ReadonlyArray<Record<string, unknown>>,
+): FilterFieldSchema {
+  return realField("Gouvernorat", "gouvernorat", rows, "gouvernorat", TUNISIA_GOVERNORATE_VALUES);
 }
 
 export type AutoSchemaInput = {
@@ -66,7 +74,7 @@ export function autoFilterSchema(
         realField("Civilité", "civility", rows, "civility"),
         realField("Issue", "outcome", rows, "outcome"),
         realField("Validation", "checkValeur", rows, "checkValeur"),
-        realField("Gouvernorat", "gouvernorat", rows, "gouvernorat"),
+        gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),
         realField("Zone", "zone", rows, "zone"),
@@ -91,7 +99,7 @@ export function autoFilterSchema(
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
         realField("Source", "source", rows, "source"),
         realField("Civilité", "civility", rows, "civility"),
-        realField("Gouvernorat", "gouvernorat", rows, "gouvernorat"),
+        gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),
         realField("Code postal", "codePostal", rows, "codePostal"),
@@ -134,7 +142,7 @@ export function autoFilterSchema(
         realField("Source", "source", rows, "source"),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
         realField("Civilité", "civility", rows, "civility"),
-        realField("Gouvernorat", "gouvernorat", rows, "gouvernorat"),
+        gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),
         realField("Code postal", "codePostal", rows, "codePostal"),

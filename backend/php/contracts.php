@@ -4,6 +4,7 @@ require_once __DIR__ . '/pipeline_helpers.php';
 require_once __DIR__ . '/geo_helpers.php';
 require_once __DIR__ . '/attachment_helpers.php';
 require_once __DIR__ . '/contract_info_helpers.php';
+require_once __DIR__ . '/conversion_helpers.php';
 require_once __DIR__ . '/list_query_helpers.php';
 if (is_file(__DIR__ . '/crm_normalize.php')) require_once __DIR__ . '/crm_normalize.php';
 
@@ -36,6 +37,7 @@ function ensure_contracts_runtime_schema(PDO $db): void {
     foreach ($stmts as $sql) {
         try { $db->exec($sql); } catch (Throwable $e) { /* column may already exist */ }
     }
+    conv_backfill_contract_references($db);
 }
 schema_ensure_once('contracts', '20260513', function () use ($db) {
     ensure_contracts_runtime_schema($db);
@@ -396,9 +398,14 @@ if ($method === 'POST') {
         $allowed = ['Validé Confirmation','En attente de validation','Annuler la confirmation','Pré-validé'];
     }
 
-    $ins = $db->prepare('INSERT INTO crminternet_contracts
-        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,billing_status,source,assigned_to,type_id,comment1,comment2)
-        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:bs,:src,:at,:tid,:c1,:c2)
+    $hasRef = conv_table_has_column($db, 'crminternet_contracts', 'reference');
+    $refCols = $hasRef ? ',reference' : '';
+    $refVals = $hasRef ? ',:ref' : '';
+    $refUpdate = $hasRef ? ', reference=IF(reference = \'\', VALUES(reference), reference)' : '';
+
+    $ins = $db->prepare("INSERT INTO crminternet_contracts
+        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,billing_status,source,assigned_to,type_id,comment1,comment2{$refCols})
+        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:bs,:src,:at,:tid,:c1,:c2{$refVals})
         ON DUPLICATE KEY UPDATE
           civility=VALUES(civility), last_name=VALUES(last_name), first_name=VALUES(first_name),
           phone=VALUES(phone), phone2=VALUES(phone2), cin=VALUES(cin), birth_date=VALUES(birth_date),
@@ -409,7 +416,7 @@ if ($method === 'POST') {
           effective_date=VALUES(effective_date), validation_date=VALUES(validation_date),
           premium=VALUES(premium), billing_status=VALUES(billing_status),
           source=VALUES(source), assigned_to=VALUES(assigned_to), type_id=VALUES(type_id),
-          comment1=VALUES(comment1), comment2=VALUES(comment2)');
+          comment1=VALUES(comment1), comment2=VALUES(comment2){$refUpdate}");
 
     $cfIns = $db->prepare('INSERT INTO crminternet_custom_field_values (entity, entity_id, field_key, value)
                            VALUES (:e,:id,:k,:v)
@@ -488,7 +495,7 @@ if ($method === 'POST') {
         if ($vd === '' || ($vd && !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$vd))) $vd = null;
 
         try {
-            $ins->execute([
+            $rowParams = [
                 ':id'  => $id,
                 ':civ' => ($r['civility'] ?? 'M') === 'Mme' ? 'Mme' : 'M',
                 ':ln'  => $ln,
@@ -516,7 +523,11 @@ if ($method === 'POST') {
                 ':tid' => isset($r['typeId']) && $r['typeId'] !== '' ? (string)$r['typeId'] : null,
                 ':c1'  => $r['comment1'] ?? null,
                 ':c2'  => $r['comment2'] ?? null,
-            ]);
+            ];
+            if ($hasRef) {
+                $rowParams[':ref'] = conv_contract_reference_value($id, $r['reference'] ?? null);
+            }
+            $ins->execute($rowParams);
         } catch (Throwable $e) {
             $skipped++;
             $blocked[] = [
