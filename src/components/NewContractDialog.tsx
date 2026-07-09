@@ -18,7 +18,7 @@ import type { Currency } from "@/lib/currency";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
 
-const PARTNERS = ["NEOLIANE", "APRIL", "ALPTIS", "MIEL MUTUELLE"];
+const PARTNERS = ["APRIL", "ALPTIS", "MIEL MUTUELLE"];
 const BILLING = ["Pré-validé", "Validé Confirmation", "Annulé"];
 
 export function NewContractDialog({ currency }: { currency: Currency }) {

@@ -313,7 +313,13 @@ function ProspectsPage() {
         const field = (KEY_MAP[k] ?? k) as keyof Prospect;
         const val = (p as any)[field];
         const target = String(raw).toLowerCase();
-        if (val == null) return false;
+        
+        if (val == null) {
+          // If filtering for boolean "false", treat null/undefined as false.
+          if (target === "false") continue;
+          return false;
+        }
+        
         if (typeof val === "boolean") { if (String(val) !== target) return false; continue; }
         if (!String(val).toLowerCase().includes(target)) return false;
       }

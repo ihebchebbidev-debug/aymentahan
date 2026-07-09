@@ -280,6 +280,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
           onUpdate={async (id, patch) => { await actions.update(id, patch); }}
           onDelete={async (id) => { await actions.remove(id); if (activeId === id) setActiveId(null); }}
           onMove={move}
+          onApply={onApply}
         />
       )}
     </>
@@ -310,6 +311,7 @@ type ManagerProps = {
   onDelete: (id: string) => Promise<void>;
   onMove: (id: string, dir: -1 | 1) => Promise<void>;
   canDelete?: boolean;
+  onApply: (f: Record<string, unknown>) => void;
 };
 
 const ROLE_GLOBAL = "__global__";
@@ -318,7 +320,7 @@ function PresetManagerDialog(props: ManagerProps) {
   const {
     open, onOpenChange, presets, editing, setEditing,
     currentFilters, filterKeys, filterSchema, onCreate, onUpdate, onDelete, onMove,
-    canDelete = false,
+    canDelete = false, onApply
   } = props;
 
   const [name, setName] = useState("");
@@ -717,8 +719,16 @@ function PresetManagerDialog(props: ManagerProps) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
+          <Button variant="secondary" onClick={() => {
+            const finalVals: Record<string, unknown> = {};
+            for (const f of filterSchema ?? []) {
+              if (enabled[f.key]) finalVals[f.key] = values[f.key];
+            }
+            onApply(finalVals);
+            onOpenChange(false);
+          }}>Appliquer</Button>
           <Button onClick={submit} disabled={busy}>
-            {editing ? "Enregistrer" : "Créer le modèle"}
+            {editing ? "Enregistrer le modèle" : "Créer le modèle"}
           </Button>
         </DialogFooter>
       </DialogContent>

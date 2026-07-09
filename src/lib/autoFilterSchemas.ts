@@ -122,7 +122,7 @@ export function autoFilterSchema(
     case "migrations":
       return [
         { key: "search", label: "Recherche (nom, téléphone, CIN, opérateurs)", type: "text" },
-        realField("Workflow", "workflow", rows, "workflowStatus"),
+        realField("Workflow", "statut", rows, "workflowStatus"),
         realField("Statut technique", "technical", rows, "technicalStatus"),
         realField("Ancien opérateur", "oldOp", rows, "oldOperator"),
         realField("Nouvel opérateur", "newOp", rows, "newOperator"),

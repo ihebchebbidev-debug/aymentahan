@@ -44,7 +44,7 @@ function ensure_reports_schema(PDO $db): void {
         "ALTER TABLE crminternet_contracts ADD COLUMN signature_date DATE NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN premium DECIMAL(10,2) NOT NULL DEFAULT 0",
         "ALTER TABLE crminternet_contracts ADD COLUMN assigned_to VARCHAR(80) NOT NULL DEFAULT ''",
-        "ALTER TABLE crminternet_contracts ADD COLUMN partner VARCHAR(80) NOT NULL DEFAULT 'NEOLIANE'",
+        "ALTER TABLE crminternet_contracts ADD COLUMN partner VARCHAR(80) NOT NULL DEFAULT ''",
         "ALTER TABLE crminternet_contracts ADD COLUMN cabinet VARCHAR(120) NOT NULL DEFAULT ''",
         "ALTER TABLE crminternet_contracts ADD COLUMN effective_date DATE NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN billing_status VARCHAR(80) NOT NULL DEFAULT 'Pré-validé'",

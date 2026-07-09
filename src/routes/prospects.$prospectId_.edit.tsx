@@ -12,7 +12,8 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
 import { api } from "@/lib/api";
-import { LEAD_STATUSES, type ProspectType } from "@/lib/types";
+import { type ProspectType } from "@/lib/types";
+import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
@@ -43,7 +44,7 @@ function GuardedEditProspectPage() {
 
 
 const SOURCES = ["Terrain", "Facebook", "Base de donné", "Technicien", "Autre"];
-const STATUSES = LEAD_STATUSES;
+// Statuses loaded dynamically inside the component (useLeadStatusNames).
 
 function EditProspectPage() {
   const { prospectId } = Route.useParams();
@@ -76,6 +77,7 @@ function EditProspectPage() {
   const [codePostal, setCodePostal] = useState("");
   const [source, setSource] = useState(SOURCES[0]);
   const [status, setStatus] = useState("");
+  const STATUSES = useLeadStatusNames();
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
   const [comment, setComment] = useState("");
   const [comment2, setComment2] = useState("");
@@ -359,7 +361,7 @@ function EditProspectPage() {
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__blank__">—</SelectItem>
-                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {STATUSES.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

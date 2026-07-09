@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS crminternet_contracts (
   last_name        VARCHAR(120) NOT NULL,
   first_name       VARCHAR(120) NOT NULL DEFAULT '',
   city             VARCHAR(120) NOT NULL DEFAULT '',
-  partner          VARCHAR(80)  NOT NULL DEFAULT 'NEOLIANE',
+  partner          VARCHAR(80)  NOT NULL DEFAULT '',
   cabinet          VARCHAR(120) NOT NULL DEFAULT 'Cabinet Paris 1',
   signature_date   DATE         NOT NULL,
   effective_date   DATE         NOT NULL,
@@ -657,7 +657,7 @@ INSERT IGNORE INTO crminternet_opportunities
 
 INSERT IGNORE INTO crminternet_contracts
   (id, last_name, first_name, city, partner, cabinet, signature_date, effective_date, validation_date, premium, billing_status, source, assigned_to, stage_id, opportunity_id) VALUES
-  ('C-2001','Khelifi','Amira','Tunis','NEOLIANE','Cabinet Tunis 1', DATE_SUB(CURDATE(),INTERVAL 3 DAY), CURDATE(),                              CURDATE(),                              1850.00,'Validé Confirmation',     'Facebook','ines.vente',  'CS-3','OPP-2'),
+  ('C-2001','Khelifi','Amira','Tunis','','Cabinet Tunis 1', DATE_SUB(CURDATE(),INTERVAL 3 DAY), CURDATE(),                              CURDATE(),                              1850.00,'Validé Confirmation',     'Facebook','ines.vente',  'CS-3','OPP-2'),
   ('C-2002','Trabelsi','Sana','Sousse','SPVIE',  'Cabinet Sousse',  DATE_SUB(CURDATE(),INTERVAL 1 DAY), DATE_ADD(CURDATE(),INTERVAL 14 DAY), NULL,                                   1200.00,'En attente de validation','Facebook','karim.suivi','CS-2', NULL);
 
 INSERT IGNORE INTO crminternet_calendar_events (id, title, date, time, type, agent) VALUES

@@ -13,13 +13,12 @@ import {
 } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
-import { api, apiUpload, API_ENABLED } from "@/lib/api";
-import { LEAD_STATUSES, type ProspectType } from "@/lib/types";
+import { apiUpload, API_ENABLED } from "@/lib/api";
+import { type ProspectType } from "@/lib/types";
+import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
-import { Link } from "@tanstack/react-router";
-import { AlertTriangle } from "lucide-react";
 import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
 import { normalizeGouvernorat } from "@/lib/tunisiaGovernorates";
@@ -39,13 +38,6 @@ import {
 } from "@/lib/stagedAttachmentPreview";
 
 const SOURCES = ["Terrain", "Facebook", "Autre"];
-const STATUSES = LEAD_STATUSES;
-
-type DupMatch = {
-  id: string; lastName: string; firstName: string;
-  phone: string; phone2: string; cin: string;
-  status: string; assignedTo: string | null; createdAt: string;
-};
 
 type StagedFile = { original: File; toUpload: File; status: "ready" | "too_big" | "rejected"; reason?: string };
 
@@ -94,13 +86,13 @@ export function NewProspectDialog() {
   const [codePostal, setCodePostal] = useState("");
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("");
+  const STATUSES = useLeadStatusNames();
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
   const [observ1, setObserv1] = useState("");
   const [observ2, setObserv2] = useState("");
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [typeId, setTypeId] = useState<string>("");
-  const [duplicates, setDuplicates] = useState<DupMatch[]>([]);
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [staging, setStaging] = useState(false);
   const [slots, setSlots] = useState<Record<string, CategorizedSlotState>>({});
@@ -108,24 +100,6 @@ export function NewProspectDialog() {
   const { preview, context, openFromFile, close, setPreview } = useStagedAttachmentPreview();
   const [replacingPreview, setReplacingPreview] = useState(false);
   const stagedPreviewItems = useStagedPreviewItems(slots, files);
-
-  // CRM MVP §1 — Vérification anciens clients (CIN / téléphone).
-  useEffect(() => {
-    if (!open) return;
-    const cinV = cin.trim();
-    const phV = phone.trim();
-    const ph2V = phone2.trim();
-    if (cinV.length < 4 && phV.length < 6 && ph2V.length < 6) { setDuplicates([]); return; }
-    const t = setTimeout(async () => {
-      try {
-        const r = await api<{ matches: DupMatch[] }>("/prospects.php", {
-          query: { check_duplicate: "1", cin: cinV, phone: phV, phone2: ph2V },
-        });
-        setDuplicates(r.matches ?? []);
-      } catch { /* silent */ }
-    }, 350);
-    return () => clearTimeout(t);
-  }, [cin, phone, phone2, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -154,7 +128,6 @@ export function NewProspectDialog() {
     setAssignedTo("__none__"); setCivility("M"); setSource(""); setStatus("");
     setCustomValues({});
     setTypeId(types[0]?.id || "");
-    setDuplicates([]);
     setFiles([]);
     setSlots({});
     close();
@@ -323,7 +296,7 @@ export function NewProspectDialog() {
             </div>
           )}
           <div className="space-y-1.5">
-            <Label>CIN <span className="text-[10px] text-muted-foreground">(unique si renseigné)</span></Label>
+            <Label>CIN</Label>
             <Input value={cin} onChange={(e) => setCin(e.target.value)} placeholder="12345678" />
           </div>
           <div className="space-y-1.5">
@@ -368,7 +341,7 @@ export function NewProspectDialog() {
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__blank__">—</SelectItem>
-                {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {STATUSES.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -485,25 +458,6 @@ export function NewProspectDialog() {
           />
 
           <CustomFieldsInline entity="prospect" values={customValues} onChange={setCustomValues} typeId={typeId || null} />
-          {duplicates.length > 0 && (
-            <div className="col-span-2 rounded-lg border border-warning/40 bg-warning/10 p-3">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-warning-foreground">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {duplicates.length} prospect{duplicates.length > 1 ? "s" : ""} déjà existant{duplicates.length > 1 ? "s" : ""} (CIN / téléphone)
-              </div>
-              <ul className="mt-2 space-y-1 text-xs">
-                {duplicates.slice(0, 5).map((d) => (
-                  <li key={d.id}>
-                    <Link to="/prospects/$prospectId" params={{ prospectId: d.id }}
-                      className="text-primary hover:underline" onClick={() => setOpen(false)}>
-                      {d.lastName} {d.firstName}
-                    </Link>
-                    <span className="text-muted-foreground"> — {d.phone || d.phone2 || d.cin} • {d.status}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
         <DialogFooter className="px-6 py-4 border-t">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Annuler</Button>

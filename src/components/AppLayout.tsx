@@ -8,7 +8,7 @@ import { CommandPalette } from "./CommandPalette";
 import { OnboardingTour } from "./OnboardingTour";
 import { ForceChangePasswordDialog } from "./ForceChangePasswordDialog";
 import { ChatWidget } from "./ChatWidget";
-import { IdleLogout } from "./IdleLogout";
+
 import { useAuth } from "@/lib/auth";
 import { useErp } from "@/lib/erpStore";
 import { Bell, Search, Settings, LogOut, UserCircle2, HelpCircle, Plus, Sparkles, PanelLeftClose, PanelLeftOpen, UserPlus, CalendarPlus, ListPlus, BellOff } from "lucide-react";
@@ -371,7 +371,7 @@ export function AppLayout({ children, skeleton = "dashboard" }: { children: Reac
       <OnboardingTour />
       <ForceChangePasswordDialog />
       <ChatWidget />
-      <IdleLogout />
+
     </div>
     </RequireAuth>
   );

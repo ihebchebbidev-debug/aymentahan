@@ -1,7 +1,7 @@
 import { DatePicker } from "@/components/ui/date-picker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Upload, X, FileText, Image as ImageIcon, Loader2, AlertTriangle, UserPlus } from "lucide-react";
+import { ArrowLeft, Upload, X, FileText, Image as ImageIcon, Loader2, UserPlus } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
-import { api, apiUpload, API_ENABLED } from "@/lib/api";
-import { LEAD_STATUSES, type ProspectType } from "@/lib/types";
+import { apiUpload, API_ENABLED } from "@/lib/api";
+import { type ProspectType } from "@/lib/types";
+import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
@@ -58,13 +59,6 @@ function GuardedNewProspectPage() {
 
 
 const SOURCES = ["Terrain", "Facebook", "Base de donné", "Technicien"];
-const STATUSES = LEAD_STATUSES;
-
-type DupMatch = {
-  id: string; lastName: string; firstName: string;
-  phone: string; phone2: string; cin: string;
-  status: string; assignedTo: string | null; createdAt: string;
-};
 
 type StagedFile = { original: File; toUpload: File; status: "ready" | "too_big" | "rejected"; reason?: string };
 
@@ -103,6 +97,7 @@ function NewProspectPage() {
   const [codePostal, setCodePostal] = useState("");
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("");
+  const STATUSES = useLeadStatusNames();
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
   const [observ1, setObserv1] = useState("");
   const [observ2, setObserv2] = useState("");
@@ -110,7 +105,6 @@ function NewProspectPage() {
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [typeId, setTypeId] = useState<string>("");
-  const [duplicates, setDuplicates] = useState<DupMatch[]>([]);
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [staging, setStaging] = useState(false);
   const [slots, setSlots] = useState<Record<string, CategorizedSlotState>>({});
@@ -143,23 +137,6 @@ function NewProspectPage() {
     ],
   );
   useUnsavedForm(isDirty);
-
-  // Vérification anciens clients (CIN / téléphone)
-  useEffect(() => {
-    const cinV = cin.trim();
-    const phV = phone.trim();
-    const ph2V = phone2.trim();
-    if (cinV.length < 4 && phV.length < 6 && ph2V.length < 6) { setDuplicates([]); return; }
-    const t = setTimeout(async () => {
-      try {
-        const r = await api<{ matches: DupMatch[] }>("/prospects.php", {
-          query: { check_duplicate: "1", cin: cinV, phone: phV, phone2: ph2V },
-        });
-        setDuplicates(r.matches ?? []);
-      } catch { /* silent */ }
-    }, 350);
-    return () => clearTimeout(t);
-  }, [cin, phone, phone2]);
 
   useEffect(() => {
     let cancel = false;
@@ -335,7 +312,7 @@ function NewProspectPage() {
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Mohamed" />
               </div>
               <div className="space-y-1.5">
-                <Label>CIN <span className="text-[10px] text-muted-foreground">(unique si renseigné)</span></Label>
+                <Label>CIN</Label>
                 <Input value={cin} onChange={(e) => setCin(e.target.value)} placeholder="12345678" />
               </div>
               <div className="space-y-1.5">
@@ -408,7 +385,7 @@ function NewProspectPage() {
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__blank__">—</SelectItem>
-                    {STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {STATUSES.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -548,36 +525,15 @@ function NewProspectPage() {
           </div>
         </Card>
 
-        {/* Side panel — duplicates / hints */}
+        {/* Side panel — hints */}
         <aside className="space-y-4">
-          {duplicates.length > 0 ? (
-            <Card className="p-4 border-warning/40 bg-warning/5">
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                <AlertTriangle className="h-4 w-4 text-warning" />
-                {duplicates.length} doublon{duplicates.length > 1 ? "s" : ""} détecté{duplicates.length > 1 ? "s" : ""}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">CIN ou téléphone déjà présent dans le CRM.</p>
-              <ul className="mt-3 space-y-1.5 text-xs">
-                {duplicates.slice(0, 8).map((d) => (
-                  <li key={d.id}>
-                    <Link to="/prospects/$prospectId" params={{ prospectId: d.id }} className="text-primary hover:underline font-medium">
-                      {d.lastName} {d.firstName}
-                    </Link>
-                    <span className="text-muted-foreground"> — {d.phone || d.phone2 || d.cin} • {d.status}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : (
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold mb-1">Conseils</h3>
-              <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
-                <li>Renseignez le CIN pour éviter les doublons.</li>
-                <li>Les pièces jointes sont compressées automatiquement.</li>
-                <li>Vous pourrez modifier la fiche après création.</li>
-              </ul>
-            </Card>
-          )}
+          <Card className="p-4">
+            <h3 className="text-sm font-semibold mb-1">Conseils</h3>
+            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-1">
+              <li>Les pièces jointes sont compressées automatiquement.</li>
+              <li>Vous pourrez modifier la fiche après création.</li>
+            </ul>
+          </Card>
         </aside>
       </form>
     </AppLayout>

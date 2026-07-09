@@ -94,28 +94,6 @@ $role = $me['role'] ?? '';
 $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
 if ($method === 'GET') {
-    // CRM MVP §1 — Vérification anciens clients : détection de doublons par CIN/téléphone.
-    if (!empty($_GET['check_duplicate'])) {
-        $cin   = trim((string)($_GET['cin'] ?? ''));
-        $phone = trim((string)($_GET['phone'] ?? ''));
-        $phone2= trim((string)($_GET['phone2'] ?? ''));
-        if ($cin === '' && $phone === '' && $phone2 === '') ok(['matches' => []]);
-        $where = []; $params = [];
-        if ($cin !== '')    { $where[] = 'cin = :cin';     $params[':cin']   = $cin; }
-        if ($phone !== '')  { $where[] = '(phone = :p OR phone2 = :p)'; $params[':p'] = $phone; }
-        if ($phone2 !== '') { $where[] = '(phone = :p2 OR phone2 = :p2)'; $params[':p2'] = $phone2; }
-        $sql = 'SELECT id, last_name, first_name, phone, phone2, cin, status, assigned_to, created_at
-                FROM crminternet_prospects WHERE ' . implode(' OR ', $where) . '
-                ORDER BY created_at DESC LIMIT 10';
-        $s = $db->prepare($sql);
-        $s->execute($params);
-        ok(['matches' => array_map(fn($r) => [
-            'id' => $r['id'], 'lastName' => $r['last_name'], 'firstName' => $r['first_name'],
-            'phone' => $r['phone'], 'phone2' => $r['phone2'] ?? '', 'cin' => $r['cin'] ?? '',
-            'status' => $r['status'], 'assignedTo' => $r['assigned_to'], 'createdAt' => $r['created_at'],
-        ], $s->fetchAll())]);
-    }
-
     $id = $_GET['id'] ?? null;
     if ($id) {
         $s = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :id');
@@ -243,7 +221,7 @@ if ($method === 'POST') {
         require_permission($db, $me, 'opportunity.convert');
         $pid     = $in['id'] ?? '';
         $premium = (float)($in['premium'] ?? 950);
-        $partner = trim($in['partner'] ?? 'NEOLIANE');
+        $partner = trim($in['partner'] ?? '');
         if (!$pid) fail('id requis', 422);
 
         require_once __DIR__ . '/conversion_helpers.php';
@@ -442,8 +420,7 @@ if ($method === 'POST') {
                            VALUES (:e,:id,:k,:v)
                            ON DUPLICATE KEY UPDATE value = VALUES(value)');
 
-    // CIN n'est plus unique : on accepte les doublons (autres fiches)
-    // mais on remonte des "warnings" pour informer l'utilisateur.
+    // CIN doublons autorisés — pas de vérification ni warning à l'import.
     $warnings = [];
 
     // PERF: hoist out of the per-row loop to avoid N round-trips that blow up
@@ -458,7 +435,6 @@ if ($method === 'POST') {
         }
     } catch (Throwable $e) { /* fallback to per-row check below */ }
     $existsStmt = $db->prepare('SELECT 1 FROM crminternet_prospects WHERE id = :id');
-    $cinChkStmt = $db->prepare('SELECT id FROM crminternet_prospects WHERE cin = :c AND id <> :id LIMIT 5');
 
     // Map prospect-type name (case/space-insensitive) -> id, for resolving the
     // "type" column in CSV imports. Also indexes by id so existing typeId
@@ -516,18 +492,9 @@ if ($method === 'POST') {
             continue;
         }
 
-        // ---- CIN normalisation (doublons autorisés) ----
+        // ---- CIN normalisation ----
         $cinNorm = trim((string)($r['cin'] ?? ''));
         $cinNorm = $cinNorm === '' ? null : $cinNorm;
-        if ($cinNorm !== null) {
-            $cinChkStmt->execute([':c' => $cinNorm, ':id' => $id]);
-            $siblings = $cinChkStmt->fetchAll(PDO::FETCH_COLUMN);
-            if ($siblings) {
-                $warnings[] = ['row' => $rowNum, 'reason' => 'CIN_DUPLICATE', 'field' => 'cin',
-                               'message' => "CIN $cinNorm déjà présent (fiche doublon créée)",
-                               'siblings' => $siblings];
-            }
-        }
 
         $ca = $r['createdAt'] ?? date('Y-m-d');
         if (is_string($ca) && strlen($ca) >= 10) $ca = substr($ca, 0, 10);
@@ -678,7 +645,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
             if ($k === 'cin') {
                 $val = is_string($val) ? trim($val) : $val;
                 if ($val === '' || $val === null) $val = null;
-                // Doublons autorisés : pas de blocage, juste normalisation.
             }
             if ($k === 'ancienLigne' || $k === 'animateur') {
                 $val = is_string($val) ? trim($val) : $val;

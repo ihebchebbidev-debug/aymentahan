@@ -306,7 +306,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
         if ($k === 'cin') {
             $val = is_string($val) ? trim($val) : $val;
             if ($val === '' || $val === null) $val = null;
-            // Doublons CIN autorisés (warning seulement à l'import).
         }
         if ($k === 'birthDate' || $k === 'signatureDate' || $k === 'effectiveDate' || $k === 'validationDate') {
             if (is_string($val) && strlen($val) >= 10) $val = substr($val, 0, 10);
@@ -453,23 +452,9 @@ if ($method === 'POST') {
             continue;
         }
 
-        // CIN normalisation (doublons autorisés, warning informatif).
+        // CIN normalisation
         $cin = trim((string)($r['cin'] ?? ''));
         $cin = $cin === '' ? null : $cin;
-        if ($cin !== null) {
-            $sib = $db->prepare('SELECT id FROM crminternet_contracts WHERE cin = :c AND id <> :id LIMIT 5');
-            $sib->execute([':c' => $cin, ':id' => $id]);
-            $siblings = $sib->fetchAll(PDO::FETCH_COLUMN);
-            if ($siblings) {
-                $warnings[] = [
-                    'row'      => $rowNum,
-                    'reason'   => 'CIN_DUPLICATE',
-                    'field'    => 'cin',
-                    'message'  => "CIN $cin déjà présent (fiche doublon créée)",
-                    'siblings' => $siblings,
-                ];
-            }
-        }
 
         // billingStatus validation (fallback safe).
         $bs = $r['billingStatus'] ?? 'Pré-validé';
@@ -511,7 +496,7 @@ if ($method === 'POST') {
                 ':ad'  => trim((string)($r['address']    ?? '')),
                 ':loc' => prospect_norm_xy($r['localisationXy'] ?? $r['localisation_xy'] ?? null),
                 ':cp'  => prospect_norm_cp($r['codePostal']     ?? $r['code_postal']     ?? null),
-                ':p'   => $r['partner']  ?? 'NEOLIANE',
+                ':p'   => $r['partner']  ?? '',
                 ':cab' => $r['cabinet']  ?? 'Cabinet Paris 1',
                 ':sd'  => $sd,
                 ':ed'  => $ed,

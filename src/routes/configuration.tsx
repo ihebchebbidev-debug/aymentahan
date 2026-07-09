@@ -26,7 +26,7 @@ import {
 } from "@/lib/currency";
 import { ProspectTypesPanel } from "@/components/ProspectTypesPanel";
 import type { ProspectType } from "@/lib/types";
-import { IdleTimeoutsPanel } from "@/components/IdleTimeoutsPanel";
+
 import { ObjectivesPanel, EntitiesPanel } from "@/components/GuichetAdmin";
 import { TeamsPanel } from "@/components/TeamsPanel";
 import { Can } from "@/components/Can";
@@ -630,7 +630,7 @@ function ConfigPage() {
       <Tabs defaultValue="general" className="mt-6">
         <TabsList>
           <TabsTrigger value="general">Général</TabsTrigger>
-          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+
           <TabsTrigger value="types">Types de prospect</TabsTrigger>
           <TabsTrigger value="prospect">Prospects</TabsTrigger>
           <TabsTrigger value="opportunity">Opportunités</TabsTrigger>
@@ -648,7 +648,7 @@ function ConfigPage() {
         <TabsContent value="general" className="space-y-4 mt-4">
           <CurrencySettings />
         </TabsContent>
-        <TabsContent value="sessions" className="space-y-4 mt-4"><IdleTimeoutsPanel /></TabsContent>
+
         <TabsContent value="types" className="space-y-0 mt-4"><ProspectTypesPanel /></TabsContent>
         <TabsContent value="prospect" className="space-y-0 mt-4"><FieldList tab="prospect" /></TabsContent>
         <TabsContent value="opportunity" className="space-y-0 mt-4"><FieldList tab="opportunity" /></TabsContent>

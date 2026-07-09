@@ -24,10 +24,12 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
-import { exportCSV, exportJSON, exportXLSX } from "@/lib/exportUtils";
+import { exportCSV, exportJSON, exportXLSX, withCustomFields, relabelRows } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
+import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 
 export const Route = createFileRoute("/migrations/")({
   validateSearch: zodValidator(z.object({
@@ -44,6 +46,21 @@ export const Route = createFileRoute("/migrations/")({
 
 const ALL = "__all__";
 const PAGE_SIZE = 50;
+
+const MIGRATION_LABELS: Record<string, string> = {
+  id: "ID",
+  lastName: "Nom",
+  firstName: "Prénom",
+  phone: "Téléphone",
+  oldOperator: "Ancien opérateur",
+  newOperator: "Nouvel opérateur",
+  portingNumber: "Portabilité",
+  workflowStatus: "Statut",
+  technicalStatus: "Technique",
+  assignedTo: "Assigné à",
+  requestedDate: "Date demande",
+  createdAt: "Créée le",
+};
 
 const workflowColor: Record<string, string> = {
   "Créer": "bg-info/15 text-info border-info/20",
@@ -97,6 +114,16 @@ function MigrationsPage() {
     }
   }, [urlStatut, statut, setStatut]);
 
+  const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("migration");
+  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
+  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const setCustomFilter = (k: string, v: string) =>
+    setCustomFilters((prev) => {
+      const next = { ...prev };
+      if (!v) delete next[k]; else next[k] = v;
+      return next;
+    });
+
   const debouncedSearch = useDebouncedValue(search, 250);
 
   const workflowOptions = useMemo(() => {
@@ -122,6 +149,7 @@ function MigrationsPage() {
 
   const filtered = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
+    const cfEntries = Object.entries(customFilters);
     return allMigrations.filter((m) => {
       if (q) {
         const hay = `${m.lastName} ${m.firstName} ${m.phone ?? ""} ${m.cin ?? ""} ${m.portingNumber ?? ""} ${m.oldOperator ?? ""} ${m.newOperator ?? ""}`.toLowerCase();
@@ -135,14 +163,29 @@ function MigrationsPage() {
       const created = (m.createdAt ?? "").slice(0, 10);
       if (dateFrom && created < dateFrom) return false;
       if (dateTo && created > dateTo) return false;
+      if (cfEntries.length > 0) {
+        const vals = customValuesById[m.id] ?? {};
+        for (const [k, want] of cfEntries) {
+          const v = String(vals[k] ?? "").toLowerCase();
+          if (!v.includes(want.toLowerCase())) return false;
+        }
+      }
       for (const [k, raw] of Object.entries(presetExtra)) {
         if (raw == null || raw === "") continue;
         const val = (m as Record<string, unknown>)[k];
-        if (val == null || !String(val).toLowerCase().includes(String(raw).toLowerCase())) return false;
+        const target = String(raw).toLowerCase();
+        
+        if (val == null) {
+          if (target === "false") continue;
+          return false;
+        }
+        
+        if (typeof val === "boolean") { if (String(val) !== target) return false; continue; }
+        if (!String(val).toLowerCase().includes(target)) return false;
       }
       return true;
     });
-  }, [allMigrations, debouncedSearch, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, presetExtra]);
+  }, [allMigrations, debouncedSearch, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, presetExtra, customFilters, customValuesById]);
 
   const filterSchema = useMemo(
     () => autoFilterSchema("migrations", { agents: agentOptions, rows: allMigrations as unknown as ReadonlyArray<Record<string, unknown>> }),
@@ -179,6 +222,18 @@ function MigrationsPage() {
     { key: "createdAt", header: "Créée", cell: (m) => m.createdAt?.slice(0, 10) ?? "—" },
   ];
 
+  const customColumns: DataGridColumn<Migration>[] = customDefs
+    .filter((d) => visibleCols.has(d.key))
+    .map((d) => ({
+      key: `cf-${d.key}`,
+      header: d.label,
+      accessor: (m) => customValuesById[m.id]?.[d.key] ?? "",
+      cell: (m) => <span className="text-muted-foreground text-sm">{formatCustomValue(d, customValuesById[m.id]?.[d.key])}</span>,
+      hideBelow: "lg",
+    }));
+
+  const allColumns = [...columns, ...customColumns];
+
   const reset = () => {
     setSearch("");
     setStatut(ALL);
@@ -189,23 +244,14 @@ function MigrationsPage() {
     setDateFrom("");
     setDateTo("");
     setPresetExtra({});
+    setCustomFilters({});
     toast.success("Filtres réinitialisés");
   };
 
-  const exportRows: Record<string, unknown>[] = filtered.map((m) => ({
-    ID: m.id,
-    Nom: m.lastName,
-    Prénom: m.firstName,
-    Téléphone: m.phone ?? "",
-    "Ancien opérateur": m.oldOperator ?? "",
-    "Nouvel opérateur": m.newOperator ?? "",
-    Portabilité: m.portingNumber ?? "",
-    Statut: m.workflowStatus,
-    Technique: m.technicalStatus ?? "",
-    "Assigné à": m.assignedTo ?? "",
-    "Date demande": m.requestedDate ?? "",
-    "Créée le": m.createdAt ?? "",
-  }));
+  const exportRows = useMemo(
+    () => relabelRows(withCustomFields(filtered, customDefs, customValuesById), MIGRATION_LABELS),
+    [filtered, customDefs, customValuesById],
+  );
 
   return (
     <AppLayout skeleton="table">
@@ -221,6 +267,15 @@ function MigrationsPage() {
         actions={
           canExport ? (
             <>
+              <CustomColumnsPicker
+                defs={customDefs}
+                visible={visibleCols}
+                onToggle={(k, v) => setVisibleCols((prev) => {
+                  const n = new Set(prev);
+                  if (v) n.add(k); else n.delete(k);
+                  return n;
+                })}
+              />
               <Button size="sm" variant="outline" onClick={() => exportCSV("migrations", exportRows)}>
                 <Download className="h-4 w-4 mr-1.5" />CSV
               </Button>
@@ -231,7 +286,17 @@ function MigrationsPage() {
                 <FileJson className="h-4 w-4 mr-1.5" />JSON
               </Button>
             </>
-          ) : null
+          ) : (
+            <CustomColumnsPicker
+              defs={customDefs}
+              visible={visibleCols}
+              onToggle={(k, v) => setVisibleCols((prev) => {
+                const n = new Set(prev);
+                if (v) n.add(k); else n.delete(k);
+                return n;
+              })}
+            />
+          )
         }
       />
 
@@ -298,14 +363,12 @@ function MigrationsPage() {
           </div>
           <FilterPresetPicker
             scope="migrations"
-            current={{ search, statut, workflow: statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, ...presetExtra }}
+            current={{ search, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo }}
             filterKeys={schemaKeys(filterSchema)}
             filterSchema={filterSchema}
             onApply={(f) => {
               setSearch(typeof f.search === "string" ? f.search : "");
-              const st = typeof f.statut === "string" && f.statut ? f.statut
-                : typeof f.workflow === "string" && f.workflow ? f.workflow : ALL;
-              setStatut(st);
+              setStatut(typeof f.statut === "string" && f.statut ? f.statut : ALL);
               setTechnical(typeof f.technical === "string" && f.technical ? f.technical : ALL);
               setOldOp(typeof f.oldOp === "string" && f.oldOp ? f.oldOp : ALL);
               setNewOp(typeof f.newOp === "string" && f.newOp ? f.newOp : ALL);
@@ -314,17 +377,38 @@ function MigrationsPage() {
               setDateTo(typeof f.dateTo === "string" ? f.dateTo : "");
               const extra: Record<string, unknown> = {};
               for (const [k, v] of Object.entries(f)) {
-                if (!["search", "statut", "workflow", "technical", "oldOp", "newOp", "assigne", "dateFrom", "dateTo"].includes(k)) {
-                  extra[k] = v;
+                if (!["search", "statut", "technical", "oldOp", "newOp", "assigne", "dateFrom", "dateTo"].includes(k)) {
+                  if (v != null && v !== "") extra[k] = v;
                 }
               }
               setPresetExtra(extra);
             }}
+            onReset={reset}
           />
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <X className="h-4 w-4 mr-1" />Réinitialiser
-          </Button>
+          <div
+            key={`count-${search}|${statut}|${technical}|${oldOp}|${newOp}|${assigne}|${dateFrom}|${dateTo}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
+            className="ml-auto text-xs text-muted-foreground tabular-nums animate-in fade-in slide-in-from-right-2 duration-300"
+          >
+            <span className="font-semibold text-foreground">{filtered.length.toLocaleString("fr-FR")}</span> résultat(s)
+          </div>
         </div>
+
+        {customDefs.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground ml-2 mr-1">Champs perso</Label>
+            {customDefs.map((def) => (
+              <Input
+                key={def.id}
+                type={def.type === "number" ? "number" : def.type === "date" ? "date" : "text"}
+                value={customFilters[def.key] ?? ""}
+                onChange={(e) => setCustomFilter(def.key, e.target.value)}
+                placeholder={def.label}
+                className="h-9 w-[160px]"
+              />
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3">
           <div>
             <Label className="text-xs">Créée du</Label>
@@ -335,15 +419,12 @@ function MigrationsPage() {
             <DatePicker value={dateTo} onChange={setDateTo} />
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {filtered.length.toLocaleString("fr-FR")} résultat(s) sur {allMigrations.length.toLocaleString("fr-FR")}
-        </p>
       </Card>
 
       <DataGrid
         storageKey="migrations:list"
         rows={filtered}
-        columns={columns}
+        columns={allColumns}
         rowKey={(m) => m.id}
         pageSize={PAGE_SIZE}
         emptyState="Aucune migration ne correspond aux filtres."
