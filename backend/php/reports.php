@@ -12,22 +12,27 @@ $format = $_GET['format'] ?? 'json';
 $team = isset($_GET['team']) ? trim((string)$_GET['team']) : '';
 $teamIsNone = ($team === '__none__');
 if ($teamIsNone) {
-    $teamFilter = " AND (u.team = '' OR u.team IS NULL) ";
+    $teamFilter = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
-    $teamFilter = ' AND u.team = :team ';
+    $teamFilter = ' AND t.name = :team ';
 } else {
     $teamFilter = '';
 }
 
+// Use the real "Équipe" (crminternet_teams.name) assigned to each user via
+// team_id — this is the dynamic list managed in Users > Équipe(s).
+$NO_TEAM = 'Sans équipe';
+
 // Per-agent KPIs
 $agentSql = "
-  SELECT u.username, u.full_name, u.team,
+  SELECT u.username, u.full_name, COALESCE(t.name, '') AS team_name,
     COALESCE(SUM(p.cnt),0)  AS handled,
     COALESCE(SUM(p.won),0)  AS won,
     COALESCE(SUM(p.lost),0) AS lost,
     COALESCE(c.contracts_count,0) AS contracts_count,
     COALESCE(c.revenue,0)   AS revenue
   FROM crminternet_users u
+  LEFT JOIN crminternet_teams t ON t.id = u.team_id
   LEFT JOIN (
     SELECT assigned_to,
       COUNT(*) cnt,
@@ -45,7 +50,7 @@ $agentSql = "
     WHERE signature_date BETWEEN :from2 AND :to2
     GROUP BY assigned_to
   ) c ON c.assigned_to = u.username
-  WHERE u.role IN ('Agent','Manager','AgentSuivi','AgentActivation','AgentVente') AND u.active = 1
+  WHERE u.role IN ('Agent','Manager','AgentSuivi','AgentActivation','AgentVente','AgentGuichet','AgentTechnicoCommercial') AND u.active = 1
   $teamFilter
   GROUP BY u.id
   ORDER BY revenue DESC
@@ -54,12 +59,13 @@ $s = $db->prepare($agentSql);
 $params = [':from1'=>$from, ':to1'=>$to, ':from2'=>$from, ':to2'=>$to];
 if ($team !== '' && !$teamIsNone) $params[':team'] = $team;
 $s->execute($params);
-$agents = array_map(function($r){
+$agents = array_map(function($r) use ($NO_TEAM) {
     $h = (int)$r['handled'];
+    $tn = (string)$r['team_name'];
     return [
         'username'  => $r['username'],
         'fullName'  => $r['full_name'],
-        'team'      => $r['team'],
+        'team'      => $tn !== '' ? $tn : $NO_TEAM,
         'handled'   => $h,
         'won'       => (int)$r['won'],
         'lost'      => (int)$r['lost'],
@@ -69,12 +75,12 @@ $agents = array_map(function($r){
     ];
 }, $s->fetchAll());
 
+
 // Per-team (agence) aggregation derived from the agent rows above so the
 // team filter is naturally honored.
-$NO_TEAM = 'Aucune agence';
 $teamsAgg = [];
 foreach ($agents as $a) {
-    $t = $a['team'] !== '' && $a['team'] !== null ? $a['team'] : $NO_TEAM;
+    $t = $a['team'];
     if (!isset($teamsAgg[$t])) {
         $teamsAgg[$t] = ['team'=>$t,'agents'=>0,'handled'=>0,'won'=>0,'lost'=>0,'contracts'=>0,'revenue'=>0.0];
     }
@@ -91,13 +97,17 @@ $teams = array_values(array_map(function($t){
 }, $teamsAgg));
 usort($teams, fn($a,$b) => $b['revenue'] <=> $a['revenue']);
 
+
 // Funnel
 if ($teamIsNone) {
-    $funnelJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to AND (u.team = '' OR u.team IS NULL) ";
+    $funnelJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $funnelWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
-    $funnelJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to AND u.team = :team ';
+    $funnelJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $funnelWhereTeam = '';
 } else {
     $funnelJoin = '';
+    $funnelWhereTeam = '';
 }
 $funnel = $db->prepare("
   SELECT
@@ -108,6 +118,7 @@ $funnel = $db->prepare("
   FROM crminternet_prospects p
   $funnelJoin
   WHERE p.created_at BETWEEN :f AND :t
+  $funnelWhereTeam
 ");
 $fp = [':f'=>$from, ':t'=>$to];
 if ($team !== '' && !$teamIsNone) $fp[':team'] = $team;
@@ -116,17 +127,21 @@ $f = $funnel->fetch();
 
 // Monthly revenue (12 buckets back from `to`)
 if ($teamIsNone) {
-    $monthlyJoin = " INNER JOIN crminternet_users u ON u.username = c.assigned_to AND (u.team = '' OR u.team IS NULL) ";
+    $monthlyJoin = " INNER JOIN crminternet_users u ON u.username = c.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $monthlyWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
-    $monthlyJoin = ' INNER JOIN crminternet_users u ON u.username = c.assigned_to AND u.team = :team ';
+    $monthlyJoin = ' INNER JOIN crminternet_users u ON u.username = c.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $monthlyWhereTeam = '';
 } else {
     $monthlyJoin = '';
+    $monthlyWhereTeam = '';
 }
 $monthly = $db->prepare("
   SELECT DATE_FORMAT(c.signature_date,'%Y-%m') ym, COUNT(*) cnt, SUM(c.premium) rev
   FROM crminternet_contracts c
   $monthlyJoin
   WHERE c.signature_date >= DATE_SUB(:t, INTERVAL 12 MONTH)
+  $monthlyWhereTeam
   GROUP BY ym ORDER BY ym
 ");
 $mp = [':t'=>$to];
@@ -136,19 +151,25 @@ $months = array_map(fn($r)=>['month'=>$r['ym'],'contracts'=>(int)$r['cnt'],'reve
 
 // Per source
 if ($teamIsNone) {
-    $srcJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to AND (u.team = '' OR u.team IS NULL) ";
+    $srcJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $srcWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
-    $srcJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to AND u.team = :team ';
+    $srcJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $srcWhereTeam = '';
 } else {
     $srcJoin = '';
+    $srcWhereTeam = '';
 }
+
 $src = $db->prepare("
   SELECT p.source, COUNT(*) total,
     SUM(CASE WHEN p.outcome='won' THEN 1 ELSE 0 END) won
   FROM crminternet_prospects p
   $srcJoin
   WHERE p.created_at BETWEEN :f AND :t
+  $srcWhereTeam
   GROUP BY p.source ORDER BY total DESC
+
 ");
 $sp = [':f'=>$from, ':t'=>$to];
 if ($team !== '' && !$teamIsNone) $sp[':team'] = $team;
