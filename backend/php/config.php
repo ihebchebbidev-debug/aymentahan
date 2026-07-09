@@ -12,9 +12,9 @@ ini_set('log_errors', 1);
 // briefly exceed PHP's default 128M/512M when the dataset grows. Bumping the
 // limit + execution time prevents the "Allowed memory size exhausted" fatals
 // that made the prospects table appear empty after large imports.
-@ini_set('memory_limit', '1024M');
-@ini_set('max_execution_time', '120');
-@ini_set('max_input_time', '120');
+@ini_set('memory_limit', '-1');
+@ini_set('max_execution_time', '0');
+@ini_set('max_input_time', '0');
 
 // ---------- FATAL → JSON ---------------------------------------------
 // Without this, a PHP fatal produces an empty 500 body and the browser

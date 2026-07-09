@@ -6,7 +6,7 @@
 
 if (!defined('CRM_LIST_MAX_PER_PAGE')) {
     /** Max rows per HTTP page (prospects/contracts/opportunities paginated fetch). */
-    define('CRM_LIST_MAX_PER_PAGE', 100000);
+    define('CRM_LIST_MAX_PER_PAGE', 999999999);
 }
 
 if (!defined('CRM_LIST_DEFAULT_PER_PAGE')) {
@@ -15,7 +15,7 @@ if (!defined('CRM_LIST_DEFAULT_PER_PAGE')) {
 
 if (!defined('CRM_LIST_MAX_ROWS')) {
     /** Hard safety ceiling for unpaginated legacy full-list responses. */
-    define('CRM_LIST_MAX_ROWS', 2000000);
+    define('CRM_LIST_MAX_ROWS', 999999999);
 }
 
 if (!function_exists('crm_clamp_int')) {

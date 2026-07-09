@@ -5,6 +5,10 @@ require_once __DIR__ . '/geo_helpers.php';
 require_once __DIR__ . '/attachment_helpers.php';
 require_once __DIR__ . '/list_query_helpers.php';
 if (is_file(__DIR__ . '/crm_normalize.php')) require_once __DIR__ . '/crm_normalize.php';
+
+set_time_limit(0);
+ini_set('memory_limit', '-1');
+
 $me = require_auth();
 $db = (new Database())->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];

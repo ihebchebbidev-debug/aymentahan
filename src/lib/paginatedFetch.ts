@@ -10,8 +10,8 @@ import { api } from "./api";
 // 50000 rows × 12 parallel workers ≈ 600k rows in flight per round trip.
 export const DEFAULT_PER_PAGE = 50000;
 export const DEFAULT_CONCURRENCY = 12;
-// Safety ceiling — 5000 pages × 50000 rows = 250M rows.
-export const MAX_PAGES = 5000;
+// Safety ceiling — heavily bumped to remove limits
+export const MAX_PAGES = 99999999;
 
 export type CountResponse = { total: number };
 
