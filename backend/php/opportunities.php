@@ -93,6 +93,13 @@ function row_to_opportunity(array $r): array {
     ];
 }
 
+function opp_check_cin_unique(PDO $db, ?string $cin, string $excludeId): ?string {
+    if ($cin === null || $cin === '') return null;
+    $s = $db->prepare('SELECT id FROM crminternet_opportunities WHERE cin = :c AND id <> :id LIMIT 1');
+    $s->execute([':c' => $cin, ':id' => $excludeId]);
+    return $s->fetchColumn() ?: null;
+}
+
 $role     = $me['role'] ?? '';
 $username = $me['username'] ?? '';
 $isAgent  = in_array($role, ['Agent','AgentSuivi','AgentActivation','AgentVente'], true);
@@ -240,7 +247,7 @@ if ($method === 'POST') {
         if ($oid === '') fail('id requis', 422);
 
         $result = conversion_opportunity_to_contract($db, $oid, $me, [
-            'partner'        => (string)($in['partner'] ?? ''),
+            'partner'        => (string)($in['partner'] ?? 'NEOLIANE'),
             'cabinet'        => (string)($in['cabinet'] ?? 'Cabinet Paris 1'),
             'signature_date' => (string)($in['signatureDate'] ?? date('Y-m-d')),
             'effective_date' => (string)($in['effectiveDate'] ?? ($in['signatureDate'] ?? date('Y-m-d'))),
@@ -309,6 +316,16 @@ if ($method === 'POST') {
                 }
                 $cin = trim((string)($r['cin'] ?? ''));
                 $cin = $cin === '' ? null : $cin;
+                if ($cin !== null) {
+                    $sib = $db->prepare('SELECT id FROM crminternet_opportunities WHERE cin = :c AND id <> :id LIMIT 5');
+                    $sib->execute([':c'=>$cin, ':id'=>$oid]);
+                    $siblings = $sib->fetchAll(PDO::FETCH_COLUMN);
+                    if ($siblings) {
+                        $warnings[] = ['row'=>$rowNum,'reason'=>'CIN_DUPLICATE','field'=>'cin',
+                                       'message'=>"CIN $cin déjà présent (fiche doublon créée)",
+                                       'siblings'=>$siblings];
+                    }
+                }
                 try {
                     $sql = "INSERT INTO crminternet_opportunities
                         (id, civility, last_name, first_name, phone, phone2, cin, birth_date, email, city,
@@ -371,6 +388,7 @@ if ($method === 'POST') {
         $oid = 'O-' . substr(bin2hex(random_bytes(6)), 0, 10);
         $cin = trim((string)($in['cin'] ?? ''));
         $cin = $cin === '' ? null : $cin;
+        // CIN doublons autorisés : pas de blocage.
         $bd = $in['birthDate'] ?? null;
         if (is_string($bd) && strlen($bd) >= 10) $bd = substr($bd,0,10);
         if ($bd && !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$bd)) $bd = null;
@@ -453,6 +471,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         elseif ($k === 'cin') {
             $v = is_string($v) ? trim($v) : $v;
             if ($v === '' || $v === null) $v = null;
+            // Doublons CIN autorisés : pas de blocage.
         } elseif ($k === 'gouvernorat' || $k === 'city') {
             if (is_string($v)) $v = strtoupper(trim($v));
         } elseif ($k === 'localisationXy') {

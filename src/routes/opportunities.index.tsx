@@ -277,12 +277,7 @@ function OpportunitiesPage() {
         const field = KEY_MAP[k] ?? k;
         const val = (o as any)[field];
         const target = String(raw).toLowerCase();
-        
-        if (val == null) {
-          if (target === "false") continue;
-          return false;
-        }
-        
+        if (val == null) return false;
         if (typeof val === "boolean") { if (String(val) !== target) return false; continue; }
         if (!String(val).toLowerCase().includes(target)) return false;
       }

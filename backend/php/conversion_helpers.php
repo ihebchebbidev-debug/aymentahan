@@ -175,7 +175,7 @@ function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array
         ':src'  => $o['source'] ?: 'Web',
         ':tid'  => $o['type_id'] ?? null,
         ':lst'  => $o['lead_status'] ?? null,
-        ':pa'   => $extra['partner']      ?? '',
+        ':pa'   => $extra['partner']      ?? 'NEOLIANE',
         ':ca'   => $extra['cabinet']      ?? 'Cabinet Paris 1',
         ':sd'   => $extra['signature_date'] ?? $today,
         ':ed'   => $extra['effective_date'] ?? ($extra['signature_date'] ?? $today),
@@ -532,7 +532,7 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
         return ['ok' => false, 'error' => 'Opportunité déjà transformée en migration', 'code' => 409];
     }
 
-    $partner = (string) ($opts['partner'] ?? '');
+    $partner = (string) ($opts['partner'] ?? 'NEOLIANE');
     $cabinet = (string) ($opts['cabinet'] ?? 'Cabinet Paris 1');
     $signatureDate = (string) ($opts['signature_date'] ?? date('Y-m-d'));
     $effectiveDate = (string) ($opts['effective_date'] ?? $signatureDate);
@@ -631,8 +631,6 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
     $role = (string) ($me['role'] ?? '');
     $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
-    conv_backfill_contract_references($db);
-
     if (($opts['checkAgent'] ?? true) && $isAgent) {
         $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
         $own->execute([':id' => $pid]);
@@ -678,7 +676,7 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
             ];
         }
 
-        $partner = (string) ($opts['partner'] ?? '');
+        $partner = (string) ($opts['partner'] ?? 'NEOLIANE');
         $premium = (float) ($opts['premium'] ?? 950);
         $cid = (string) ($opts['contractId'] ?? ('C-' . substr(bin2hex(random_bytes(6)), 0, 10)));
 

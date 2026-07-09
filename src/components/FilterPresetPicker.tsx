@@ -280,7 +280,6 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
           onUpdate={async (id, patch) => { await actions.update(id, patch); }}
           onDelete={async (id) => { await actions.remove(id); if (activeId === id) setActiveId(null); }}
           onMove={move}
-          onApply={onApply}
         />
       )}
     </>
@@ -311,7 +310,6 @@ type ManagerProps = {
   onDelete: (id: string) => Promise<void>;
   onMove: (id: string, dir: -1 | 1) => Promise<void>;
   canDelete?: boolean;
-  onApply: (f: Record<string, unknown>) => void;
 };
 
 const ROLE_GLOBAL = "__global__";
@@ -320,7 +318,7 @@ function PresetManagerDialog(props: ManagerProps) {
   const {
     open, onOpenChange, presets, editing, setEditing,
     currentFilters, filterKeys, filterSchema, onCreate, onUpdate, onDelete, onMove,
-    canDelete = false, onApply
+    canDelete = false,
   } = props;
 
   const [name, setName] = useState("");
@@ -594,98 +592,145 @@ function PresetManagerDialog(props: ManagerProps) {
                     Reprendre les filtres actuels
                   </Button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Cochez les critères à appliquer, puis choisissez la valeur. Les
-                  champs non cochés ne seront pas filtrés.
-                </p>
-                <div className="border rounded-md divide-y max-h-[300px] overflow-y-auto">
-                  {filterSchema.map((f) => {
-                    const on = !!enabled[f.key];
-                    const val = values[f.key] ?? "";
-                    return (
-                      <div key={f.key} className="px-3 py-2 flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id={`pp-${f.key}`}
-                          className="mt-2 h-4 w-4 rounded border-input"
-                          checked={on}
-                          onChange={(e) => setEnabled((p) => ({ ...p, [f.key]: e.target.checked }))}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Label htmlFor={`pp-${f.key}`} className="text-sm font-medium">
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Critères de filtrage</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Ajoutez uniquement les champs que vous souhaitez sauvegarder dans ce modèle.
+                    </p>
+                  </div>
+                  <Select
+                    value=""
+                    onValueChange={(key) => {
+                      if (!key) return;
+                      setEnabled((p) => ({ ...p, [key]: true }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[240px] h-9 text-xs bg-background shadow-sm border-dashed border-muted-foreground/40 hover:border-primary/50 transition-colors">
+                      <Plus className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                      <SelectValue placeholder="Ajouter un champ..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filterSchema.filter(f => !enabled[f.key]).map(f => (
+                        <SelectItem key={f.key} value={f.key}>
+                          <div className="flex items-center">
+                            <Plus className="h-3 w-3 mr-2 text-muted-foreground" />
                             {f.label}
-                          </Label>
-                          {f.description && (
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{f.description}</p>
-                          )}
-                          <div className="mt-1.5">
-                            {f.type === "select" && !freeText[f.key] ? (
-                              <div className="flex gap-1.5">
-                                <Select
-                                  value={val || undefined}
-                                  onValueChange={(v) => {
-                                    setValues((p) => ({ ...p, [f.key]: v }));
-                                    setEnabled((p) => ({ ...p, [f.key]: true }));
-                                  }}
-                                  disabled={!on}
-                                >
-                                  <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Choisir une valeur…" /></SelectTrigger>
-                                  <SelectContent>
-                                    {(f.options ?? []).map((o) => (
-                                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-9 text-[11px] shrink-0"
-                                  onClick={() => setFreeText((p) => ({ ...p, [f.key]: true }))}
-                                  title="Saisir une valeur libre (non listée)"
-                                >
-                                  <Pencil className="h-3 w-3 mr-1" />Libre
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-1.5">
-                                <Input
-                                  type={f.type === "date" ? "date" : "text"}
-                                  value={val}
-                                  onChange={(e) => {
-                                    setValues((p) => ({ ...p, [f.key]: e.target.value }));
-                                    if (e.target.value) setEnabled((p) => ({ ...p, [f.key]: true }));
-                                  }}
-                                  disabled={!on}
-                                  className="h-9 flex-1"
-                                  placeholder={
-                                    f.type === "date"
-                                      ? ""
-                                      : f.type === "select"
-                                        ? "Saisir une valeur libre…"
-                                        : "Saisir une valeur (texte libre)…"
-                                  }
-                                />
-                                {f.type === "select" && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-9 text-[11px] shrink-0"
-                                    onClick={() => setFreeText((p) => ({ ...p, [f.key]: false }))}
-                                    title="Revenir à la liste"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      {filterSchema.filter(f => !enabled[f.key]).length === 0 && (
+                        <SelectItem value="_empty" disabled>Tous les champs sont ajoutés</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {filterSchema.filter(f => enabled[f.key]).length > 0 ? (
+                  <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1 mt-4">
+                    {filterSchema.filter(f => enabled[f.key]).map((f) => {
+                        const val = values[f.key] ?? "";
+                        return (
+                          <div key={f.key} className="p-3.5 bg-card border rounded-lg shadow-sm hover:shadow-md transition-shadow relative group">
+                            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Label className="text-sm font-semibold text-foreground">
+                                    {f.label}
+                                  </Label>
+                                  <Badge variant="secondary" className="h-4.5 text-[9px] uppercase tracking-wider px-1.5 opacity-70">
+                                    {f.type === "select" ? "Liste" : f.type === "date" ? "Date" : "Texte"}
+                                  </Badge>
+                                </div>
+                                {f.description && (
+                                  <p className="text-[11px] text-muted-foreground mb-3">{f.description}</p>
                                 )}
                               </div>
-                            )}
+                              
+                              <div className="w-full sm:w-[300px] shrink-0 mt-2 sm:mt-0">
+                                {f.type === "select" && !freeText[f.key] ? (
+                                  <div className="flex gap-1.5">
+                                    <Select
+                                      value={val || undefined}
+                                      onValueChange={(v) => {
+                                        setValues((p) => ({ ...p, [f.key]: v }));
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 flex-1"><SelectValue placeholder="Choisir une valeur…" /></SelectTrigger>
+                                      <SelectContent>
+                                        {(f.options ?? []).map((o) => (
+                                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-9 text-[11px] shrink-0"
+                                      onClick={() => setFreeText((p) => ({ ...p, [f.key]: true }))}
+                                      title="Saisir une valeur libre (non listée)"
+                                    >
+                                      <Pencil className="h-3 w-3 mr-1" />Libre
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-1.5">
+                                    <Input
+                                      type={f.type === "date" ? "date" : "text"}
+                                      value={val}
+                                      onChange={(e) => {
+                                        setValues((p) => ({ ...p, [f.key]: e.target.value }));
+                                      }}
+                                      className="h-9 flex-1"
+                                      placeholder={f.type === "date" ? "" : "Saisir une valeur..."}
+                                    />
+                                    {f.type === "select" && (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-9 text-[11px] shrink-0"
+                                        onClick={() => setFreeText((p) => ({ ...p, [f.key]: false }))}
+                                        title="Revenir à la liste"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-background border shadow-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => {
+                                setEnabled(p => ({ ...p, [f.key]: false }));
+                                setValues(p => ({ ...p, [f.key]: "" }));
+                              }}
+                              title="Retirer ce critère"
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center border-2 border-dashed rounded-xl bg-muted/10 mt-4">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                      <Filter className="h-5 w-5 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold mb-1">Aucun critère ajouté</h3>
+                    <p className="text-xs text-muted-foreground max-w-[250px]">
+                      Sélectionnez un champ dans la liste ci-dessus pour commencer à construire votre modèle de filtre.
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -719,16 +764,8 @@ function PresetManagerDialog(props: ManagerProps) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
-          <Button variant="secondary" onClick={() => {
-            const finalVals: Record<string, unknown> = {};
-            for (const f of filterSchema ?? []) {
-              if (enabled[f.key]) finalVals[f.key] = values[f.key];
-            }
-            onApply(finalVals);
-            onOpenChange(false);
-          }}>Appliquer</Button>
           <Button onClick={submit} disabled={busy}>
-            {editing ? "Enregistrer le modèle" : "Créer le modèle"}
+            {editing ? "Enregistrer" : "Créer le modèle"}
           </Button>
         </DialogFooter>
       </DialogContent>

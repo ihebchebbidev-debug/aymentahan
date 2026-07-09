@@ -50,7 +50,7 @@ function buildImportFields(currencySymbol: string): ImportField[] {
     { key: "address", label: "Adresse", sample: "12 rue …" },
     { key: "localisationXy", label: "Localisation XY (lat,lng)", sample: "36.123456,10.123698" },
     { key: "codePostal", label: "Code postal", sample: "75001" },
-    { key: "partner", label: "Partenaire", sample: "APRIL" },
+    { key: "partner", label: "Partenaire", sample: "NEOLIANE" },
     { key: "cabinet", label: "Cabinet", sample: "Cabinet Paris 1" },
     { key: "premium", label: `Cotisation (${currencySymbol})`, required: true, sample: "950" },
     { key: "billingStatus", label: "Statut facturation", sample: "Pré-validé" },
@@ -183,7 +183,7 @@ function ContractsPage() {
     setSearch(""); setDateSig(""); setDateEffet(""); setDateVal("");
     setDateFrom(""); setDateTo("");
     setAssigne(ALL); setSource(ALL); setStatut(ALL); setPartenaire(ALL); setCabinet(ALL); setPage(0);
-    setPresetExtra({}); setCustomFilters({});
+    setCustomFilters({});
     toast.success("Filtres réinitialisés");
   };
 
@@ -257,15 +257,10 @@ function ContractsPage() {
         if (raw == null || raw === "" || VIEW_KEYS.includes(k)) continue;
         if (k === "premiumMin") { if (Number((c as any).premium ?? 0) < Number(raw)) return false; continue; }
         if (k === "premiumMax") { if (Number((c as any).premium ?? 0) > Number(raw)) return false; continue; }
-        const field = (KEY_MAP[k] ?? k) as keyof Contract;
+        const field = KEY_MAP[k] ?? k;
         const val = (c as any)[field];
         const target = String(raw).toLowerCase();
-        
-        if (val == null) {
-          if (target === "false") continue;
-          return false;
-        }
-        
+        if (val == null) return false;
         if (typeof val === "boolean") { if (String(val) !== target) return false; continue; }
         if (!String(val).toLowerCase().includes(target)) return false;
       }

@@ -13,7 +13,6 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/schema_repair.php';
 require_once __DIR__ . '/guichet_schema.php';
-require_once __DIR__ . '/conversion_helpers.php';
 require_method('GET');
 
 $token = getenv('CRM_SEED_TOKEN') ?: 'crm-seed-2026';
@@ -102,7 +101,7 @@ $indexSpec = [
         'idx_prospect_opportunity' => 'opportunity_id',
         'idx_prospect_deleted'     => 'deleted_at',
         'idx_prospect_converted'   => 'converted',
-        'ix_prospect_cin'          => 'cin',
+        'ux_prospect_cin'          => null, // unique on cin, handled separately
     ],
     'crminternet_opportunities' => [
         'idx_opp_deleted'      => 'deleted_at',
@@ -150,8 +149,13 @@ foreach ($indexSpec as $table => $idx) {
     $existingCols = table_columns($db, $table);
     foreach ($idx as $name => $col) {
         if (isset($existingIdx[$name])) continue;
-        if (!$col || !isset($existingCols[$col])) continue;
-        $sql = "ALTER TABLE `$table` ADD INDEX `$name` (`$col`)";
+        if ($name === 'ux_prospect_cin') {
+            if (!isset($existingCols['cin'])) continue;
+            $sql = "ALTER TABLE `$table` ADD UNIQUE KEY `$name` (cin)";
+        } else {
+            if (!$col || !isset($existingCols[$col])) continue;
+            $sql = "ALTER TABLE `$table` ADD INDEX `$name` (`$col`)";
+        }
         if ($dry) { $report['indexes'][] = "[DRY] $sql"; continue; }
         try {
             $db->exec($sql);
@@ -175,12 +179,6 @@ if (!$dry) {
     try {
         $db->exec("UPDATE crminternet_prospects SET cin = NULL WHERE cin = ''");
     } catch (Throwable $e) { /* ignore */ }
-    try {
-        conv_backfill_contract_references($db);
-        $report['contract_references'] = 'backfilled';
-    } catch (Throwable $e) {
-        $report['errors'][] = 'contract_references → ' . $e->getMessage();
-    }
 }
 
 // Guichet repair (idempotent)

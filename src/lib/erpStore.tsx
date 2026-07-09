@@ -362,7 +362,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
     );
   }, [refreshProspects]);
 
-  const markWon = useCallback(async (prospectId: string, premium = 950, partner = "") => {
+  const markWon = useCallback(async (prospectId: string, premium = 950, partner = "NEOLIANE") => {
     if (API_ENABLED) {
       await api("/prospects.php", { method: "POST", body: { action: "mark_won", id: prospectId, premium, partner } });
       // mark_won creates a contract → refresh both, in parallel.
@@ -631,7 +631,7 @@ export function ErpProvider({ children }: { children: ReactNode }) {
           id, lastName,
           firstName: String(r.firstName ?? existing?.firstName ?? "").trim(),
           city: String(r.city ?? existing?.city ?? "").toUpperCase(),
-          partner: String(r.partner ?? existing?.partner ?? ""),
+          partner: String(r.partner ?? existing?.partner ?? "NEOLIANE"),
           cabinet: String(r.cabinet ?? existing?.cabinet ?? "Cabinet Paris 1"),
           signatureDate: String(r.signatureDate ?? existing?.signatureDate ?? today),
           effectiveDate: String(r.effectiveDate ?? existing?.effectiveDate ?? today),

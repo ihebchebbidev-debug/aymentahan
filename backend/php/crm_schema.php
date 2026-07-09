@@ -265,7 +265,7 @@ function crm_create_tables_sql(): array {
             last_name VARCHAR(120) NOT NULL,
             first_name VARCHAR(120) NOT NULL DEFAULT '',
             city VARCHAR(120) NOT NULL DEFAULT '',
-            partner VARCHAR(80) NOT NULL DEFAULT '',
+            partner VARCHAR(80) NOT NULL DEFAULT 'NEOLIANE',
             cabinet VARCHAR(120) NOT NULL DEFAULT 'Cabinet Paris 1',
             signature_date DATE NOT NULL,
             effective_date DATE NOT NULL,

@@ -302,7 +302,7 @@ INSERT INTO billing_statuses (name, color) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO partners (name, type) VALUES
- ('SPVIE','sante'),('APRIL','sante'),
+ ('NEOLIANE','sante'),('SPVIE','sante'),('APRIL','sante'),
  ('APIVIA','sante'),('MALAKOFF','prevoyance')
 ON CONFLICT DO NOTHING;
 

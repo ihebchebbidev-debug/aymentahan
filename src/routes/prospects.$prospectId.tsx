@@ -26,6 +26,7 @@ import { LeadActionsTimeline } from "@/components/LeadActionsTimeline";
 import { LeadHistoryCard } from "@/components/LeadHistoryCard";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 
+import { CinDuplicatesCard } from "@/components/CinDuplicatesCard";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
 import { api, API_ENABLED } from "@/lib/api";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
@@ -270,6 +271,9 @@ function ProspectDetailPage() {
                 showAncienLigne={showAncienLigne || !!prospect.ancienLigne}
                 showAnimateur={isStreetType || !!prospect.animateur}
               />
+
+              <CinDuplicatesCard cin={prospect.cin} currentId={prospect.id} />
+
               {/* Suivi commercial — historique des actions horodatées */}
               <LeadActionsTimeline prospectId={prospect.id} />
 
