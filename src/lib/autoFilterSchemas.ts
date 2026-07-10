@@ -55,7 +55,27 @@ export type AutoSchemaInput = {
   contractBilling?: string[];
   /** Prospect/Contract types, if available. */
   types?: { id: string; name: string }[];
+  /** Custom-field definitions for the entity — appended so presets can filter on them. */
+  customFields?: ReadonlyArray<{ key: string; label: string; type: string; options?: string[] }>;
 };
+
+/** Map a custom-field type to a preset-builder schema entry. */
+function customFieldsToSchema(
+  defs: ReadonlyArray<{ key: string; label: string; type: string; options?: string[] }> = [],
+): FilterFieldSchema[] {
+  return defs.map((d) => {
+    const label = `★ ${d.label}`;
+    if (d.type === "date") return { key: d.key, label, type: "date" };
+    if (d.type === "boolean") return {
+      key: d.key, label, type: "select",
+      options: [{ value: "1", label: "Oui" }, { value: "0", label: "Non" }],
+    };
+    if ((d.type === "select" || d.type === "multiselect") && d.options && d.options.length > 0) {
+      return { key: d.key, label, type: "select", options: d.options.map((v) => ({ value: v, label: v })) };
+    }
+    return { key: d.key, label, type: "text" };
+  });
+}
 
 export function autoFilterSchema(
   scope: FilterPresetScope,
@@ -63,10 +83,13 @@ export function autoFilterSchema(
 ): FilterFieldSchema[] {
   const rows = input.rows ?? [];
   const types = (input.types ?? []).map((t) => ({ value: t.id, label: t.name }));
+  const cfs = customFieldsToSchema(input.customFields);
+  const withCf = (base: FilterFieldSchema[]) => cfs.length > 0 ? [...base, ...cfs] : base;
+
 
   switch (scope) {
     case "prospects":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (nom, prénom, tél, email, CIN)", type: "text" },
         realField("Statut", "statut", rows, "status"),
         realField("Source", "source", rows, "source"),
@@ -90,10 +113,10 @@ export function autoFilterSchema(
           options: [{ value: "true", label: "Oui" }, { value: "false", label: "Non" }] },
         { key: "createdAt", label: "Date de création", type: "date" },
         { key: "birthDate", label: "Date de naissance", type: "date" },
-      ];
+      ]);
 
     case "opportunities":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (nom, ville, titre)", type: "text" },
         realField("Étape", "stage", rows, "stage", input.opportunityStages ?? []),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
@@ -117,10 +140,10 @@ export function autoFilterSchema(
           options: [{ value: "true", label: "Oui" }, { value: "false", label: "Non" }] },
         { key: "expectedCloseDate", label: "Date de clôture prévue", type: "date" },
         { key: "createdAt", label: "Date de création", type: "date" },
-      ];
+      ]);
 
     case "migrations":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (nom, téléphone, CIN, opérateurs)", type: "text" },
         realField("Workflow", "workflow", rows, "workflowStatus"),
         realField("Statut technique", "technical", rows, "technicalStatus"),
@@ -131,10 +154,10 @@ export function autoFilterSchema(
         { key: "dateTo", label: "Créée au", type: "date" },
         { key: "portingNumber", label: "N° portabilité", type: "text" },
         { key: "externalRef", label: "Réf. externe", type: "text" },
-      ];
+      ]);
 
     case "contracts":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (nom, prénom, ville)", type: "text" },
         realField("Statut Facturation", "statut", rows, "billingStatus", input.contractBilling ?? []),
         realField("Partenaire", "partenaire", rows, "partner"),
@@ -157,10 +180,10 @@ export function autoFilterSchema(
         { key: "dateSig", label: "Date Signature", type: "date" },
         { key: "dateEffet", label: "Date Effet", type: "date" },
         { key: "dateVal", label: "Date Validation", type: "date" },
-      ];
+      ]);
 
     case "guichet":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (réf, client, CIN)", type: "text" },
         realField("Entité", "entityId", rows, "entityId"),
         realField("Type d'opération", "type", rows, "type"),
@@ -175,10 +198,10 @@ export function autoFilterSchema(
         realField("Offre", "offre", rows, "offre"),
         { key: "dateFrom", label: "Date début", type: "date" },
         { key: "dateTo", label: "Date fin", type: "date" },
-      ];
+      ]);
 
     case "reclamations":
-      return [
+      return withCf([
         { key: "search", label: "Recherche (client, tél, CIN, GSM, réf)", type: "text" },
         realField("Service", "service", rows, "service"),
         { key: "audit", label: "Audit", type: "select", options: [
@@ -200,7 +223,7 @@ export function autoFilterSchema(
         { key: "annee", label: "Année", type: "text" },
         { key: "date_creation", label: "Date création", type: "date" },
         { key: "date_resolution", label: "Date résolution", type: "date" },
-      ];
+      ]);
   }
 }
 

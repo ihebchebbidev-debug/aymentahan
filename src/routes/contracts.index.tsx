@@ -28,6 +28,7 @@ import { ImportDialog, type ImportField } from "@/components/ImportDialog";
 import { NewContractDialog } from "@/components/NewContractDialog";
 import { SavedViews } from "@/components/SavedViews";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
+import { useFilterPresets } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
@@ -188,6 +189,8 @@ function ContractsPage() {
   };
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("contract");
+  const { data: presetsData } = useFilterPresets("contracts");
+  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
   const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
   const setCustomFilter = (k: string, v: string) =>
@@ -269,7 +272,7 @@ function ContractsPage() {
   }, [contracts, debouncedSearch, haystackById, dateSig, dateEffet, dateVal, dateFrom, dateTo, assigne, source, statut, partenaire, cabinet, customFilters, customValuesById, presetExtra]);
 
   const presetChips = useMemo(() => {
-    const schema = autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any });
+    const schema = autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
     return Object.entries(presetExtra)
       .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
@@ -303,8 +306,8 @@ function ContractsPage() {
             <FilterPresetPicker
               scope="contracts"
               current={currentView}
-              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any }))}
-              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any })}
+              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs }))}
+              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs })}
               onApply={(f) => {
                 applyView({
                   search: typeof f.search === "string" ? f.search : "",
@@ -385,51 +388,55 @@ function ContractsPage() {
                 className="pl-9 h-9"
               />
             </div>
-            <Select value={statut} onValueChange={(v) => { setStatut(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Statut" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous statuts</SelectItem>
-                {[...new Set([...BILLING, ...(statut !== ALL && statut ? [statut] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={partenaire} onValueChange={(v) => { setPartenaire(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Partenaire" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous partenaires</SelectItem>
-                {[...new Set([...partnerOptions, ...(partenaire !== ALL && partenaire ? [partenaire] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={cabinet} onValueChange={(v) => { setCabinet(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Cabinet" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous cabinets</SelectItem>
-                {[...new Set([...cabinetOptions, ...(cabinet !== ALL && cabinet ? [cabinet] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Source" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Toutes sources</SelectItem>
-                {[...new Set([...sourceOptions, ...(source !== ALL && source ? [source] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {!isAgent && (
-              <Select value={assigne} onValueChange={(v) => { setAssigne(v); setPage(0); }}>
-                <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Assigné à" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Tous</SelectItem>
-                  {[...new Set([...assigneOptions, ...(assigne !== ALL && assigne ? [assigne] : [])])].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            {!hideHardcoded && (
+              <>
+                <Select value={statut} onValueChange={(v) => { setStatut(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Statut" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous statuts</SelectItem>
+                    {[...new Set([...BILLING, ...(statut !== ALL && statut ? [statut] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={partenaire} onValueChange={(v) => { setPartenaire(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Partenaire" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous partenaires</SelectItem>
+                    {[...new Set([...partnerOptions, ...(partenaire !== ALL && partenaire ? [partenaire] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={cabinet} onValueChange={(v) => { setCabinet(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Cabinet" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous cabinets</SelectItem>
+                    {[...new Set([...cabinetOptions, ...(cabinet !== ALL && cabinet ? [cabinet] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Source" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Toutes sources</SelectItem>
+                    {[...new Set([...sourceOptions, ...(source !== ALL && source ? [source] : [])])].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {!isAgent && (
+                  <Select value={assigne} onValueChange={(v) => { setAssigne(v); setPage(0); }}>
+                    <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Assigné à" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Tous</SelectItem>
+                      {[...new Set([...assigneOptions, ...(assigne !== ALL && assigne ? [assigne] : [])])].map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </>
             )}
             {(search || statut !== ALL || partenaire !== ALL || cabinet !== ALL || source !== ALL || assigne !== ALL || dateSig || dateEffet || dateVal || dateFrom || dateTo || Object.keys(customFilters).length > 0) && (
               <Button variant="ghost" size="sm" onClick={reset}><X className="h-3.5 w-3.5 mr-1" />Réinitialiser</Button>
             )}
             <FilterPresetPicker
               scope="contracts"
-              current={currentView}
-              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any }))}
-              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any })}
+              current={{ ...currentView, ...customFilters }}
+              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs }))}
+              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs })}
               onApply={(f) => {
                 applyView({
                   search: typeof f.search === "string" ? f.search : "",
@@ -442,11 +449,16 @@ function ContractsPage() {
                   partenaire: typeof f.partenaire === "string" && f.partenaire ? f.partenaire : ALL,
                   cabinet: typeof f.cabinet === "string" && f.cabinet ? f.cabinet : ALL,
                 });
+                const cfKeys = new Set(customDefs.map((d) => d.key));
+                const nextCf: Record<string, string> = {};
                 const extra: Record<string, unknown> = {};
                 for (const [k, v] of Object.entries(f)) {
                   if (VIEW_KEYS.includes(k)) continue;
-                  if (v != null && v !== "") extra[k] = v;
+                  if (v == null || v === "") continue;
+                  if (cfKeys.has(k)) nextCf[k] = String(v);
+                  else extra[k] = v;
                 }
+                setCustomFilters(nextCf);
                 setPresetExtra(extra);
               }}
               onReset={() => {

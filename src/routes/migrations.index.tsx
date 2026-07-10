@@ -23,11 +23,13 @@ import { useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
+import { useFilterPresets } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
-import { exportCSV, exportJSON, exportXLSX } from "@/lib/exportUtils";
+import { exportCSV, exportJSON, exportXLSX, withCustomFields } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
+import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
 
 export const Route = createFileRoute("/migrations/")({
   validateSearch: zodValidator(z.object({
@@ -90,6 +92,17 @@ function MigrationsPage() {
   const [dateFrom, setDateFrom] = usePersistedState(pk("dateFrom"), "");
   const [dateTo, setDateTo] = usePersistedState(pk("dateTo"), "");
   const [presetExtra, setPresetExtra] = useState<Record<string, unknown>>({});
+  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const setCustomFilter = (k: string, v: string) =>
+    setCustomFilters((prev) => {
+      const n = { ...prev };
+      if (v === "") delete n[k]; else n[k] = v;
+      return n;
+    });
+
+  const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("migration");
+  const { data: presetsData } = useFilterPresets("migrations");
+  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
 
   useEffect(() => {
     if (urlStatut && urlStatut !== statut) {
@@ -135,6 +148,16 @@ function MigrationsPage() {
       const created = (m.createdAt ?? "").slice(0, 10);
       if (dateFrom && created < dateFrom) return false;
       if (dateTo && created > dateTo) return false;
+      const cfEntries = Object.entries(customFilters);
+      if (cfEntries.length > 0) {
+        const vals = customValuesById[m.id] ?? {};
+        for (const [k, raw] of cfEntries) {
+          const q2 = String(raw).trim().toLowerCase();
+          if (!q2) continue;
+          const v = String(vals[k] ?? "").toLowerCase();
+          if (!v.includes(q2)) return false;
+        }
+      }
       for (const [k, raw] of Object.entries(presetExtra)) {
         if (raw == null || raw === "") continue;
         const val = (m as Record<string, unknown>)[k];
@@ -142,10 +165,10 @@ function MigrationsPage() {
       }
       return true;
     });
-  }, [allMigrations, debouncedSearch, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, presetExtra]);
+  }, [allMigrations, debouncedSearch, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, presetExtra, customFilters, customValuesById]);
 
   const filterSchema = useMemo(
-    () => autoFilterSchema("migrations", { agents: agentOptions, rows: allMigrations as unknown as ReadonlyArray<Record<string, unknown>> }),
+    () => autoFilterSchema("migrations", { agents: agentOptions, rows: allMigrations as unknown as ReadonlyArray<Record<string, unknown>>, customFields: customDefs }),
     [agentOptions, allMigrations],
   );
 
@@ -177,6 +200,15 @@ function MigrationsPage() {
     { key: "assignedTo", header: "Assigné", cell: (m) => m.assignedTo || "—" },
     { key: "requestedDate", header: "Demandée", cell: (m) => m.requestedDate?.slice(0, 10) ?? "—" },
     { key: "createdAt", header: "Créée", cell: (m) => m.createdAt?.slice(0, 10) ?? "—" },
+    ...customDefs.map<DataGridColumn<Migration>>((d) => ({
+      key: `cf_${d.key}`,
+      header: d.label,
+      cell: (m) => (
+        <span className="text-muted-foreground text-sm">
+          {formatCustomValue(d, customValuesById[m.id]?.[d.key])}
+        </span>
+      ),
+    })),
   ];
 
   const reset = () => {
@@ -189,10 +221,11 @@ function MigrationsPage() {
     setDateFrom("");
     setDateTo("");
     setPresetExtra({});
+    setCustomFilters({});
     toast.success("Filtres réinitialisés");
   };
 
-  const exportRows: Record<string, unknown>[] = filtered.map((m) => ({
+  const baseExportRows: Record<string, unknown>[] = filtered.map((m) => ({
     ID: m.id,
     Nom: m.lastName,
     Prénom: m.firstName,
@@ -205,7 +238,9 @@ function MigrationsPage() {
     "Assigné à": m.assignedTo ?? "",
     "Date demande": m.requestedDate ?? "",
     "Créée le": m.createdAt ?? "",
+    id: m.id,
   }));
+  const exportRows = withCustomFields(baseExportRows, customDefs, customValuesById);
 
   return (
     <AppLayout skeleton="table">
@@ -244,61 +279,65 @@ function MigrationsPage() {
               <Input className="pl-9" placeholder="Nom, téléphone, CIN, opérateurs…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
-          <div className="w-40">
-            <Label className="text-xs">Statut</Label>
-            <Select value={statut} onValueChange={setStatut}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous statuts</SelectItem>
-                {workflowOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-40">
-            <Label className="text-xs">Statut technique</Label>
-            <Select value={technical} onValueChange={setTechnical}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous</SelectItem>
-                {technicalOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-36">
-            <Label className="text-xs">Ancien op.</Label>
-            <Select value={oldOp} onValueChange={setOldOp}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous</SelectItem>
-                {oldOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-36">
-            <Label className="text-xs">Nouvel op.</Label>
-            <Select value={newOp} onValueChange={setNewOp}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous</SelectItem>
-                {newOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-40">
-            <Label className="text-xs">Assigné à</Label>
-            <Select value={assigne} onValueChange={setAssigne}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous</SelectItem>
-                {[...new Set([...agentOptions, ...allMigrations.map((m) => m.assignedTo).filter(Boolean)])].sort().map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!hideHardcoded && (
+            <>
+              <div className="w-40">
+                <Label className="text-xs">Statut</Label>
+                <Select value={statut} onValueChange={setStatut}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous statuts</SelectItem>
+                    {workflowOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-40">
+                <Label className="text-xs">Statut technique</Label>
+                <Select value={technical} onValueChange={setTechnical}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous</SelectItem>
+                    {technicalOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-36">
+                <Label className="text-xs">Ancien op.</Label>
+                <Select value={oldOp} onValueChange={setOldOp}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous</SelectItem>
+                    {oldOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-36">
+                <Label className="text-xs">Nouvel op.</Label>
+                <Select value={newOp} onValueChange={setNewOp}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous</SelectItem>
+                    {newOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-40">
+                <Label className="text-xs">Assigné à</Label>
+                <Select value={assigne} onValueChange={setAssigne}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous</SelectItem>
+                    {[...new Set([...agentOptions, ...allMigrations.map((m) => m.assignedTo).filter(Boolean)])].sort().map((a) => (
+                      <SelectItem key={a} value={a}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
           <FilterPresetPicker
             scope="migrations"
-            current={{ search, statut, workflow: statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, ...presetExtra }}
+            current={{ search, statut, workflow: statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, ...customFilters, ...presetExtra }}
             filterKeys={schemaKeys(filterSchema)}
             filterSchema={filterSchema}
             onApply={(f) => {
@@ -312,12 +351,16 @@ function MigrationsPage() {
               setAssigne(typeof f.assigne === "string" && f.assigne ? f.assigne : ALL);
               setDateFrom(typeof f.dateFrom === "string" ? f.dateFrom : "");
               setDateTo(typeof f.dateTo === "string" ? f.dateTo : "");
+              const cfKeys = new Set(customDefs.map((d) => d.key));
+              const nextCf: Record<string, string> = {};
               const extra: Record<string, unknown> = {};
               for (const [k, v] of Object.entries(f)) {
-                if (!["search", "statut", "workflow", "technical", "oldOp", "newOp", "assigne", "dateFrom", "dateTo"].includes(k)) {
-                  extra[k] = v;
-                }
+                if (["search", "statut", "workflow", "technical", "oldOp", "newOp", "assigne", "dateFrom", "dateTo"].includes(k)) continue;
+                if (v == null || v === "") continue;
+                if (cfKeys.has(k)) nextCf[k] = String(v);
+                else extra[k] = v;
               }
+              setCustomFilters(nextCf);
               setPresetExtra(extra);
             }}
           />
@@ -334,6 +377,26 @@ function MigrationsPage() {
             <Label className="text-xs">au</Label>
             <DatePicker value={dateTo} onChange={setDateTo} />
           </div>
+          {customDefs.length > 0 && (
+            <>
+              <div className="basis-full h-0" />
+              <div className="flex items-center">
+                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mr-2">Champs perso</Label>
+              </div>
+              {customDefs.map((def) => (
+                <div key={def.id}>
+                  <Label className="text-xs">{def.label}</Label>
+                  <Input
+                    type={def.type === "number" ? "number" : def.type === "date" ? "date" : "text"}
+                    value={customFilters[def.key] ?? ""}
+                    onChange={(e) => setCustomFilter(def.key, e.target.value)}
+                    placeholder={def.label}
+                    className="h-9 w-[180px]"
+                  />
+                </div>
+              ))}
+            </>
+          )}
         </div>
         <p className="text-sm text-muted-foreground">
           {filtered.length.toLocaleString("fr-FR")} résultat(s) sur {allMigrations.length.toLocaleString("fr-FR")}

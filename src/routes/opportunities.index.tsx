@@ -32,6 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
+import { useFilterPresets } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
@@ -103,6 +104,8 @@ function OpportunitiesPage() {
   }, [oppQ.error]);
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("opportunity");
+  const { data: presetsData } = useFilterPresets("opportunities");
+  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
 
   const agentOptions = useMemo(
     () => users.filter((u) => u.role === "Agent" || u.role === "Manager" || u.role === "AgentSuivi" || u.role === "AgentActivation" || u.role === "AgentVente").map((u) => u.username),
@@ -286,7 +289,7 @@ function OpportunitiesPage() {
   }, [items, debouncedSearch, haystackById, stageF, filterStage, assigne, source, dateCree, dateFrom, dateTo, customFilters, customValuesById, presetExtra]);
 
   const presetChips = useMemo(() => {
-    const schema = autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any });
+    const schema = autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
     return Object.entries(presetExtra)
       .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
@@ -401,37 +404,41 @@ function OpportunitiesPage() {
                 className="pl-9 h-9"
               />
             </div>
-            <Select value={stageF} onValueChange={(v) => { setStageF(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Statut" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Tous statuts</SelectItem>
-                {stages.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
-              <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Source" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL}>Toutes sources</SelectItem>
-                {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {!isAgent && (
-              <Select value={assigne} onValueChange={(v) => { setAssigne(v); setPage(0); }}>
-                <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Assigné à" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Tous</SelectItem>
-                  {assigneOptions.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            {!hideHardcoded && (
+              <>
+                <Select value={stageF} onValueChange={(v) => { setStageF(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Statut" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Tous statuts</SelectItem>
+                    {stages.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
+                  <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Source" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>Toutes sources</SelectItem>
+                    {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {!isAgent && (
+                  <Select value={assigne} onValueChange={(v) => { setAssigne(v); setPage(0); }}>
+                    <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Assigné à" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Tous</SelectItem>
+                      {assigneOptions.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+              </>
             )}
             {hasActiveFilter && (
               <Button variant="ghost" size="sm" onClick={reset}><X className="h-3.5 w-3.5 mr-1" />Réinitialiser</Button>
             )}
             <FilterPresetPicker
               scope="opportunities"
-              current={currentView as any}
-              filterKeys={schemaKeys(autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any }))}
-              filterSchema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any })}
+              current={{ ...(currentView as any), ...customFilters }}
+              filterKeys={schemaKeys(autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs }))}
+              filterSchema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs })}
               onApply={(f) => {
                 applyView({
                   search: typeof f.search === "string" ? f.search : "",
@@ -440,11 +447,16 @@ function OpportunitiesPage() {
                   source: typeof f.source === "string" && f.source ? f.source : ALL,
                   dateCree: typeof f.dateCree === "string" ? f.dateCree : "",
                 });
+                const cfKeys = new Set(customDefs.map((d) => d.key));
+                const nextCf: Record<string, string> = {};
                 const extra: Record<string, unknown> = {};
                 for (const [k, v] of Object.entries(f)) {
                   if (VIEW_KEYS.includes(k)) continue;
-                  if (v != null && v !== "") extra[k] = v;
+                  if (v == null || v === "") continue;
+                  if (cfKeys.has(k)) nextCf[k] = String(v);
+                  else extra[k] = v;
                 }
+                setCustomFilters(nextCf);
                 setPresetExtra(extra);
               }}
               onReset={reset}

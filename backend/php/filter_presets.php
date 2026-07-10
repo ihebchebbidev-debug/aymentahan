@@ -224,17 +224,19 @@ if ($method === 'POST') {
         ok(['reordered' => count($order)]);
     }
 
-    /* ----- create : admin ----- */
-    fp_require_manage($db, $me);
+    /* ----- create : tout utilisateur authentifié (personnel), manager pour partagé/défaut ----- */
+    $canManage = fp_can_manage($db, $me);
     $scope = fp_scope((string)($in['scope'] ?? ''));
     $name  = trim((string)($in['name'] ?? ''));
     if ($name === '' || mb_strlen($name) > 120) fail('name requis (1-120)', 422);
     $description = isset($in['description']) ? mb_substr((string)$in['description'], 0, 500) : null;
     $filters     = $in['filters'] ?? new stdClass();
     if (!is_array($filters) && !is_object($filters)) fail('filters doit être un objet', 422);
-    $isShared    = !empty($in['is_shared']) ? 1 : 0;
-    $isDefault   = !empty($in['is_default']) ? 1 : 0;
-    $defaultRole = isset($in['default_role']) && $in['default_role'] !== ''
+    // Un utilisateur non-manager ne peut créer que des modèles personnels
+    // (non partagés, non par défaut). On force silencieusement ces valeurs.
+    $isShared    = $canManage ? (!empty($in['is_shared']) ? 1 : 0) : 0;
+    $isDefault   = $canManage ? (!empty($in['is_default']) ? 1 : 0) : 0;
+    $defaultRole = $canManage && isset($in['default_role']) && $in['default_role'] !== ''
         ? mb_substr((string)$in['default_role'], 0, 60) : null;
     $position    = isset($in['position']) ? (int)$in['position'] : 9999;
     $id          = fp_new_id();
@@ -264,11 +266,15 @@ if ($method === 'POST') {
 /* ----------------------------------------------------------------- PATCH */
 
 if ($method === 'PATCH') {
-    fp_require_manage($db, $me);
     $id = (string)($_GET['id'] ?? '');
     if ($id === '') fail('id requis', 422);
     $existing = fp_fetch($db, $id);
     if (!$existing) fail('Modèle introuvable', 404);
+
+    $canManage = fp_can_manage($db, $me);
+    $isOwner   = ($existing['created_by'] ?? null) === ($me['username'] ?? null)
+                 && !$existing['is_shared'];
+    if (!$canManage && !$isOwner) fail('Accès refusé', 403);
 
     $in = json_input();
     $sets = [];
@@ -288,13 +294,16 @@ if ($method === 'PATCH') {
         $sets[] = 'filters_json = :f';
         $args[':f'] = json_encode($in['filters'], JSON_UNESCAPED_UNICODE);
     }
-    if (array_key_exists('is_shared', $in))  { $sets[] = 'is_shared = :sh';  $args[':sh'] = $in['is_shared'] ? 1 : 0; }
-    if (array_key_exists('is_default', $in)) { $sets[] = 'is_default = :df'; $args[':df'] = $in['is_default'] ? 1 : 0; }
-    if (array_key_exists('default_role', $in)) {
-        $sets[] = 'default_role = :dr';
-        $args[':dr'] = $in['default_role'] === null || $in['default_role'] === '' ? null : mb_substr((string)$in['default_role'], 0, 60);
+    // Les toggles partage / défaut / rôle sont réservés au manager.
+    if ($canManage) {
+        if (array_key_exists('is_shared', $in))  { $sets[] = 'is_shared = :sh';  $args[':sh'] = $in['is_shared'] ? 1 : 0; }
+        if (array_key_exists('is_default', $in)) { $sets[] = 'is_default = :df'; $args[':df'] = $in['is_default'] ? 1 : 0; }
+        if (array_key_exists('default_role', $in)) {
+            $sets[] = 'default_role = :dr';
+            $args[':dr'] = $in['default_role'] === null || $in['default_role'] === '' ? null : mb_substr((string)$in['default_role'], 0, 60);
+        }
+        if (array_key_exists('position', $in)) { $sets[] = 'position = :p'; $args[':p'] = (int)$in['position']; }
     }
-    if (array_key_exists('position', $in)) { $sets[] = 'position = :p'; $args[':p'] = (int)$in['position']; }
 
     if (!$sets) fail('Aucune modification', 422);
 
@@ -312,10 +321,15 @@ if ($method === 'PATCH') {
 /* ---------------------------------------------------------------- DELETE */
 
 if ($method === 'DELETE') {
-    // Suppression réservée à l'Administrateur uniquement.
-    if (($me['role'] ?? '') !== 'Administrateur') fail('Suppression réservée à l\'Administrateur', 403);
     $id = (string)($_GET['id'] ?? '');
     if ($id === '') fail('id requis', 422);
+    $existing = fp_fetch($db, $id);
+    if (!$existing) fail('Modèle introuvable', 404);
+
+    $isAdmin = (($me['role'] ?? '') === 'Administrateur');
+    $isOwner = ($existing['created_by'] ?? null) === ($me['username'] ?? null)
+               && !$existing['is_shared'];
+    if (!$isAdmin && !$isOwner) fail('Suppression réservée au propriétaire ou à l\'Administrateur', 403);
 
     $db->prepare('DELETE FROM crminternet_filter_preset_user_choice WHERE preset_id = :id')
        ->execute([':id' => $id]);

@@ -240,12 +240,12 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
             </ul>
           )}
 
-          {(activeId || presets.length > 0) && (
-            <div className="border-t border-border p-2 flex items-center justify-between">
+          {(activeId || presets.length > 0 || !canManage) && (
+            <div className="border-t border-border p-2 flex items-center justify-between gap-2 flex-wrap">
               <Button size="sm" variant="ghost" onClick={clear}>
                 <X className="h-3.5 w-3.5 mr-1" />Effacer le modèle
               </Button>
-              {canManage && (
+              {canManage ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -257,6 +257,30 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Créer depuis filtres actuels
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    const name = window.prompt("Nom du modèle personnel :", "Mes filtres");
+                    if (!name || !name.trim()) return;
+                    try {
+                      await actions.create({
+                        name: name.trim(),
+                        filters: current,
+                        isShared: false,
+                        isDefault: false,
+                      });
+                      toast.success(`Modèle personnel « ${name.trim()} » enregistré`);
+                      setOpen(false);
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Enregistrement impossible");
+                    }
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Enregistrer mes filtres
                 </Button>
               )}
             </div>
