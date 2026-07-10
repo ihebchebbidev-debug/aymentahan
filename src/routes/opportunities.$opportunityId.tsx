@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Target, ArrowLeft, User, Phone, Mail, MapPin, Calendar, CreditCard,
-  LayoutGrid, Paperclip, Sparkles, History, FileSignature, ArrowRightLeft, RotateCcw, Hash, Pencil,
+  LayoutGrid, Paperclip, Sparkles, History, FileSignature, ArrowRightLeft, RotateCcw, Hash, Pencil, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ function OpportunityDetailPage() {
   const canConvertMigration =
     hasPermission("opportunity.convert_migration") || hasPermission("opportunity.convert");
   const canRevert = hasPermission("opportunity.revert");
+  const canDelete = hasPermission("opportunity.delete");
   const canViewJourney = hasPermission("lead.history");
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
@@ -215,6 +216,29 @@ function OpportunityDetailPage() {
             {canRevert && !isTerminal && (
               <Button size="sm" variant="outline" disabled={busy} onClick={revertToLead}>
                 <RotateCcw className="h-4 w-4 mr-1.5" />Renvoyer en lead
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                disabled={busy}
+                onClick={async () => {
+                  const { confirmCascadeDelete, deleteWithCascade } = await import("@/lib/entityDelete");
+                  if (!(await confirmCascadeDelete("opportunity", opp))) return;
+                  setBusy(true);
+                  try {
+                    const r = await deleteWithCascade("opportunity", opp);
+                    await revertOpportunity();
+                    toast.success(r.reverted ? "Opportunité restaurée en lead" : "Opportunité supprimée");
+                    if (r.reverted && r.parentId) navigate({ to: "/prospects/$prospectId", params: { prospectId: r.parentId } });
+                    else navigate({ to: "/opportunities" });
+                  } catch (e: any) { toast.error(e?.message ?? "Échec"); }
+                  finally { setBusy(false); }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />Supprimer
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => navigate({ to: "/opportunities" })}>

@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import {
   ClipboardList, ArrowLeft, User, Phone, MapPin, MessageSquare,
-  LayoutGrid, Paperclip, Sparkles, BellRing, History, ArrowRightCircle, Pencil,
+  LayoutGrid, Paperclip, Sparkles, BellRing, History, ArrowRightCircle, Pencil, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +56,7 @@ function ProspectDetailPage() {
   const { prospectId } = Route.useParams();
   const navigate = useNavigate();
   const { prospectToOpportunity, afterProspectAuto } = useCrmListSync();
-  const { prospects, users, updateProspect, refresh } = useErp();
+  const { prospects, users, updateProspect, deleteProspect, refresh } = useErp();
   const { user, hasPermission } = useAuth();
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
   const canConvert = hasPermission("opportunity.convert");
@@ -64,6 +64,7 @@ function ProspectDetailPage() {
   const canViewHistory = hasPermission("lead.history");
   const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("prospect.edit");
+  const canDelete = hasPermission("prospect.delete");
   const canChangeType = canEdit || hasPermission("prospect.type");
   const canChangeStatus = canEdit || hasPermission("prospect.status");
   const canChangeSource = canEdit || hasPermission("prospect.source");
@@ -226,6 +227,20 @@ function ProspectDetailPage() {
               >
                 <ArrowRightCircle className="h-4 w-4 mr-1.5" />
                 {prospect.opportunityId ? "Voir l'opportunité" : "Convertir en opportunité"}
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={async () => {
+                  if (!(await confirmDialog({ title: "Suppression", description: `Supprimer définitivement ${prospect.firstName} ${prospect.lastName} ?`, tone: "destructive", confirmText: "Supprimer" }))) return;
+                  try { await deleteProspect(prospect.id); toast.success("Supprimé"); navigate({ to: "/prospects" }); }
+                  catch (e: any) { toast.error(e?.message ?? "Échec"); }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />Supprimer
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => navigate({ to: "/prospects" })}>

@@ -3,7 +3,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
-import { Target, RotateCcw, FileSignature, ArrowRightLeft, Trash2, Eye, Search, X, Download, FileSpreadsheet, FileJson, Paperclip } from "lucide-react";
+import { Target, RotateCcw, FileSignature, ArrowRightLeft, Trash2, Eye, Pencil, Search, X, Download, FileSpreadsheet, FileJson, Paperclip } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
-import { useFilterPresets } from "@/lib/filterPresets";
+import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
@@ -105,7 +105,10 @@ function OpportunitiesPage() {
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("opportunity");
   const { data: presetsData } = useFilterPresets("opportunities");
-  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
+  const presetActions = useFilterPresetActions("opportunities");
+  const [activePresetId, setActivePresetId] = usePersistedState<string | null>("opportunities:list:activePreset", null);
+  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
+  const hideHardcoded = !!activePresetId;
 
   const agentOptions = useMemo(
     () => users.filter((u) => u.role === "Agent" || u.role === "Manager" || u.role === "AgentSuivi" || u.role === "AgentActivation" || u.role === "AgentVente").map((u) => u.username),
@@ -125,9 +128,9 @@ function OpportunitiesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [attachOpp, setAttachOpp] = useState<Opportunity | null>(null);
-  const [presetExtra, setPresetExtra] = useState<Record<string, unknown>>({});
+  const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("opportunities:list:presetExtra", {});
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
-  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("opportunities:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
       const next = { ...prev };
@@ -165,10 +168,13 @@ function OpportunitiesPage() {
     a.search === b.search && a.stage === b.stage && a.assigne === b.assigne &&
     a.source === b.source && a.dateCree === b.dateCree;
 
-  const reset = () => {
+  const reset = async () => {
+    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch(""); setStageF(ALL); setAssigne(ALL); setSource(ALL);
     setDateCree(""); setDateFrom(""); setDateTo("");
     setPresetExtra({}); setCustomFilters({}); setPage(0);
+    setActivePresetId(null);
+    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
@@ -460,6 +466,7 @@ function OpportunitiesPage() {
                 setPresetExtra(extra);
               }}
               onReset={reset}
+              onActiveChange={setActivePresetId}
             />
             <div
               key={`count-${search}|${stageF}|${assigne}|${source}|${dateCree}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
@@ -701,6 +708,7 @@ function OpportunitiesPage() {
               onDeleteRow={canDelete ? (row) => remove(row.id) : undefined}
               rowActions={[
                 { label: "Ouvrir la fiche", icon: <Eye className="h-4 w-4" />, onClick: (o) => navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: o.id } }) },
+                ...(canEdit ? [{ label: "Modifier", icon: <Pencil className="h-4 w-4" />, onClick: (o: Opportunity) => navigate({ to: "/opportunities/$opportunityId/edit", params: { opportunityId: o.id } }) }] : []),
                 { label: "Pièces jointes", icon: <Paperclip className="h-4 w-4" />, onClick: (o: Opportunity) => setAttachOpp(o) },
                 ...(canConvert ? [{ label: "Convertir en contrat", icon: <FileSignature className="h-4 w-4" />, onClick: (o: Opportunity) => convertContract(o.id) }] : []),
                 ...(canConvertMigration ? [{ label: "Convertir en migration", icon: <ArrowRightLeft className="h-4 w-4" />, onClick: (o: Opportunity) => convertMigration(o.id) }] : []),

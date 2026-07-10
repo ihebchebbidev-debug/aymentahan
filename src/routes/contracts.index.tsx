@@ -15,7 +15,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DataGrid, CellSelect, type DataGridColumn } from "@/components/DataGrid";
-import { Eye, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { api, API_ENABLED } from "@/lib/api";
@@ -28,7 +28,7 @@ import { ImportDialog, type ImportField } from "@/components/ImportDialog";
 import { NewContractDialog } from "@/components/NewContractDialog";
 import { SavedViews } from "@/components/SavedViews";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
-import { useFilterPresets } from "@/lib/filterPresets";
+import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
@@ -180,19 +180,25 @@ function ContractsPage() {
     }
   }, [urlStatut]);
 
-  const reset = () => {
+  const reset = async () => {
+    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch(""); setDateSig(""); setDateEffet(""); setDateVal("");
     setDateFrom(""); setDateTo("");
     setAssigne(ALL); setSource(ALL); setStatut(ALL); setPartenaire(ALL); setCabinet(ALL); setPage(0);
-    setCustomFilters({});
+    setCustomFilters({}); setPresetExtra({});
+    setActivePresetId(null);
+    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("contract");
   const { data: presetsData } = useFilterPresets("contracts");
-  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
+  const presetActions = useFilterPresetActions("contracts");
+  const [activePresetId, setActivePresetId] = usePersistedState<string | null>(pk("activePreset"), null);
+  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
+  const hideHardcoded = !!activePresetId;
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
-  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
       const next = { ...prev };
@@ -205,7 +211,7 @@ function ContractsPage() {
     assigne: string; source: string; statut: string; partenaire: string; cabinet: string;
   };
   const currentView: ViewState = { search, dateSig, dateEffet, dateVal, assigne, source, statut, partenaire, cabinet };
-  const [presetExtra, setPresetExtra] = useState<Record<string, unknown>>({});
+  const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>(pk("presetExtra"), {});
   const applyView = (v: ViewState) => {
     setSearch(v.search ?? ""); setDateSig(v.dateSig ?? ""); setDateEffet(v.dateEffet ?? "");
     setDateVal(v.dateVal ?? ""); setAssigne(v.assigne ?? ALL); setSource(v.source ?? ALL);
@@ -334,6 +340,7 @@ function ContractsPage() {
                 });
                 setPresetExtra({});
               }}
+              onActiveChange={setActivePresetId}
             />
             <CustomColumnsPicker
               defs={customDefs}
@@ -468,6 +475,7 @@ function ContractsPage() {
                 });
                 setPresetExtra({});
               }}
+              onActiveChange={setActivePresetId}
             />
             <div
               key={`count-${search}|${statut}|${partenaire}|${cabinet}|${source}|${assigne}|${dateSig}|${dateEffet}|${dateVal}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
@@ -720,6 +728,7 @@ function ContractsPage() {
                   } : undefined}
                   rowActions={[
                     { label: "Ouvrir la fiche", icon: <Eye className="h-4 w-4" />, onClick: (c) => navigate({ to: "/contracts/$contractId", params: { contractId: c.id } }) },
+                    ...(canEditContract ? [{ label: "Modifier", icon: <Pencil className="h-4 w-4" />, onClick: (c: Contract) => navigate({ to: "/contracts/$contractId/edit", params: { contractId: c.id } }) }] : []),
                     { label: "Pièces jointes", icon: <Paperclip className="h-4 w-4" />, onClick: (c: Contract) => setAttachContract(c) },
                     ...(canDeleteContract ? [{ label: "Supprimer", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: async (c: Contract) => {
                       if (!(await confirmDialog({ title: "Suppression", description: `Supprimer ${c.lastName} ?`, tone: "destructive", confirmText: "Supprimer" }))) return;

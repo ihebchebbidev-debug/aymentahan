@@ -3,7 +3,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
-import { ClipboardList, Download, FileSpreadsheet, FileJson, Eye, Trash2, UserCheck, Search, X, Paperclip, Plus } from "lucide-react";
+import { ClipboardList, Download, FileSpreadsheet, FileJson, Eye, Pencil, Trash2, UserCheck, Search, X, Paperclip, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import { SavedViews } from "@/components/SavedViews";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
-import { useFilterPresets } from "@/lib/filterPresets";
+import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useProspectTypes } from "@/hooks/use-prospect-types";
@@ -119,7 +119,10 @@ function ProspectsPage() {
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("prospect");
   const { data: presetsData } = useFilterPresets("prospects");
-  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
+  const presetActions = useFilterPresetActions("prospects");
+  const [activePresetId, setActivePresetId] = usePersistedState<string | null>("prospects:list:activePreset", null);
+  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
+  const hideHardcoded = !!activePresetId;
   const types = useProspectTypes();
   // Backwards-compat: ProspectTypesPanel uses the active list; some callers
   // still need every type. Re-fetch if needed.
@@ -196,9 +199,9 @@ function ProspectsPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [attachProspect, setAttachProspect] = useState<Prospect | null>(null);
   const [restoredProspectId, setRestoredProspectId] = useState<string | null>(null);
-  const [presetExtra, setPresetExtra] = useState<Record<string, unknown>>({});
+  const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("prospects:list:presetExtra", {});
   const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
-  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("prospects:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
       const next = { ...prev };
@@ -247,10 +250,13 @@ function ProspectsPage() {
     a.search === b.search && a.statut === b.statut && a.source === b.source &&
     a.assigne === b.assigne && a.typeF === b.typeF && a.dateCree === b.dateCree;
 
-  const reset = () => {
+  const reset = async () => {
+    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch(""); setStatut(ALL); setAssigne(ALL); setSource(ALL); setTypeF(ALL);
     setDateCree(""); setDateFrom(""); setDateTo("");
     setRecoveredF(ALL); setPresetExtra({}); setCustomFilters({}); setPage(0);
+    setActivePresetId(null);
+    void presetActions.choose(null).catch(() => {});
     if (filterTypeId) navigate({ to: "/prospects", search: () => ({ typeId: undefined }) });
     toast.success("Filtres réinitialisés");
   };
@@ -627,6 +633,7 @@ function ProspectsPage() {
                 setPresetExtra(extra);
               }}
               onReset={reset}
+              onActiveChange={setActivePresetId}
             />
 
             <div
@@ -919,6 +926,7 @@ function ProspectsPage() {
             } : undefined}
             rowActions={[
               { label: "Ouvrir la fiche", icon: <Eye className="h-4 w-4" />, onClick: (p) => navigate({ to: "/prospects/$prospectId", params: { prospectId: p.id } }) },
+              ...(canEdit ? [{ label: "Modifier", icon: <Pencil className="h-4 w-4" />, onClick: (p: Prospect) => navigate({ to: "/prospects/$prospectId/edit", params: { prospectId: p.id } }) }] : []),
               { label: "Pièces jointes", icon: <Paperclip className="h-4 w-4" />, onClick: (p: Prospect) => setAttachProspect(p) },
               ...(canAssign ? [{ label: "M'assigner ce lead", icon: <UserCheck className="h-4 w-4" />, hidden: (p: Prospect) => p.assignedTo === myUsername, onClick: async (p: Prospect) => {
                 try { await updateProspect(p.id, { assignedTo: myUsername } as any); toast.success("Assigné"); }

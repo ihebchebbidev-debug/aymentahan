@@ -45,13 +45,15 @@ type Props = {
   onApply: (filters: Record<string, unknown>) => void;
   /** Reset all filters (called when user clears the active preset). */
   onReset?: () => void;
+  /** Fires whenever the active preset id changes (apply, clear, auto-apply). */
+  onActiveChange?: (id: string | null) => void;
   /** Optional: declare known filter keys so the manager UI can hint which fields are saved. */
   filterKeys?: string[];
   /** Recommended: full schema enabling no-JSON checkbox/value editing. */
   filterSchema?: FilterFieldSchema[];
 };
 
-export function FilterPresetPicker({ scope, current, onApply, onReset, filterKeys, filterSchema }: Props) {
+export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveChange, filterKeys, filterSchema }: Props) {
   const { user, hasPermission } = useAuth();
   const q = useFilterPresets(scope);
   const actions = useFilterPresetActions(scope);
@@ -89,6 +91,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
         lastAppliedSig.current = sig;
         onApply(target.filters);
         setActiveId(target.id);
+        onActiveChange?.(target.id);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,6 +109,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
     lastAppliedSig.current = `${p.id}::${JSON.stringify(p.filters)}`;
     setActiveId(p.id);
     onApply(p.filters);
+    onActiveChange?.(p.id);
     setOpen(false);
     const count = Object.keys(p.filters || {}).filter((k) => {
       const v = (p.filters as any)[k];
@@ -122,6 +126,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
     lastAppliedSig.current = null;
     setActiveId(null);
     onReset?.();
+    onActiveChange?.(null);
     setOpen(false);
     toast.success("Modèle effacé");
     try { await actions.choose(null); }
@@ -302,7 +307,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, filterKey
           canDelete={user?.role === "Administrateur"}
           onCreate={async (input) => { await actions.create(input); }}
           onUpdate={async (id, patch) => { await actions.update(id, patch); }}
-          onDelete={async (id) => { await actions.remove(id); if (activeId === id) setActiveId(null); }}
+          onDelete={async (id) => { await actions.remove(id); if (activeId === id) { setActiveId(null); onActiveChange?.(null); } }}
           onMove={move}
         />
       )}

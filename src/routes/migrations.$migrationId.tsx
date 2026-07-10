@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import {
   ArrowRightLeft, ArrowLeft, Download, Printer, FileJson, FileSpreadsheet,
-  Phone, Mail, MapPin, User, Pencil, History, Activity, CheckCircle2, X,
+  Phone, Mail, MapPin, User, Pencil, History, Activity, CheckCircle2, X, Trash2,
   LayoutGrid, Paperclip, Sparkles, Network, RotateCcw, Clock, ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -89,6 +89,7 @@ function MigrationDetailPage() {
   const isAgent = ["Agent", "AgentSuivi", "AgentActivation", "AgentVente"].includes(user?.role ?? "");
   const canEdit = hasPermission("migration.edit");
   const canRevert = hasPermission("migration.revert");
+  const canDelete = hasPermission("migration.delete");
   const canExport = hasPermission("migration.export");
   const canViewJourney = hasPermission("lead.history");
 
@@ -149,7 +150,7 @@ function MigrationDetailPage() {
 
   return <MigrationDetailsView migration={m} onReload={reload} busy={busy} setBusy={setBusy}
     stages={stages} users={users} prospects={prospects}
-    canEdit={canEdit} canRevert={canRevert} canExport={canExport} canViewJourney={canViewJourney}
+    canEdit={canEdit} canRevert={canRevert} canDelete={canDelete} canExport={canExport} canViewJourney={canViewJourney}
     reverting={reverting} setReverting={setReverting} refresh={refresh} navigate={navigate} />;
 }
 
@@ -163,6 +164,7 @@ function MigrationDetailsView({
   prospects,
   canEdit,
   canRevert,
+  canDelete,
   canExport,
   canViewJourney,
   reverting,
@@ -179,6 +181,7 @@ function MigrationDetailsView({
   prospects: { id: string; lastName: string; firstName: string; phone?: string; email?: string; city?: string; createdAt?: string }[];
   canEdit: boolean;
   canRevert: boolean;
+  canDelete: boolean;
   canExport: boolean;
   canViewJourney: boolean;
   reverting: boolean;
@@ -306,6 +309,28 @@ function MigrationDetailsView({
               >
                 <RotateCcw className={`h-4 w-4 mr-1.5 ${reverting ? "animate-spin" : ""}`} />
                 Retour opportunité
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reverting || busy}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={async () => {
+                  const { confirmCascadeDelete, deleteWithCascade } = await import("@/lib/entityDelete");
+                  if (!(await confirmCascadeDelete("migration", m))) return;
+                  setReverting(true);
+                  try {
+                    const r = await deleteWithCascade("migration", m);
+                    await revertMigration();
+                    toast.success(r.reverted ? "Migration retournée en opportunité" : "Migration supprimée");
+                    if (r.reverted && r.parentId) navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: r.parentId } });
+                    else navigate({ to: "/migrations" });
+                  } catch (e: any) { toast.error(e?.message ?? "Échec"); setReverting(false); }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />Supprimer
               </Button>
             )}
             {canExport && (

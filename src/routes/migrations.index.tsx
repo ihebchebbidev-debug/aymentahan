@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowRightLeft, Search, X, Eye, Download, FileSpreadsheet, FileJson } from "lucide-react";
+import { ArrowRightLeft, Search, X, Eye, Pencil, Trash2, Download, FileSpreadsheet, FileJson } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,13 +23,16 @@ import { useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
-import { useFilterPresets } from "@/lib/filterPresets";
+import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { exportCSV, exportJSON, exportXLSX, withCustomFields } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { deleteWithCascade, confirmCascadeDelete } from "@/lib/entityDelete";
+import { useCrmListSync } from "@/hooks/useCrmListSync";
 
 export const Route = createFileRoute("/migrations/")({
   validateSearch: zodValidator(z.object({
@@ -80,6 +83,12 @@ function MigrationsPage() {
   });
   const allMigrations = migrationsQ.data ?? [];
   const canExport = hasPermission("migration.export");
+  const canEdit = hasPermission("migration.edit");
+  const canDelete = hasPermission("migration.delete");
+  const { revertMigration } = useCrmListSync();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const refresh = async () => { await migrationsQ.refetch(); };
 
   const userScope = user?.username ?? "anon";
   const pk = (k: string) => `migrations:list:${userScope}:${k}`;
@@ -91,8 +100,8 @@ function MigrationsPage() {
   const [assigne, setAssigne] = usePersistedState(pk("assigne"), ALL);
   const [dateFrom, setDateFrom] = usePersistedState(pk("dateFrom"), "");
   const [dateTo, setDateTo] = usePersistedState(pk("dateTo"), "");
-  const [presetExtra, setPresetExtra] = useState<Record<string, unknown>>({});
-  const [customFilters, setCustomFilters] = useState<Record<string, string>>({});
+  const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>(pk("presetExtra"), {});
+  const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
       const n = { ...prev };
@@ -102,7 +111,10 @@ function MigrationsPage() {
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("migration");
   const { data: presetsData } = useFilterPresets("migrations");
-  const hideHardcoded = customDefs.length > 0 || (presetsData?.presets?.length ?? 0) > 0;
+  const presetActions = useFilterPresetActions("migrations");
+  const [activePresetId, setActivePresetId] = usePersistedState<string | null>(pk("activePreset"), null);
+  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
+  const hideHardcoded = !!activePresetId;
 
   useEffect(() => {
     if (urlStatut && urlStatut !== statut) {
@@ -211,7 +223,8 @@ function MigrationsPage() {
     })),
   ];
 
-  const reset = () => {
+  const reset = async () => {
+    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch("");
     setStatut(ALL);
     setTechnical(ALL);
@@ -222,6 +235,8 @@ function MigrationsPage() {
     setDateTo("");
     setPresetExtra({});
     setCustomFilters({});
+    setActivePresetId(null);
+    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
@@ -363,6 +378,7 @@ function MigrationsPage() {
               setCustomFilters(nextCf);
               setPresetExtra(extra);
             }}
+            onActiveChange={setActivePresetId}
           />
           <Button variant="ghost" size="sm" onClick={reset}>
             <X className="h-4 w-4 mr-1" />Réinitialiser
@@ -403,20 +419,84 @@ function MigrationsPage() {
         </p>
       </Card>
 
+      {selected.size > 0 && canDelete && (
+        <Card className="p-3 mb-4 shadow-elegant bg-primary/5 border-primary/20 flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-sm font-medium">{selected.size} migration(s) sélectionnée(s)</div>
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkBusy || !API_ENABLED}
+              onClick={async () => {
+                const ids = Array.from(selected);
+                if (!(await confirmDialog({ title: "Suppression", description: `Supprimer ${ids.length} migration(s) ? Celles liées à une opportunité seront renvoyées vers leur opportunité d'origine.`, tone: "destructive", confirmText: "Supprimer" }))) return;
+                setBulkBusy(true);
+                try {
+                  const rows = filtered.filter((m) => selected.has(m.id));
+                  const CHUNK = 25;
+                  let ok = 0;
+                  for (let i = 0; i < rows.length; i += CHUNK) {
+                    const slice = rows.slice(i, i + CHUNK);
+                    const res = await Promise.allSettled(slice.map((r) => deleteWithCascade("migration", r)));
+                    ok += res.filter((r) => r.status === "fulfilled").length;
+                    toast.message(`Suppression… ${Math.min(i + CHUNK, rows.length)}/${rows.length}`);
+                  }
+                  toast.success(`${ok}/${rows.length} migration(s) traitée(s)`);
+                  setSelected(new Set());
+                  await revertMigration();
+                  await refresh();
+                } finally { setBulkBusy(false); }
+              }}
+            >Supprimer</Button>
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Désélectionner</Button>
+          </div>
+        </Card>
+      )}
+
       <DataGrid
         storageKey="migrations:list"
         rows={filtered}
         columns={columns}
         rowKey={(m) => m.id}
+        selected={selected}
+        onSelectedChange={setSelected}
         pageSize={PAGE_SIZE}
         emptyState="Aucune migration ne correspond aux filtres."
         onRowClick={(m) => navigate({ to: "/migrations/$migrationId", params: { migrationId: m.id } })}
+        onDeleteRow={canDelete ? async (row) => {
+          if (!(await confirmCascadeDelete("migration", row))) return;
+          try {
+            const r = await deleteWithCascade("migration", row);
+            await revertMigration();
+            await refresh();
+            toast.success(r.reverted ? "Migration retournée en opportunité" : "Supprimée");
+          } catch (e: any) { toast.error(e?.message ?? "Échec"); }
+        } : undefined}
         rowActions={[
           {
             label: "Ouvrir la fiche",
             icon: <Eye className="h-4 w-4" />,
             onClick: (m) => navigate({ to: "/migrations/$migrationId", params: { migrationId: m.id } }),
           },
+          ...(canEdit ? [{
+            label: "Modifier",
+            icon: <Pencil className="h-4 w-4" />,
+            onClick: (m: Migration) => navigate({ to: "/migrations/$migrationId/edit", params: { migrationId: m.id } }),
+          }] : []),
+          ...(canDelete ? [{
+            label: "Supprimer",
+            icon: <Trash2 className="h-4 w-4" />,
+            destructive: true,
+            onClick: async (m: Migration) => {
+              if (!(await confirmCascadeDelete("migration", m))) return;
+              try {
+                const r = await deleteWithCascade("migration", m);
+                await revertMigration();
+                await refresh();
+                toast.success(r.reverted ? "Migration retournée en opportunité" : "Supprimée");
+              } catch (e: any) { toast.error(e?.message ?? "Échec"); }
+            },
+          }] : []),
         ]}
       />
     </AppLayout>

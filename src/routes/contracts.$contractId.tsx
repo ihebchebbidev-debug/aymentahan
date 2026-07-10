@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   FileText, ArrowLeft, Download, Printer, FileJson, FileSpreadsheet,
   Calendar as CalendarIcon, PhoneCall, FileSignature, CheckCircle2, Clock,
-  Mail, Phone, MapPin, User, Building2, Euro, Pencil, History, Activity, ArrowRight, X,
+  Mail, Phone, MapPin, User, Building2, Euro, Pencil, History, Activity, ArrowRight, X, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
   const isAdmin = user?.role === "Administrateur";
   const canRevert = hasPermission("contract.revert");
   const canEdit = hasPermission("contract.edit");
+  const canDelete = hasPermission("contract.delete");
   const currency = useCurrency();
   const [reverting, setReverting] = useState<null | "opportunity" | "prospect">(null);
 
@@ -326,6 +327,28 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                 }}
               >
                 <RotateCcw className={`h-4 w-4 mr-1.5 ${reverting === "prospect" ? "animate-spin" : ""}`} />Retour lead
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reverting !== null}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={async () => {
+                  const { confirmCascadeDelete, deleteWithCascade } = await import("@/lib/entityDelete");
+                  if (!(await confirmCascadeDelete("contract", contract))) return;
+                  setReverting("opportunity");
+                  try {
+                    const r = await deleteWithCascade("contract", contract);
+                    await revertContract();
+                    toast.success(r.reverted ? "Contrat retourné en opportunité" : "Contrat supprimé");
+                    if (r.reverted && r.parentId) navigate({ to: "/opportunities/$opportunityId", params: { opportunityId: r.parentId } });
+                    else navigate({ to: "/contracts" });
+                  } catch (e: any) { toast.error(e?.message ?? "Échec"); setReverting(null); }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1.5" />Supprimer
               </Button>
             )}
             {hasPermission("contract.export") && (
