@@ -29,6 +29,9 @@ import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { pickColumns } from "@/lib/exportUtils";
+import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { deleteWithCascade, confirmCascadeDelete } from "@/lib/entityDelete";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
@@ -109,6 +112,26 @@ function MigrationsPage() {
     });
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("migration");
+  const colPrefs = useColumnPrefs("migrations");
+  const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "id",              label: "Réf." },
+    { key: "name",            label: "Client" },
+    { key: "oldOperator",     label: "Ancien op." },
+    { key: "newOperator",     label: "Nouvel op." },
+    { key: "portingNumber",   label: "N° portabilité" },
+    { key: "workflowStatus",  label: "Statut" },
+    { key: "technicalStatus", label: "Technique" },
+    { key: "assignedTo",      label: "Assigné" },
+    { key: "requestedDate",   label: "Demandée" },
+    { key: "createdAt",       label: "Créée" },
+  ];
+  // Export label mapping — matches the header names used in `baseExportRows`.
+  const BASE_EXPORT_LABELS: Record<string, string> = {
+    id: "ID", name: "Nom", oldOperator: "Ancien opérateur",
+    newOperator: "Nouvel opérateur", portingNumber: "Portabilité",
+    workflowStatus: "Statut", technicalStatus: "Technique",
+    assignedTo: "Assigné à", requestedDate: "Date demande", createdAt: "Créée le",
+  };
 
   useEffect(() => {
     if (urlStatut && urlStatut !== statut) {
@@ -178,7 +201,7 @@ function MigrationsPage() {
     [agentOptions, allMigrations],
   );
 
-  const columns: DataGridColumn<Migration>[] = [
+  const allColumns: DataGridColumn<Migration>[] = [
     { key: "id", header: "Réf.", width: "110px", cell: (m) => <span className="font-mono text-xs">{m.id}</span> },
     {
       key: "name",
@@ -216,6 +239,12 @@ function MigrationsPage() {
       ),
     })),
   ];
+  // Custom-field visibility uses the raw `d.key`, base columns their own key.
+  // The DataGrid columns for custom fields are keyed `cf_<key>` — remap here.
+  const columns = allColumns.filter((c) => {
+    if (c.key.startsWith("cf_")) return colPrefs.isVisible(c.key.slice(3));
+    return colPrefs.isVisible(c.key);
+  });
 
   const reset = async () => {
     if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
@@ -247,7 +276,12 @@ function MigrationsPage() {
     "Créée le": m.createdAt ?? "",
     id: m.id,
   }));
-  const exportRows = withCustomFields(baseExportRows, customDefs, customValuesById);
+  const exportRowsFull = withCustomFields(baseExportRows, customDefs, customValuesById);
+  const exportLabels = [
+    ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => BASE_EXPORT_LABELS[c.key] ?? c.label),
+    ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+  ];
+  const exportRows = pickColumns(exportRowsFull, exportLabels);
 
   return (
     <AppLayout skeleton="table">
@@ -263,6 +297,14 @@ function MigrationsPage() {
         actions={
           canExport ? (
             <>
+              <CustomColumnsPicker
+                baseCols={BASE_COLS_META}
+                defs={customDefs}
+                isVisible={colPrefs.isVisible}
+                onToggle={colPrefs.setVisible}
+                onShowAll={colPrefs.showAll}
+                onReset={colPrefs.reset}
+              />
               <Button size="sm" variant="outline" onClick={() => exportCSV("migrations", exportRows)}>
                 <Download className="h-4 w-4 mr-1.5" />CSV
               </Button>
@@ -273,7 +315,16 @@ function MigrationsPage() {
                 <FileJson className="h-4 w-4 mr-1.5" />JSON
               </Button>
             </>
-          ) : null
+          ) : (
+            <CustomColumnsPicker
+              baseCols={BASE_COLS_META}
+              defs={customDefs}
+              isVisible={colPrefs.isVisible}
+              onToggle={colPrefs.setVisible}
+              onShowAll={colPrefs.showAll}
+              onReset={colPrefs.reset}
+            />
+          )
         }
       />
 

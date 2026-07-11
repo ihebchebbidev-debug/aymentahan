@@ -22,6 +22,8 @@ import { DataGrid, CellSelect, type DataGridColumn } from "@/components/DataGrid
 import { SavedViews } from "@/components/SavedViews";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { pickColumns } from "@/lib/exportUtils";
 import { useErp } from "@/lib/erpStore";
 import type { Opportunity, OpportunityStage } from "@/lib/types";
 import { useMemo, useState, useEffect } from "react";
@@ -124,7 +126,16 @@ function OpportunitiesPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [attachOpp, setAttachOpp] = useState<Opportunity | null>(null);
   const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("opportunities:list:presetExtra", {});
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
+  const colPrefs = useColumnPrefs("opportunities");
+  const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "lastName",   label: "Nom" },
+    { key: "phone",      label: "Téléphone" },
+    { key: "city",       label: "Ville" },
+    { key: "stage",      label: "Statut" },
+    { key: "probability",label: "%" },
+    { key: "assignedTo", label: "Assigné à" },
+    { key: "createdAt",  label: "Créé le" },
+  ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("opportunities:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
@@ -341,7 +352,7 @@ function OpportunitiesPage() {
     },
   ];
   const customColumns: DataGridColumn<Opportunity>[] = customDefs
-    .filter((d) => visibleCols.has(d.key))
+    .filter((d) => colPrefs.isVisible(d.key))
     .map((d) => ({
       key: `cf-${d.key}`,
       header: d.label,
@@ -364,13 +375,12 @@ function OpportunitiesPage() {
           <>
             <SavedViews scope="opportunities" current={currentView} onApply={applyView} isEqual={eqView} />
             <CustomColumnsPicker
+              baseCols={BASE_COLS_META}
               defs={customDefs}
-              visible={visibleCols}
-              onToggle={(k, v) => setVisibleCols((prev) => {
-                const n = new Set(prev);
-                if (v) n.add(k); else n.delete(k);
-                return n;
-              })}
+              isVisible={colPrefs.isVisible}
+              onToggle={colPrefs.setVisible}
+              onShowAll={colPrefs.showAll}
+              onReset={colPrefs.reset}
             />
             {canExport && (
               <DropdownMenu>
@@ -378,10 +388,26 @@ function OpportunitiesPage() {
                   <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1.5" />Exporter</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={async () => { try { await exportXLSX("opportunites.xlsx", exportRows as any, "Opportunités"); toast.success("Export Excel"); } catch (e: any) { toast.error("Échec Excel", { description: e?.message }); } }}>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const labels = [
+                        ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ];
+                      await exportXLSX("opportunites.xlsx", pickColumns(exportRows as any, labels) as any, "Opportunités");
+                      toast.success("Export Excel");
+                    } catch (e: any) { toast.error("Échec Excel", { description: e?.message }); }
+                  }}>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />Excel ({filtered.length})
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { exportJSON("opportunites.json", exportRows as any); toast.success("Export JSON"); }}>
+                  <DropdownMenuItem onClick={() => {
+                    const labels = [
+                      ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                    ];
+                    exportJSON("opportunites.json", pickColumns(exportRows as any, labels) as any);
+                    toast.success("Export JSON");
+                  }}>
                     <FileJson className="h-4 w-4 mr-2" />JSON
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -517,7 +543,11 @@ function OpportunitiesPage() {
                       withCustomFields(filtered.filter((o) => selected.has(o.id)), customDefs, customValuesById),
                       OPPORTUNITY_LABELS,
                     );
-                    exportCSV("opportunites-selection.csv", rows as any);
+                    const labels = [
+                      ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                    ];
+                    exportCSV("opportunites-selection.csv", pickColumns(rows, labels) as any);
                     toast.success(`${rows.length} opportunité(s) exportée(s)`);
                   }}
                 >Exporter sélection</Button>
@@ -599,7 +629,7 @@ function OpportunitiesPage() {
             <DataGrid
               storageKey="opportunities:list"
               rows={filtered}
-              columns={[...baseColumns, ...customColumns]}
+              columns={colPrefs.filterCols([...baseColumns, ...customColumns])}
               rowKey={(o) => o.id}
               selected={selected}
               onSelectedChange={setSelected}

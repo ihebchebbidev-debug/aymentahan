@@ -31,7 +31,9 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Can } from "@/components/Can";
-import { exportCSV, exportXLSX } from "@/lib/exportUtils";
+import { exportCSV, exportXLSX, pickColumns } from "@/lib/exportUtils";
+import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { ImportDialog, type ImportField } from "@/components/ImportDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useErp } from "@/lib/erpStore";
@@ -238,6 +240,23 @@ function GuichetPage() {
     (Number(n) || 0).toLocaleString("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
   /* ---------- Export ---------- */
+  const GUICHET_EXPORT_COLS: { key: string; label: string }[] = [
+    { key: "Réf",     label: "Réf" },
+    { key: "Client",  label: "Client" },
+    { key: "CIN",     label: "CIN" },
+    { key: "Type",    label: "Type" },
+    { key: "Numéro",  label: "Numéro" },
+    { key: "Offre",   label: "Offre" },
+    { key: "Détails", label: "Détails" },
+    { key: "Montant", label: "Montant" },
+    { key: "Agent",   label: "Agent" },
+    { key: "Statut",  label: "Statut" },
+    { key: "Date",    label: "Date" },
+    { key: "Total",   label: "Total" },
+  ];
+  const guichetColPrefs = useColumnPrefs("guichet");
+  const guichetExportLabels = () =>
+    GUICHET_EXPORT_COLS.filter((c) => guichetColPrefs.isVisible(c.key)).map((c) => c.label);
   const buildExport = () => {
     const out: Record<string, unknown>[] = [];
     for (const d of filtered) {
@@ -262,8 +281,14 @@ function GuichetPage() {
     }
     return out;
   };
-  const onExportCsv = () => { const d = buildExport(); if (!d.length) return toast.error("Aucune donnée"); exportCSV(`guichet_${new Date().toISOString().slice(0,10)}.csv`, d); };
-  const onExportXlsx = async () => { const d = buildExport(); if (!d.length) return toast.error("Aucune donnée"); await exportXLSX(`guichet_${new Date().toISOString().slice(0,10)}.xlsx`, d, "Guichet"); };
+  const onExportCsv = () => {
+    const d = buildExport(); if (!d.length) return toast.error("Aucune donnée");
+    exportCSV(`guichet_${new Date().toISOString().slice(0,10)}.csv`, pickColumns(d, guichetExportLabels()));
+  };
+  const onExportXlsx = async () => {
+    const d = buildExport(); if (!d.length) return toast.error("Aucune donnée");
+    await exportXLSX(`guichet_${new Date().toISOString().slice(0,10)}.xlsx`, pickColumns(d, guichetExportLabels()), "Guichet");
+  };
 
   /* ---------- Import ---------- */
   const TYPE_ALIAS: Record<string, GuichetEntryType> = (() => {
@@ -469,6 +494,17 @@ function GuichetPage() {
                   <Can perm="guichet.export">
                     <DropdownMenuItem onClick={onExportCsv}><Download className="h-4 w-4 mr-2" /> Export Excel</DropdownMenuItem>
                     <DropdownMenuItem onClick={onExportXlsx}><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Excel</DropdownMenuItem>
+                  </Can>
+                  <Can perm="guichet.export">
+                    <div className="px-2 py-1.5">
+                      <CustomColumnsPicker
+                        baseCols={GUICHET_EXPORT_COLS}
+                        isVisible={guichetColPrefs.isVisible}
+                        onToggle={guichetColPrefs.setVisible}
+                        onShowAll={guichetColPrefs.showAll}
+                        onReset={guichetColPrefs.reset}
+                      />
+                    </div>
                   </Can>
                   <Can anyOf={["guichet.import", "guichet.create"]}>
                     <ImportDialog

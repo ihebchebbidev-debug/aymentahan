@@ -128,3 +128,24 @@ export async function parseSpreadsheet(file: File): Promise<Record<string, unkno
   return rows;
 }
 
+/**
+ * Project each row onto the ordered list of column labels. Missing keys become
+ * empty strings — this keeps the exported header row consistent even when
+ * some rows didn't carry a value for that column.
+ *
+ * Use AFTER `relabelRows` so that labels already match the visible headers.
+ */
+export function pickColumns<T extends Record<string, unknown>>(
+  rows: T[],
+  labels: string[],
+): Record<string, unknown>[] {
+  if (rows.length === 0 || labels.length === 0) return [];
+  return rows.map((r) => {
+    const out: Record<string, unknown> = {};
+    for (const label of labels) {
+      out[label] = (r as Record<string, unknown>)[label] ?? "";
+    }
+    return out;
+  });
+}
+

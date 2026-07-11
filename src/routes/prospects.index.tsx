@@ -19,6 +19,8 @@ import { PROSPECT_LABELS } from "@/lib/exportLabels";
 import { ImportDialog, type ImportField } from "@/components/ImportDialog";
 import { DataGrid, CellInput, CellSelect, type DataGridColumn } from "@/components/DataGrid";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { pickColumns } from "@/lib/exportUtils";
 import { SavedViews } from "@/components/SavedViews";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { DynamicFilterBar } from "@/components/DynamicFilterBar";
@@ -195,7 +197,20 @@ function ProspectsPage() {
   const [attachProspect, setAttachProspect] = useState<Prospect | null>(null);
   const [restoredProspectId, setRestoredProspectId] = useState<string | null>(null);
   const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("prospects:list:presetExtra", {});
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
+  const colPrefs = useColumnPrefs("prospects");
+  const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "lastName",    label: "Nom" },
+    { key: "firstName",   label: "Prénom" },
+    { key: "phone",       label: "Gsm 1" },
+    { key: "phone2",      label: "Gsm 2" },
+    { key: "ancienLigne", label: "Ancien Ligne" },
+    { key: "cin",         label: "CIN" },
+    { key: "email",       label: "Mail" },
+    { key: "typeId",      label: "Type" },
+    { key: "status",      label: "Statut" },
+    { key: "assignedTo",  label: "Assigné À" },
+    { key: "createdAt",   label: "Créé le" },
+  ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("prospects:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
@@ -409,7 +424,7 @@ function ProspectsPage() {
     },
   ];
   const customColumns: DataGridColumn<Prospect>[] = customDefs
-    .filter((d) => visibleCols.has(d.key))
+    .filter((d) => colPrefs.isVisible(d.key))
     .map((d) => ({
       key: `cf-${d.key}`,
       header: d.label,
@@ -419,7 +434,7 @@ function ProspectsPage() {
     }));
 
   const buildVisibleCsvRows = () => {
-    const cols = [...baseColumns, ...customColumns];
+    const cols = colPrefs.filterCols([...baseColumns, ...customColumns]);
     return csvScope.map((p) => {
       const row: Record<string, unknown> = {};
       for (const c of cols) {
@@ -444,13 +459,12 @@ function ProspectsPage() {
           <>
             <SavedViews scope="prospects" current={currentView} onApply={applyView} isEqual={eqView} />
             <CustomColumnsPicker
+              baseCols={BASE_COLS_META}
               defs={customDefs}
-              visible={visibleCols}
-              onToggle={(k, v) => setVisibleCols((prev) => {
-                const n = new Set(prev);
-                if (v) n.add(k); else n.delete(k);
-                return n;
-              })}
+              isVisible={colPrefs.isVisible}
+              onToggle={colPrefs.setVisible}
+              onShowAll={colPrefs.showAll}
+              onReset={colPrefs.reset}
             />
             {canExport && (
               <DropdownMenu>
@@ -714,7 +728,11 @@ function ProspectsPage() {
                     withCustomFields(withType(filtered.filter((p) => selected.has(p.id))), customDefs, customValuesById),
                     PROSPECT_LABELS,
                   );
-                  exportCSV("prospects-selection.csv", rows as any);
+                  const labels = [
+                    ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                    ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                  ];
+                  exportCSV("prospects-selection.csv", pickColumns(rows, labels) as any);
                   toast.success(`${rows.length} prospect(s) exporté(s)`);
                 }}
               >Exporter sélection</Button>

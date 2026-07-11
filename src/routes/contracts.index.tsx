@@ -30,6 +30,8 @@ import { DynamicFilterBar } from "@/components/DynamicFilterBar";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { pickColumns } from "@/lib/exportUtils";
 import type { Contract } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -192,7 +194,19 @@ function ContractsPage() {
   };
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("contract");
-  const [visibleCols, setVisibleCols] = useState<Set<string>>(new Set());
+  const colPrefs = useColumnPrefs("contracts");
+  // Ordered metadata for the built-in columns — powers the picker AND the
+  // "export what you see" projection. Labels use CONTRACT_LABELS so exported
+  // headers match the UI.
+  const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "lastName",       label: CONTRACT_LABELS.lastName ?? "Nom" },
+    { key: "partner",        label: CONTRACT_LABELS.partner ?? "Partenaire" },
+    { key: "debit",          label: "Débit" },
+    { key: "signatureDate",  label: CONTRACT_LABELS.signatureDate ?? "Date signature" },
+    { key: "validationDate", label: CONTRACT_LABELS.validationDate ?? "Date validation" },
+    { key: "billingStatus",  label: CONTRACT_LABELS.billingStatus ?? "Statut facturation" },
+    { key: "assignedTo",     label: CONTRACT_LABELS.assignedTo ?? "Assigné à" },
+  ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
@@ -346,13 +360,12 @@ function ContractsPage() {
               onActiveChange={setActivePresetId}
             />
             <CustomColumnsPicker
+              baseCols={BASE_COLS_META}
               defs={customDefs}
-              visible={visibleCols}
-              onToggle={(k, v) => setVisibleCols((prev) => {
-                const n = new Set(prev);
-                if (v) n.add(k); else n.delete(k);
-                return n;
-              })}
+              isVisible={colPrefs.isVisible}
+              onToggle={colPrefs.setVisible}
+              onShowAll={colPrefs.showAll}
+              onReset={colPrefs.reset}
             />
             {canExport && (
               <DropdownMenu>
@@ -360,10 +373,27 @@ function ContractsPage() {
                   <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1.5" />Exporter</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={async () => { try { await exportXLSX("contrats.xlsx", exportRows as any, "Contrats"); toast.success("Export Excel généré"); } catch (e: any) { toast.error("Échec Excel", { description: e?.message }); } }}>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      const labels = [
+                        ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ];
+                      const projected = pickColumns(exportRows as any, labels);
+                      await exportXLSX("contrats.xlsx", projected as any, "Contrats");
+                      toast.success("Export Excel généré");
+                    } catch (e: any) { toast.error("Échec Excel", { description: e?.message }); }
+                  }}>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />Excel ({filtered.length})
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { exportJSON("contrats.json", exportRows); toast.success("Export JSON généré"); }}>
+                  <DropdownMenuItem onClick={() => {
+                    const labels = [
+                      ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                    ];
+                    exportJSON("contrats.json", pickColumns(exportRows as any, labels));
+                    toast.success("Export JSON généré");
+                  }}>
                     <FileJson className="h-4 w-4 mr-2" />JSON
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -493,7 +523,11 @@ function ContractsPage() {
                         ),
                         CONTRACT_LABELS,
                       );
-                      exportCSV("contrats-selection.csv", rows);
+                      const labels = [
+                        ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ];
+                      exportCSV("contrats-selection.csv", pickColumns(rows, labels));
                       toast.success(`${rows.length} contrat(s) exporté(s)`);
                     }}
                   >Exporter sélection</Button>
@@ -590,7 +624,7 @@ function ContractsPage() {
                 cell: (c) => <span className="text-muted-foreground">{c.assignedTo}</span> },
             ];
             const customColumns: DataGridColumn<Contract>[] = customDefs
-              .filter((d) => visibleCols.has(d.key))
+              .filter((d) => colPrefs.isVisible(d.key))
               .map((d) => ({
                 key: `cf-${d.key}`,
                 header: d.label,
@@ -606,7 +640,7 @@ function ContractsPage() {
                 <DataGrid
                   storageKey="contracts:list"
                   rows={filtered}
-                  columns={[...baseColumns, ...customColumns]}
+                  columns={colPrefs.filterCols([...baseColumns, ...customColumns])}
                   rowKey={(c) => c.id}
                   selected={selected}
                   onSelectedChange={setSelected}
