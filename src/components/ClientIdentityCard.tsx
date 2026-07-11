@@ -197,7 +197,7 @@ export function ClientIdentityCard({
         <div className="sm:col-span-2">
           <Row icon={<Building2 className="h-3.5 w-3.5" />} label="Adresse" value={m.address} />
         </div>
-        <Row icon={<Tag className="h-3.5 w-3.5" />} label="Source" value={m.source} />
+       
         <Row icon={<User className="h-3.5 w-3.5" />} label="Assigné à" value={m.assignedTo} />
         {m.createdAt && (
           <Row icon={<Calendar className="h-3.5 w-3.5" />} label="Créé le" value={fmtDate(m.createdAt)} />
