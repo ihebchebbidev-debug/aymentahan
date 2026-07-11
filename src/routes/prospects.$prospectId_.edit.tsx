@@ -354,6 +354,7 @@ function EditProspectPage() {
           <section className="border-t border-border pt-6">
             <h2 className="text-sm font-semibold mb-3 text-foreground">Qualification</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Source retirée de l'UI — déduite désormais du type de prospect. Valeur existante préservée au save. */}
               <div className="space-y-1.5">
                 <Label>Statut</Label>
                 <Select value={status || "__blank__"} onValueChange={(v) => setStatus(v === "__blank__" ? "" : v)}>
