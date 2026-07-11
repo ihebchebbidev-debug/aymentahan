@@ -355,16 +355,6 @@ function EditProspectPage() {
             <h2 className="text-sm font-semibold mb-3 text-foreground">Qualification</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Source</Label>
-                <Select value={source || "__blank__"} onValueChange={(v) => setSource(v === "__blank__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__blank__">—</SelectItem>
-                    {SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
                 <Label>Statut</Label>
                 <Select value={status || "__blank__"} onValueChange={(v) => setStatus(v === "__blank__" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
