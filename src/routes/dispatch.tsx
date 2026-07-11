@@ -461,7 +461,7 @@ function DispatchPage() {
 function WonDialog({ onConfirm, currency }: { onConfirm: (premium: number, partner: string) => void; currency: import("@/lib/currency").Currency }) {
   const [open, setOpen] = useState(false);
   const [premium, setPremium] = useState("950");
-  const [partner, setPartner] = useState("NEOLIANE");
+  const [partner, setPartner] = useState("SPVIE");
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -480,7 +480,7 @@ function WonDialog({ onConfirm, currency }: { onConfirm: (premium: number, partn
             <Select value={partner} onValueChange={setPartner}>
               <SelectTrigger id="partner"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {["NEOLIANE", "SPVIE", "APRIL", "APIVIA", "MALAKOFF"].map((x) => (
+                {["SPVIE", "APRIL", "APIVIA", "MALAKOFF"].map((x) => (
                   <SelectItem key={x} value={x}>{x}</SelectItem>
                 ))}
               </SelectContent>

@@ -28,12 +28,13 @@ function realField(
   rows: ReadonlyArray<Record<string, unknown>>,
   rowKey: string,
   extra: Iterable<string> = [],
+  forceSelect: boolean = false,
 ): FilterFieldSchema {
   const set = new Set<string>();
   for (const v of extra) if (v) set.add(String(v));
   for (const v of uniqStr(rows, rowKey)) set.add(v);
   const vals = [...set].sort(sortFr);
-  if (vals.length === 0) return { key, label, type: "text" };
+  if (vals.length === 0 && !forceSelect) return { key, label, type: "text" };
   return { key, label, type: "select", options: vals.map((v) => ({ value: v, label: v })) };
 }
 
@@ -41,7 +42,7 @@ function realField(
 function gouvernoratField(
   rows: ReadonlyArray<Record<string, unknown>>,
 ): FilterFieldSchema {
-  return realField("Gouvernorat", "gouvernorat", rows, "gouvernorat", TUNISIA_GOVERNORATE_VALUES);
+  return realField("Gouvernorat", "gouvernorat", rows, "gouvernorat", TUNISIA_GOVERNORATE_VALUES, true);
 }
 
 export type AutoSchemaInput = {
@@ -53,6 +54,8 @@ export type AutoSchemaInput = {
   opportunityStages?: string[];
   /** Contract billing statuses (configured pipeline). Merged with values found in rows. */
   contractBilling?: string[];
+  /** Prospect status names (dynamic stages). Merged with values found in rows. */
+  prospectStatuses?: string[];
   /** Prospect/Contract types, if available. */
   types?: { id: string; name: string }[];
   /** Custom-field definitions for the entity — appended so presets can filter on them. */
@@ -86,17 +89,26 @@ export function autoFilterSchema(
   const cfs = customFieldsToSchema(input.customFields);
   const withCf = (base: FilterFieldSchema[]) => cfs.length > 0 ? [...base, ...cfs] : base;
 
+  const standardSources = ["Appel Entrant", "Fiche Contact", "Partenaire", "Facebook", "WhatsApp", "Recommandation", "Prospection Téléphonique", "Site Web", "Autre"];
 
   switch (scope) {
     case "prospects":
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, tél, email, CIN)", type: "text" },
-        realField("Statut", "statut", rows, "status"),
-        realField("Source", "source", rows, "source"),
-        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
-        realField("Civilité", "civility", rows, "civility"),
-        realField("Issue", "outcome", rows, "outcome"),
-        realField("Validation", "checkValeur", rows, "checkValeur"),
+        realField("Statut", "statut", rows, "status", input.prospectStatuses ?? [], true),
+        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
+        realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
+        { key: "outcome", label: "Issue", type: "select", options: [
+          { value: "pending", label: "En cours" },
+          { value: "won", label: "Gagné" },
+          { value: "lost", label: "Perdu" }
+        ]},
+        { key: "checkValeur", label: "Validation", type: "select", options: [
+          { value: "pending", label: "En attente" },
+          { value: "valid", label: "Validé" },
+          { value: "invalid", label: "Rejeté" }
+        ]},
         gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),
@@ -125,10 +137,10 @@ export function autoFilterSchema(
     case "opportunities":
       return withCf([
         { key: "search", label: "Recherche (nom, ville, titre)", type: "text" },
-        realField("Étape", "stage", rows, "stage", input.opportunityStages ?? []),
-        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
-        realField("Source", "source", rows, "source"),
-        realField("Civilité", "civility", rows, "civility"),
+        realField("Étape", "stage", rows, "stage", input.opportunityStages ?? [], true),
+        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
+        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
         gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),
@@ -154,11 +166,11 @@ export function autoFilterSchema(
     case "migrations":
       return withCf([
         { key: "search", label: "Recherche (nom, téléphone, CIN, opérateurs)", type: "text" },
-        realField("Workflow", "workflow", rows, "workflowStatus"),
-        realField("Statut technique", "technical", rows, "technicalStatus"),
-        realField("Ancien opérateur", "oldOp", rows, "oldOperator"),
-        realField("Nouvel opérateur", "newOp", rows, "newOperator"),
-        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
+        realField("Workflow", "workflow", rows, "workflowStatus", ["Nouveau", "En attente document", "Soumis", "Approuvé", "Rejeté", "En cours de portage", "Complété", "Annulé"], true),
+        realField("Statut technique", "technical", rows, "technicalStatus", ["En attente", "En cours", "OK", "KO", "Annulé"], true),
+        realField("Ancien opérateur", "oldOp", rows, "oldOperator", ["Tunisie Telecom", "Ooredoo", "Orange", "Autre"], true),
+        realField("Nouvel opérateur", "newOp", rows, "newOperator", ["Tunisie Telecom", "Ooredoo", "Orange", "Autre"], true),
+        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
         { key: "dateFrom", label: "Créée du", type: "date" },
         { key: "dateTo", label: "Créée au", type: "date" },
         { key: "portingNumber", label: "N° portabilité", type: "text" },
@@ -168,12 +180,12 @@ export function autoFilterSchema(
     case "contracts":
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, ville)", type: "text" },
-        realField("Statut Facturation", "statut", rows, "billingStatus", input.contractBilling ?? []),
-        realField("Partenaire", "partenaire", rows, "partner"),
-        realField("Cabinet", "cabinet", rows, "cabinet"),
-        realField("Source", "source", rows, "source"),
-        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? []),
-        realField("Civilité", "civility", rows, "civility"),
+        realField("Statut Facturation", "statut", rows, "billingStatus", input.contractBilling ?? ["Brouillon", "Actif", "Résilié", "Suspendu"], true),
+        realField("Partenaire", "partenaire", rows, "partner", ["APRIL", "ALPTIS", "MIEL MUTUELLE", "SPVIE"], true),
+        realField("Cabinet", "cabinet", rows, "cabinet", ["Cabinet Paris 1"], true),
+        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
+        realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
         gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
         realField("Ville", "city", rows, "city"),

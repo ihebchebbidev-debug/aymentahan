@@ -324,7 +324,7 @@ function ProspectsPage() {
   }, [prospects, debouncedSearch, haystackById, statut, assigne, source, effectiveTypeId, dateCree, dateFrom, dateTo, recoveredF, customFilters, customValuesById, presetExtra]);
 
   const presetChips = useMemo(() => {
-    const schema = autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs });
+    const schema = autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs, prospectStatuses: leadStatusNames });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
     return Object.entries(presetExtra)
       .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
@@ -559,7 +559,7 @@ function ProspectsPage() {
 
             <DynamicFilterBar
               scope="prospects"
-              schema={autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs })}
+              schema={autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs, prospectStatuses: leadStatusNames })}
               values={{ statut, source, assigne, typeF, recoveredF, dateFrom, dateTo, dateCree, ...presetExtra, ...customFilters }}
               onChange={(k, v) => {
                 if (k === "statut") setStatut(v || ALL);

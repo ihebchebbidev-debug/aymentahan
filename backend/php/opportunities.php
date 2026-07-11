@@ -247,7 +247,7 @@ if ($method === 'POST') {
         if ($oid === '') fail('id requis', 422);
 
         $result = conversion_opportunity_to_contract($db, $oid, $me, [
-            'partner'        => (string)($in['partner'] ?? 'NEOLIANE'),
+            'partner'        => (string)($in['partner'] ?? ''),
             'cabinet'        => (string)($in['cabinet'] ?? 'Cabinet Paris 1'),
             'signature_date' => (string)($in['signatureDate'] ?? date('Y-m-d')),
             'effective_date' => (string)($in['effectiveDate'] ?? ($in['signatureDate'] ?? date('Y-m-d'))),

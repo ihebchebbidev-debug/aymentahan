@@ -247,7 +247,7 @@ if ($method === 'POST') {
         require_permission($db, $me, 'opportunity.convert');
         $pid     = $in['id'] ?? '';
         $premium = (float)($in['premium'] ?? 950);
-        $partner = trim($in['partner'] ?? 'NEOLIANE');
+        $partner = trim($in['partner'] ?? '');
         if (!$pid) fail('id requis', 422);
 
         require_once __DIR__ . '/conversion_helpers.php';

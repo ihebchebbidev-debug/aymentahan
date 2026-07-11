@@ -40,6 +40,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { SavedViews } from "@/components/SavedViews";
+import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 
 function buildImportFields(currencySymbol: string): ImportField[] {
   return [
@@ -49,7 +51,7 @@ function buildImportFields(currencySymbol: string): ImportField[] {
     { key: "address", label: "Adresse", sample: "12 rue …" },
     { key: "localisationXy", label: "Localisation XY (lat,lng)", sample: "36.123456,10.123698" },
     { key: "codePostal", label: "Code postal", sample: "75001" },
-    { key: "partner", label: "Partenaire", sample: "NEOLIANE" },
+    { key: "partner", label: "Partenaire", sample: "APRIL" },
     { key: "cabinet", label: "Cabinet", sample: "Cabinet Paris 1" },
     { key: "premium", label: `Cotisation (${currencySymbol})`, required: true, sample: "950" },
     { key: "billingStatus", label: "Statut facturation", sample: "Pré-validé" },
@@ -185,7 +187,6 @@ function ContractsPage() {
     setAssigne(ALL); setSource(ALL); setStatut(ALL); setPartenaire(ALL); setCabinet(ALL); setPage(0);
     setCustomFilters({}); setPresetExtra({});
     setActivePresetId(null);
-    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
@@ -205,6 +206,7 @@ function ContractsPage() {
   };
   const currentView: ViewState = { search, dateSig, dateEffet, dateVal, assigne, source, statut, partenaire, cabinet };
   const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>(pk("presetExtra"), {});
+  const [activePresetId, setActivePresetId] = usePersistedState<string | null>(pk("activePreset"), null);
   const applyView = (v: ViewState) => {
     setSearch(v.search ?? ""); setDateSig(v.dateSig ?? ""); setDateEffet(v.dateEffet ?? "");
     setDateVal(v.dateVal ?? ""); setAssigne(v.assigne ?? ALL); setSource(v.source ?? ALL);

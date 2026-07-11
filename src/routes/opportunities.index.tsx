@@ -113,6 +113,13 @@ function OpportunitiesPage() {
   const [search, setSearch] = usePersistedState("opportunities:list:search", "");
   const [page, setPage] = usePersistedState("opportunities:list:page", 0);
 
+  const [stageF, setStageF] = usePersistedState("opportunities:list:stage", ALL);
+  const [source, setSource] = usePersistedState("opportunities:list:source", ALL);
+  const [assigne, setAssigne] = usePersistedState("opportunities:list:assigne", ALL);
+  const [dateCree, setDateCree] = usePersistedState("opportunities:list:dateCree", "");
+  const [dateFrom, setDateFrom] = usePersistedState("opportunities:list:dateFrom", "");
+  const [dateTo, setDateTo] = usePersistedState("opportunities:list:dateTo", "");
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [attachOpp, setAttachOpp] = useState<Opportunity | null>(null);

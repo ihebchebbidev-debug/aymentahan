@@ -511,7 +511,7 @@ if ($method === 'POST') {
                 ':ad'  => trim((string)($r['address']    ?? '')),
                 ':loc' => prospect_norm_xy($r['localisationXy'] ?? $r['localisation_xy'] ?? null),
                 ':cp'  => prospect_norm_cp($r['codePostal']     ?? $r['code_postal']     ?? null),
-                ':p'   => $r['partner']  ?? 'NEOLIANE',
+                ':p'   => $r['partner']  ?? '',
                 ':cab' => $r['cabinet']  ?? 'Cabinet Paris 1',
                 ':sd'  => $sd,
                 ':ed'  => $ed,
