@@ -631,6 +631,8 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
     $role = (string) ($me['role'] ?? '');
     $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
+    conv_backfill_contract_references($db);
+
     if (($opts['checkAgent'] ?? true) && $isAgent) {
         $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
         $own->execute([':id' => $pid]);

@@ -34,6 +34,7 @@ import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
+import { presetText, presetSelect, splitPresetByFields } from "@/lib/applyFilterPreset";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
 const opportunitiesSearchSchema = z.object({
@@ -167,6 +168,25 @@ function OpportunitiesPage() {
   const eqView = (a: ViewState, b: ViewState) =>
     a.search === b.search && a.stage === b.stage && a.assigne === b.assigne &&
     a.source === b.source && a.dateCree === b.dateCree;
+
+  const applyPreset = (f: Record<string, unknown>) => {
+    setDateFrom(presetText(f.dateFrom));
+    setDateTo(presetText(f.dateTo));
+    applyView({
+      search: presetText(f.search),
+      stage: presetSelect(f.stage),
+      assigne: presetSelect(f.assigne),
+      source: presetSelect(f.source),
+      dateCree: presetText(f.dateCree) || presetText(f.createdAt),
+    });
+    const { custom, extra } = splitPresetByFields(
+      f,
+      [...VIEW_KEYS, "dateFrom", "dateTo", "createdAt"],
+      new Set(customDefs.map((d) => d.key)),
+    );
+    setCustomFilters(custom);
+    setPresetExtra(extra);
+  };
 
   const reset = async () => {
     if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
@@ -442,29 +462,10 @@ function OpportunitiesPage() {
             )}
             <FilterPresetPicker
               scope="opportunities"
-              current={{ ...(currentView as any), ...customFilters }}
+              current={{ ...(currentView as any), dateFrom, dateTo, ...customFilters, ...presetExtra }}
               filterKeys={schemaKeys(autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs }))}
               filterSchema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs })}
-              onApply={(f) => {
-                applyView({
-                  search: typeof f.search === "string" ? f.search : "",
-                  stage: typeof f.stage === "string" && f.stage ? f.stage : ALL,
-                  assigne: typeof f.assigne === "string" && f.assigne ? f.assigne : ALL,
-                  source: typeof f.source === "string" && f.source ? f.source : ALL,
-                  dateCree: typeof f.dateCree === "string" ? f.dateCree : "",
-                });
-                const cfKeys = new Set(customDefs.map((d) => d.key));
-                const nextCf: Record<string, string> = {};
-                const extra: Record<string, unknown> = {};
-                for (const [k, v] of Object.entries(f)) {
-                  if (VIEW_KEYS.includes(k)) continue;
-                  if (v == null || v === "") continue;
-                  if (cfKeys.has(k)) nextCf[k] = String(v);
-                  else extra[k] = v;
-                }
-                setCustomFilters(nextCf);
-                setPresetExtra(extra);
-              }}
+              onApply={applyPreset}
               onReset={reset}
               onActiveChange={setActivePresetId}
             />

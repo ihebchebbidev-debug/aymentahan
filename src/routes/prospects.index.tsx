@@ -23,6 +23,7 @@ import { SavedViews } from "@/components/SavedViews";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { FilterPresetPicker } from "@/components/FilterPresetPicker";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
+import { presetText, presetSelect, splitPresetByFields } from "@/lib/applyFilterPreset";
 import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -249,6 +250,26 @@ function ProspectsPage() {
   const eqView = (a: ViewState, b: ViewState) =>
     a.search === b.search && a.statut === b.statut && a.source === b.source &&
     a.assigne === b.assigne && a.typeF === b.typeF && a.dateCree === b.dateCree;
+
+  const applyPreset = (f: Record<string, unknown>) => {
+    setDateFrom(presetText(f.dateFrom));
+    setDateTo(presetText(f.dateTo));
+    applyView({
+      search: presetText(f.search),
+      statut: presetSelect(f.statut),
+      source: presetSelect(f.source),
+      assigne: presetSelect(f.assigne),
+      typeF: presetSelect(f.typeF, presetSelect(f.typeId)),
+      dateCree: presetText(f.dateCree) || presetText(f.createdAt),
+    });
+    const { custom, extra } = splitPresetByFields(
+      f,
+      [...VIEW_KEYS, "dateFrom", "dateTo", "createdAt", "typeId"],
+      new Set(customDefs.map((d) => d.key)),
+    );
+    setCustomFilters(custom);
+    setPresetExtra(extra);
+  };
 
   const reset = async () => {
     if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
@@ -608,30 +629,10 @@ function ProspectsPage() {
             )}
             <FilterPresetPicker
               scope="prospects"
-              current={{ ...(currentView as any), ...customFilters }}
+              current={{ ...(currentView as any), dateFrom, dateTo, ...customFilters, ...presetExtra }}
               filterKeys={schemaKeys(autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs }))}
               filterSchema={autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs })}
-              onApply={(f) => {
-                applyView({
-                  search: typeof f.search === "string" ? f.search : "",
-                  statut: typeof f.statut === "string" && f.statut ? f.statut : ALL,
-                  source: typeof f.source === "string" && f.source ? f.source : ALL,
-                  assigne: typeof f.assigne === "string" && f.assigne ? f.assigne : ALL,
-                  typeF: typeof f.typeF === "string" && f.typeF ? f.typeF : ALL,
-                  dateCree: typeof f.dateCree === "string" ? f.dateCree : "",
-                });
-                const cfKeys = new Set(customDefs.map((d) => d.key));
-                const nextCf: Record<string, string> = {};
-                const extra: Record<string, unknown> = {};
-                for (const [k, v] of Object.entries(f)) {
-                  if (VIEW_KEYS.includes(k)) continue;
-                  if (v == null || v === "") continue;
-                  if (cfKeys.has(k)) nextCf[k] = String(v);
-                  else extra[k] = v;
-                }
-                setCustomFilters(nextCf);
-                setPresetExtra(extra);
-              }}
+              onApply={applyPreset}
               onReset={reset}
               onActiveChange={setActivePresetId}
             />
