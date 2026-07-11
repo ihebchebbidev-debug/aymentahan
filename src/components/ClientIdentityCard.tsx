@@ -151,7 +151,6 @@ export function ClientIdentityCard({
             </CardTitle>
             <CardDescription className="flex flex-wrap items-center gap-1.5">
               <span>{description}</span>
-              {m.source && <Badge variant="outline" className="text-[10px]">{m.source}</Badge>}
               {m.status && <Badge variant="outline" className="text-[10px]">{m.status}</Badge>}
               {m.typeName && <Badge variant="secondary" className="text-[10px]">{m.typeName}</Badge>}
             </CardDescription>
