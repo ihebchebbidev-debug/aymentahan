@@ -111,7 +111,14 @@ export function autoFilterSchema(
           options: types.length ? types : uniqStr(rows, "typeId").sort(sortFr).map((v) => ({ value: v, label: v })) },
         { key: "converted", label: "Converti", type: "select",
           options: [{ value: "true", label: "Oui" }, { value: "false", label: "Non" }] },
-        { key: "createdAt", label: "Date de création", type: "date" },
+        { key: "recoveredF", label: "Récupérés", type: "select", options: [
+          { value: "any", label: "↩ Récupérés uniquement" },
+          { value: "opportunity", label: "↩ Depuis opportunité" },
+          { value: "contract", label: "↩ Depuis contrat" },
+        ]},
+        { key: "dateFrom", label: "Créé du", type: "date" },
+        { key: "dateTo", label: "Créé au", type: "date" },
+        { key: "dateCree", label: "Créé le (exact)", type: "date" },
         { key: "birthDate", label: "Date de naissance", type: "date" },
       ]);
 
@@ -138,8 +145,10 @@ export function autoFilterSchema(
           options: types.length ? types : uniqStr(rows, "typeId").sort(sortFr).map((v) => ({ value: v, label: v })) },
         { key: "convertedToContract", label: "Converti en contrat", type: "select",
           options: [{ value: "true", label: "Oui" }, { value: "false", label: "Non" }] },
+        { key: "dateFrom", label: "Créée du", type: "date" },
+        { key: "dateTo", label: "Créée au", type: "date" },
+        { key: "dateCree", label: "Créée le (exact)", type: "date" },
         { key: "expectedCloseDate", label: "Date de clôture prévue", type: "date" },
-        { key: "createdAt", label: "Date de création", type: "date" },
       ]);
 
     case "migrations":
@@ -180,6 +189,8 @@ export function autoFilterSchema(
         { key: "dateSig", label: "Date Signature", type: "date" },
         { key: "dateEffet", label: "Date Effet", type: "date" },
         { key: "dateVal", label: "Date Validation", type: "date" },
+        { key: "dateFrom", label: "Signature du", type: "date" },
+        { key: "dateTo", label: "Signature au", type: "date" },
       ]);
 
     case "guichet":

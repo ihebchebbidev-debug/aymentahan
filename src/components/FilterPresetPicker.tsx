@@ -67,7 +67,6 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const autoApplied = useRef(false);
-  const pendingManualId = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
   const [editing, setEditing] = useState<FilterPreset | null>(null);
@@ -77,9 +76,6 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
   const lastAppliedSig = useRef<string | null>(null);
   useEffect(() => {
     if (!data) return;
-    // Avoid racing stale server myChoice over a preset the user just picked.
-    if (pendingManualId.current) return;
-
     let target: FilterPreset | null = null;
     if (!autoApplied.current) {
       target = resolveInitialPreset(data);
@@ -89,15 +85,14 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
     } else if (activeId) {
       target = data.presets.find((p) => p.id === activeId) ?? null;
     }
-
-    if (!target) return;
-
-    const sig = `${target.id}::${JSON.stringify(target.filters)}`;
-    if (sig !== lastAppliedSig.current) {
-      lastAppliedSig.current = sig;
-      onApply(target.filters);
-      setActiveId(target.id);
-      onActiveChange?.(target.id);
+    if (target) {
+      const sig = `${target.id}::${JSON.stringify(target.filters)}`;
+      if (sig !== lastAppliedSig.current) {
+        lastAppliedSig.current = sig;
+        onApply(target.filters);
+        setActiveId(target.id);
+        onActiveChange?.(target.id);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
@@ -109,9 +104,9 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
   const effectiveDefault = data?.effectiveDefault ?? null;
 
   const apply = async (p: FilterPreset) => {
-    const sig = `${p.id}::${JSON.stringify(p.filters)}`;
-    lastAppliedSig.current = sig;
-    pendingManualId.current = p.id;
+    // Mark as applied BEFORE calling onApply so the post-refetch effect
+    // doesn't re-fire onApply with stale data and clobber state.
+    lastAppliedSig.current = `${p.id}::${JSON.stringify(p.filters)}`;
     setActiveId(p.id);
     onApply(p.filters);
     onActiveChange?.(p.id);
@@ -123,18 +118,12 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
     toast.success(`Modèle « ${p.name} » appliqué`, {
       description: count > 0 ? `${count} filtre(s) actif(s)` : "Aucun filtre — affichage complet",
     });
-    try {
-      await actions.choose(p.id);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Choix non enregistré");
-    } finally {
-      pendingManualId.current = null;
-    }
+    try { await actions.choose(p.id); }
+    catch (e: any) { toast.error(e?.message ?? "Choix non enregistré"); }
   };
 
   const clear = async () => {
     lastAppliedSig.current = null;
-    pendingManualId.current = null;
     setActiveId(null);
     onReset?.();
     onActiveChange?.(null);
@@ -165,7 +154,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
           >
             <Filter className="h-4 w-4 mr-1.5" />
             {activeId
-              ? <span className="max-w-[220px] truncate">{presets.find((p) => p.id === activeId)?.name ?? "Modèle"}</span>
+              ? <span className="max-w-[140px] truncate">{presets.find((p) => p.id === activeId)?.name ?? "Modèle"}</span>
               : "Modèles de filtres"}
             {presets.length > 0 && !activeId && (
               <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted text-foreground text-[10px] font-semibold px-1.5">
@@ -177,7 +166,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-[min(34rem,calc(100vw-1.5rem))] p-0">
+        <PopoverContent align="end" className="w-96 p-0">
           <div className="px-3 py-2 border-b border-border flex items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="text-sm font-semibold">Modèles partagés</div>
@@ -218,7 +207,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
               )}
             </div>
           ) : (
-            <ul className="max-h-[min(28rem,70vh)] overflow-y-auto p-2 space-y-1">
+            <ul className="max-h-80 overflow-y-auto p-2 space-y-1">
               {presets.map((p) => {
                 const isActive = activeId === p.id;
                 return (
@@ -483,7 +472,7 @@ function PresetManagerDialog(props: ManagerProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl w-[min(96vw,72rem)] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Gérer les modèles de filtres</DialogTitle>
           <DialogDescription>
@@ -492,9 +481,9 @@ function PresetManagerDialog(props: ManagerProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,340px)_1fr] gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
           {/* Existing presets list */}
-          <div className="border rounded-md max-h-[min(32rem,65vh)] overflow-y-auto">
+          <div className="border rounded-md max-h-[420px] overflow-y-auto">
             <div className="px-3 py-2 border-b bg-muted/30 text-xs font-semibold uppercase tracking-wider">
               Existants ({presets.length})
             </div>
@@ -647,7 +636,7 @@ function PresetManagerDialog(props: ManagerProps) {
                       setEnabled((p) => ({ ...p, [key]: true }));
                     }}
                   >
-                    <SelectTrigger className="w-full sm:w-[280px] h-9 text-xs bg-background shadow-sm border-dashed border-muted-foreground/40 hover:border-primary/50 transition-colors">
+                    <SelectTrigger className="w-full sm:w-[240px] h-9 text-xs bg-background shadow-sm border-dashed border-muted-foreground/40 hover:border-primary/50 transition-colors">
                       <Plus className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
                       <SelectValue placeholder="Ajouter un champ..." />
                     </SelectTrigger>
@@ -668,7 +657,7 @@ function PresetManagerDialog(props: ManagerProps) {
                 </div>
 
                 {filterSchema.filter(f => enabled[f.key]).length > 0 ? (
-                  <div className="space-y-3 max-h-[min(28rem,55vh)] overflow-y-auto pr-1 mt-4">
+                  <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1 mt-4">
                     {filterSchema.filter(f => enabled[f.key]).map((f) => {
                         const val = values[f.key] ?? "";
                         return (
@@ -688,7 +677,7 @@ function PresetManagerDialog(props: ManagerProps) {
                                 )}
                               </div>
                               
-                              <div className="w-full sm:w-[min(100%,420px)] shrink-0 mt-2 sm:mt-0">
+                              <div className="w-full sm:w-[300px] shrink-0 mt-2 sm:mt-0">
                                 {f.type === "select" && !freeText[f.key] ? (
                                   <div className="flex gap-1.5">
                                     <Select

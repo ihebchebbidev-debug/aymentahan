@@ -22,8 +22,7 @@ import type { Migration } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { FilterPresetPicker } from "@/components/FilterPresetPicker";
-import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
+import { DynamicFilterBar } from "@/components/DynamicFilterBar";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { exportCSV, exportJSON, exportXLSX, withCustomFields } from "@/lib/exportUtils";
 import { toast } from "sonner";
@@ -110,11 +109,6 @@ function MigrationsPage() {
     });
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("migration");
-  const { data: presetsData } = useFilterPresets("migrations");
-  const presetActions = useFilterPresetActions("migrations");
-  const [activePresetId, setActivePresetId] = usePersistedState<string | null>(pk("activePreset"), null);
-  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
-  const hideHardcoded = !!activePresetId;
 
   useEffect(() => {
     if (urlStatut && urlStatut !== statut) {
@@ -235,8 +229,6 @@ function MigrationsPage() {
     setDateTo("");
     setPresetExtra({});
     setCustomFilters({});
-    setActivePresetId(null);
-    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
@@ -285,138 +277,47 @@ function MigrationsPage() {
         }
       />
 
-      <Card className="p-4 mb-4 space-y-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <Label className="text-xs">Recherche</Label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Nom, téléphone, CIN, opérateurs…" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
+      <Card className="p-4 mb-4 flex flex-col gap-2">
+        <div className="flex items-center gap-2 w-full">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher nom, téléphone, CIN, opérateurs…"
+              className="pl-9 h-9"
+            />
           </div>
-          {!hideHardcoded && (
-            <>
-              <div className="w-40">
-                <Label className="text-xs">Statut</Label>
-                <Select value={statut} onValueChange={setStatut}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous statuts</SelectItem>
-                    {workflowOptions.map((w) => <SelectItem key={w} value={w}>{w}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-40">
-                <Label className="text-xs">Statut technique</Label>
-                <Select value={technical} onValueChange={setTechnical}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {technicalOptions.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-36">
-                <Label className="text-xs">Ancien op.</Label>
-                <Select value={oldOp} onValueChange={setOldOp}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {oldOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-36">
-                <Label className="text-xs">Nouvel op.</Label>
-                <Select value={newOp} onValueChange={setNewOp}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {newOpOptions.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-40">
-                <Label className="text-xs">Assigné à</Label>
-                <Select value={assigne} onValueChange={setAssigne}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {[...new Set([...agentOptions, ...allMigrations.map((m) => m.assignedTo).filter(Boolean)])].sort().map((a) => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </>
-          )}
-          <FilterPresetPicker
-            scope="migrations"
-            current={{ search, statut, workflow: statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, ...customFilters, ...presetExtra }}
-            filterKeys={schemaKeys(filterSchema)}
-            filterSchema={filterSchema}
-            onApply={(f) => {
-              setSearch(typeof f.search === "string" ? f.search : "");
-              const st = typeof f.statut === "string" && f.statut ? f.statut
-                : typeof f.workflow === "string" && f.workflow ? f.workflow : ALL;
-              setStatut(st);
-              setTechnical(typeof f.technical === "string" && f.technical ? f.technical : ALL);
-              setOldOp(typeof f.oldOp === "string" && f.oldOp ? f.oldOp : ALL);
-              setNewOp(typeof f.newOp === "string" && f.newOp ? f.newOp : ALL);
-              setAssigne(typeof f.assigne === "string" && f.assigne ? f.assigne : ALL);
-              setDateFrom(typeof f.dateFrom === "string" ? f.dateFrom : "");
-              setDateTo(typeof f.dateTo === "string" ? f.dateTo : "");
-              const cfKeys = new Set(customDefs.map((d) => d.key));
-              const nextCf: Record<string, string> = {};
-              const extra: Record<string, unknown> = {};
-              for (const [k, v] of Object.entries(f)) {
-                if (["search", "statut", "workflow", "technical", "oldOp", "newOp", "assigne", "dateFrom", "dateTo"].includes(k)) continue;
-                if (v == null || v === "") continue;
-                if (cfKeys.has(k)) nextCf[k] = String(v);
-                else extra[k] = v;
-              }
-              setCustomFilters(nextCf);
-              setPresetExtra(extra);
-            }}
-            onActiveChange={setActivePresetId}
-          />
-          <Button variant="ghost" size="sm" onClick={reset}>
-            <X className="h-4 w-4 mr-1" />Réinitialiser
-          </Button>
+          <div
+            key={`count-${search}|${statut}|${technical}|${oldOp}|${newOp}|${assigne}|${dateFrom}|${dateTo}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
+            className="ml-auto text-xs text-muted-foreground tabular-nums animate-in fade-in slide-in-from-right-2 duration-300"
+          >
+            <span className="font-semibold text-foreground">{filtered.length.toLocaleString("fr-FR")}</span> résultat(s) sur {allMigrations.length.toLocaleString("fr-FR")}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div>
-            <Label className="text-xs">Créée du</Label>
-            <DatePicker value={dateFrom} onChange={setDateFrom} />
-          </div>
-          <div>
-            <Label className="text-xs">au</Label>
-            <DatePicker value={dateTo} onChange={setDateTo} />
-          </div>
-          {customDefs.length > 0 && (
-            <>
-              <div className="basis-full h-0" />
-              <div className="flex items-center">
-                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mr-2">Champs perso</Label>
-              </div>
-              {customDefs.map((def) => (
-                <div key={def.id}>
-                  <Label className="text-xs">{def.label}</Label>
-                  <Input
-                    type={def.type === "number" ? "number" : def.type === "date" ? "date" : "text"}
-                    value={customFilters[def.key] ?? ""}
-                    onChange={(e) => setCustomFilter(def.key, e.target.value)}
-                    placeholder={def.label}
-                    className="h-9 w-[180px]"
-                  />
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {filtered.length.toLocaleString("fr-FR")} résultat(s) sur {allMigrations.length.toLocaleString("fr-FR")}
-        </p>
+
+        <DynamicFilterBar
+          scope="migrations"
+          schema={filterSchema}
+          values={{ statut, workflow: statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, ...presetExtra, ...customFilters }}
+          onChange={(k, v) => {
+            if (k === "statut" || k === "workflow") setStatut(v || ALL);
+            else if (k === "technical") setTechnical(v || ALL);
+            else if (k === "oldOp") setOldOp(v || ALL);
+            else if (k === "newOp") setNewOp(v || ALL);
+            else if (k === "assigne") setAssigne(v || ALL);
+            else if (k === "dateFrom") setDateFrom(v || "");
+            else if (k === "dateTo") setDateTo(v || "");
+            else if (customDefs.some(d => d.key === k)) setCustomFilter(k, v);
+            else setPresetExtra(prev => {
+              const n = { ...prev };
+              if (v === "") delete n[k]; else n[k] = v;
+              return n;
+            });
+          }}
+          onReset={reset}
+        />
+
       </Card>
 
       {selected.size > 0 && canDelete && (

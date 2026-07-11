@@ -31,10 +31,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
-import { FilterPresetPicker } from "@/components/FilterPresetPicker";
-import { useFilterPresets, useFilterPresetActions } from "@/lib/filterPresets";
+import { DynamicFilterBar } from "@/components/DynamicFilterBar";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
-import { presetText, presetSelect, splitPresetByFields } from "@/lib/applyFilterPreset";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
 const opportunitiesSearchSchema = z.object({
@@ -105,25 +103,14 @@ function OpportunitiesPage() {
   }, [oppQ.error]);
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("opportunity");
-  const { data: presetsData } = useFilterPresets("opportunities");
-  const presetActions = useFilterPresetActions("opportunities");
   const [activePresetId, setActivePresetId] = usePersistedState<string | null>("opportunities:list:activePreset", null);
-  // Hide the hardcoded quick-filter row only when a dynamic preset is currently active.
-  const hideHardcoded = !!activePresetId;
 
   const agentOptions = useMemo(
     () => users.filter((u) => u.role === "Agent" || u.role === "Manager" || u.role === "AgentSuivi" || u.role === "AgentActivation" || u.role === "AgentVente").map((u) => u.username),
     [users],
   );
 
-  // -------- Persisted filters (mirrors contracts) --------
   const [search, setSearch] = usePersistedState("opportunities:list:search", "");
-  const [stageF, setStageF] = usePersistedState("opportunities:list:stage", ALL);
-  const [assigne, setAssigne] = usePersistedState("opportunities:list:assigne", ALL);
-  const [source, setSource] = usePersistedState("opportunities:list:source", ALL);
-  const [dateCree, setDateCree] = usePersistedState("opportunities:list:dateCree", "");
-  const [dateFrom, setDateFrom] = usePersistedState("opportunities:list:dateFrom", "");
-  const [dateTo, setDateTo] = usePersistedState("opportunities:list:dateTo", "");
   const [page, setPage] = usePersistedState("opportunities:list:page", 0);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -169,32 +156,11 @@ function OpportunitiesPage() {
     a.search === b.search && a.stage === b.stage && a.assigne === b.assigne &&
     a.source === b.source && a.dateCree === b.dateCree;
 
-  const applyPreset = (f: Record<string, unknown>) => {
-    setDateFrom(presetText(f.dateFrom));
-    setDateTo(presetText(f.dateTo));
-    applyView({
-      search: presetText(f.search),
-      stage: presetSelect(f.stage),
-      assigne: presetSelect(f.assigne),
-      source: presetSelect(f.source),
-      dateCree: presetText(f.dateCree) || presetText(f.createdAt),
-    });
-    const { custom, extra } = splitPresetByFields(
-      f,
-      [...VIEW_KEYS, "dateFrom", "dateTo", "createdAt"],
-      new Set(customDefs.map((d) => d.key)),
-    );
-    setCustomFilters(custom);
-    setPresetExtra(extra);
-  };
-
   const reset = async () => {
-    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (préréglages, recherche, dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
+    if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (dates, colonnes personnalisées) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch(""); setStageF(ALL); setAssigne(ALL); setSource(ALL);
     setDateCree(""); setDateFrom(""); setDateTo("");
     setPresetExtra({}); setCustomFilters({}); setPage(0);
-    setActivePresetId(null);
-    void presetActions.choose(null).catch(() => {});
     toast.success("Filtres réinitialisés");
   };
 
@@ -420,101 +386,49 @@ function OpportunitiesPage() {
 
       <div className="mt-5 space-y-3">
         <Card className="p-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[220px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                placeholder="Rechercher nom, prénom, téléphone, ville…"
-                className="pl-9 h-9"
-              />
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 w-full">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+                  placeholder="Rechercher nom, prénom, téléphone, ville…"
+                  className="pl-9 h-9"
+                />
+              </div>
+              <div
+                key={`count-${search}|${stageF}|${assigne}|${source}|${dateCree}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
+                className="ml-auto text-xs text-muted-foreground tabular-nums animate-in fade-in slide-in-from-right-2 duration-300"
+              >
+                <span className="font-semibold text-foreground">{filtered.length.toLocaleString("fr-FR")}</span> résultat(s)
+              </div>
             </div>
-            {!hideHardcoded && (
-              <>
-                <Select value={stageF} onValueChange={(v) => { setStageF(v); setPage(0); }}>
-                  <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Statut" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Tous statuts</SelectItem>
-                    {stages.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
-                  <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Source" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>Toutes sources</SelectItem>
-                    {sourceOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {!isAgent && (
-                  <Select value={assigne} onValueChange={(v) => { setAssigne(v); setPage(0); }}>
-                    <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Assigné à" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL}>Tous</SelectItem>
-                      {assigneOptions.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-              </>
-            )}
-            {hasActiveFilter && (
-              <Button variant="ghost" size="sm" onClick={reset}><X className="h-3.5 w-3.5 mr-1" />Réinitialiser</Button>
-            )}
-            <FilterPresetPicker
+
+            <DynamicFilterBar
               scope="opportunities"
-              current={{ ...(currentView as any), dateFrom, dateTo, ...customFilters, ...presetExtra }}
-              filterKeys={schemaKeys(autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs }))}
-              filterSchema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs })}
-              onApply={applyPreset}
+              schema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs })}
+              values={{ stage: stageF, source, assigne, dateFrom, dateTo, dateCree, ...presetExtra, ...customFilters }}
+              onChange={(k, v) => {
+                if (k === "stage") setStageF(v || ALL);
+                else if (k === "source") setSource(v || ALL);
+                else if (k === "assigne") setAssigne(v || ALL);
+                else if (k === "dateFrom") setDateFrom(v || "");
+                else if (k === "dateTo") setDateTo(v || "");
+                else if (k === "dateCree") setDateCree(v || "");
+                else if (customDefs.some(d => d.key === k)) setCustomFilter(k, v);
+                else setPresetExtra(prev => {
+                  const n = { ...prev };
+                  if (v === "") delete n[k]; else n[k] = v;
+                  return n;
+                });
+                setPage(0);
+              }}
               onReset={reset}
-              onActiveChange={setActivePresetId}
             />
-            <div
-              key={`count-${search}|${stageF}|${assigne}|${source}|${dateCree}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
-              className="ml-auto text-xs text-muted-foreground tabular-nums animate-in fade-in slide-in-from-right-2 duration-300"
-            >
-              <span className="font-semibold text-foreground">{filtered.length.toLocaleString("fr-FR")}</span> résultat(s)
-            </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mr-1">Date début</Label>
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
-              className="h-9 w-[160px]"
-            />
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mr-1">Date fin</Label>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
-              className="h-9 w-[160px]"
-            />
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground mr-1">Créé le (exact)</Label>
-            <Input
-              type="date"
-              value={dateCree}
-              onChange={(e) => { setDateCree(e.target.value); setPage(0); }}
-              className="h-9 w-[160px]"
-            />
-            {customDefs.length > 0 && (
-              <>
-                <Label className="text-[11px] uppercase tracking-wider text-muted-foreground ml-2 mr-1">Champs perso</Label>
-                {customDefs.map((def) => (
-                  <Input
-                    key={def.id}
-                    type={def.type === "number" ? "number" : def.type === "date" ? "date" : "text"}
-                    value={customFilters[def.key] ?? ""}
-                    onChange={(e) => setCustomFilter(def.key, e.target.value)}
-                    placeholder={def.label}
-                    className="h-9 w-[160px]"
-                  />
-                ))}
-              </>
-            )}
-          </div>
+
 
         </Card>
 
@@ -534,25 +448,7 @@ function OpportunitiesPage() {
           </div>
         )}
 
-        {presetChips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 px-1">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Filtres modèle :</span>
-            {presetChips.map((c) => (
-              <Badge key={c.key} variant="secondary" className="gap-1 pr-1">
-                <span className="text-[11px]">{c.label}: <span className="font-semibold">{c.value}</span></span>
-                <button
-                  type="button"
-                  className="rounded hover:bg-muted-foreground/20 p-0.5"
-                  onClick={() => setPresetExtra((prev) => { const n = { ...prev }; delete n[c.key]; return n; })}
-                  aria-label={`Retirer ${c.label}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            ))}
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setPresetExtra({})}>Tout retirer</Button>
-          </div>
-        )}
+
 
         {/* Stat cards (mirrors contracts) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
