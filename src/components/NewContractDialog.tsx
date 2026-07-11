@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import type { Currency } from "@/lib/currency";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
+import { DebitSelect } from "./DebitSelect";
 
 const PARTNERS = ["APRIL", "ALPTIS", "MIEL MUTUELLE", "SPVIE"];
 const BILLING = ["Pré-validé", "Validé Confirmation", "Annulé"];
@@ -38,6 +39,7 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
   const [partner, setPartner] = useState(PARTNERS[0]);
   const [cabinet, setCabinet] = useState("Cabinet Paris 1");
   const [premium, setPremium] = useState("950");
+  const [debit, setDebit] = useState<number | null>(50);
   const [billing, setBilling] = useState(BILLING[0]);
   const [signatureDate, setSignatureDate] = useState(today);
   const [effectiveDate, setEffectiveDate] = useState(today);
@@ -66,6 +68,7 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
         localisationXy: normalizeLocalisationXy(localisationXy) || null,
         codePostal: normalizeCodePostal(codePostal) || null,
         premium: p,
+        debit,
         billingStatus: billing as any,
         signatureDate, effectiveDate,
         source,
@@ -111,6 +114,7 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
               onBlur={(e) => setCodePostal(normalizeCodePostal(e.target.value))}
               placeholder="75001" maxLength={20} /></div>
           <div className="space-y-1.5"><Label>Cotisation ({currency.symbol}) *</Label><Input type="number" value={premium} onChange={(e) => setPremium(e.target.value)} /></div>
+          <DebitSelect value={debit} onChange={setDebit} />
           <div className="space-y-1.5"><Label>Partenaire</Label>
             <Select value={partner} onValueChange={setPartner}><SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{PARTNERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>

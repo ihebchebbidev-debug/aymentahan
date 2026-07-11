@@ -54,6 +54,7 @@ function buildImportFields(currencySymbol: string): ImportField[] {
     { key: "partner", label: "Partenaire", sample: "APRIL" },
     { key: "cabinet", label: "Cabinet", sample: "Cabinet Paris 1" },
     { key: "premium", label: `Cotisation (${currencySymbol})`, required: true, sample: "950" },
+    { key: "debit", label: "Débit (Mbps)", sample: "50" },
     { key: "billingStatus", label: "Statut facturation", sample: "Pré-validé" },
     { key: "signatureDate", label: "Date signature (AAAA-MM-JJ)", sample: "2026-04-28" },
     { key: "effectiveDate", label: "Date d'effet", sample: "2026-05-01" },
@@ -261,6 +262,13 @@ function ContractsPage() {
         if (raw == null || raw === "" || VIEW_KEYS.includes(k)) continue;
         if (k === "premiumMin") { if (Number((c as any).premium ?? 0) < Number(raw)) return false; continue; }
         if (k === "premiumMax") { if (Number((c as any).premium ?? 0) > Number(raw)) return false; continue; }
+        if (k === "debitMin") { if (Number((c as any).debit ?? 0) < Number(raw)) return false; continue; }
+        if (k === "debitMax") { if (Number((c as any).debit ?? 0) > Number(raw)) return false; continue; }
+        if (k === "debit") {
+          const want = Number(raw);
+          if (!Number.isFinite(want) || Number((c as any).debit ?? 0) !== want) return false;
+          continue;
+        }
         const field = KEY_MAP[k] ?? k;
         const val = (c as any)[field];
         const target = String(raw).toLowerCase();
@@ -567,6 +575,9 @@ function ContractsPage() {
                 ),
               },
               { key: "partner", header: "Partenaire", accessor: (c) => c.partner, hideBelow: "md" },
+              { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",
+                cell: (c) => <span className="text-muted-foreground">{c.debit ? `${c.debit} Mbps` : "—"}</span>,
+                hideBelow: "md" },
               { key: "signatureDate", header: "Date SI", accessor: (c) => c.signatureDate, hideBelow: "lg" },
               { key: "validationDate", header: "Date VA", accessor: (c) => c.validationDate ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{c.validationDate ?? "—"}</span> },

@@ -417,6 +417,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                     <Field label="Partenaire" icon={<Building2 className="h-3.5 w-3.5" />} value={contract.partner} />
                     <Field label="Date signature" icon={<FileSignature className="h-3.5 w-3.5" />} value={contract.signatureDate} />
                     <Field label="Date validation" icon={<CheckCircle2 className="h-3.5 w-3.5" />} value={contract.validationDate ?? "—"} />
+                    <Field label="Débit" value={contract.debit ? `${contract.debit} Mbps` : "—"} />
                   </div>
                   <LastModifiedInfo
                     kind="contract"
@@ -559,6 +560,10 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Prime</span>
                 <span className="font-medium">{formatAmount(contract.premium ?? 0, currency as Currency)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Débit</span>
+                <span className="font-medium">{contract.debit ? `${contract.debit} Mbps` : "—"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Signature</span>

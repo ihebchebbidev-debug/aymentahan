@@ -92,6 +92,7 @@ $spec = [
         'validation_date' => "DATE NULL",
         'prospect_id'     => "VARCHAR(40) NULL",
         'deleted_at'      => "DATETIME NULL",
+        'debit'           => "INT UNSIGNED NULL",
     ],
 ];
 
@@ -112,6 +113,7 @@ $indexSpec = [
         'idx_contract_deleted'   => 'deleted_at',
         'idx_contract_prospect'  => 'prospect_id',
         'idx_contract_animateur' => 'animateur',
+        'idx_contract_debit'     => 'debit',
     ],
 ];
 

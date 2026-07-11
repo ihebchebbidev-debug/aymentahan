@@ -33,6 +33,7 @@ function ensure_contracts_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_contracts ADD COLUMN stage_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN opportunity_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN type_id VARCHAR(40) NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN debit INT UNSIGNED NULL",
     ];
     foreach ($stmts as $sql) {
         try { $db->exec($sql); } catch (Throwable $e) { /* column may already exist */ }
@@ -74,6 +75,7 @@ function row_to_contract(array $r): array {
         'effectiveDate'  => $r['effective_date']    ?? null,
         'validationDate' => $r['validation_date']   ?? null,
         'premium'        => (float)($r['premium']   ?? 0),
+        'debit'          => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
         'billingStatus'  => $r['billing_status']    ?? '',
         'stageId'        => $r['stage_id']          ?? null,
         'opportunityId'  => $r['opportunity_id']    ?? null,
@@ -112,6 +114,7 @@ if ($method === 'GET') {
             'firstName'      => 'first_name',
             'billingStatus'  => 'billing_status',
             'premium'        => 'premium',
+            'debit'          => 'debit',
             'assignedTo'     => 'assigned_to',
             'phone'          => 'phone',
             'cin'            => 'cin',
@@ -136,7 +139,7 @@ if ($method === 'GET') {
         ok(['total' => (int)$s->fetchColumn()]);
     }
 
-    $listCols = 'id, civility, last_name, first_name, phone, phone2, cin, signature_date, effective_date, premium, billing_status, stage_id, opportunity_id, prospect_id, assigned_to, gouvernorat, delegation, type_id';
+    $listCols = 'id, civility, last_name, first_name, phone, phone2, cin, signature_date, effective_date, premium, debit, billing_status, stage_id, opportunity_id, prospect_id, assigned_to, gouvernorat, delegation, type_id';
     $selectCols = $params['fields'] === 'list' ? $listCols : '*';
     $orderBy = build_list_order($params);
 
@@ -260,6 +263,33 @@ if ($method === 'PATCH' || $method === 'PUT') {
                     ':f'   => 'premium',
                     ':pv'  => (string)($existing['premium'] ?? ''),
                     ':nv'  => (string)$new,
+                    ':u'   => $me['username'] ?? '',
+                ]);
+            } catch (Throwable $e) { /* best-effort */ }
+        }
+    }
+
+    /* ---- debit (Mbps, logged separately) ----------------------------- */
+    if (array_key_exists('debit', $in)) {
+        $raw = $in['debit'];
+        $newDebit = ($raw === null || $raw === '' ) ? null : (int)$raw;
+        if ($newDebit !== null && $newDebit < 0) $newDebit = null;
+        $sets[]           = 'debit = :dbt';
+        $params[':dbt']   = $newDebit;
+        $prev = $existing['debit'] ?? null;
+        if ((string)$prev !== (string)($newDebit ?? '')) {
+            try {
+                $log = $db->prepare('INSERT INTO crminternet_activity_log
+                    (id,entity_type,entity_id,contract_id,field,previous_value,new_value,user_username)
+                    VALUES (:id,:et,:eid,:cid,:f,:pv,:nv,:u)');
+                $log->execute([
+                    ':id'  => 'A-' . substr(bin2hex(random_bytes(6)), 0, 10),
+                    ':et'  => 'contract',
+                    ':eid' => $cid,
+                    ':cid' => $cid,
+                    ':f'   => 'debit',
+                    ':pv'  => (string)($prev ?? ''),
+                    ':nv'  => (string)($newDebit ?? ''),
                     ':u'   => $me['username'] ?? '',
                 ]);
             } catch (Throwable $e) { /* best-effort */ }
@@ -404,8 +434,8 @@ if ($method === 'POST') {
     $refUpdate = $hasRef ? ', reference=IF(reference = \'\', VALUES(reference), reference)' : '';
 
     $ins = $db->prepare("INSERT INTO crminternet_contracts
-        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,billing_status,source,assigned_to,type_id,comment1,comment2{$refCols})
-        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:bs,:src,:at,:tid,:c1,:c2{$refVals})
+        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,debit,billing_status,source,assigned_to,type_id,comment1,comment2{$refCols})
+        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:dbt,:bs,:src,:at,:tid,:c1,:c2{$refVals})
         ON DUPLICATE KEY UPDATE
           civility=VALUES(civility), last_name=VALUES(last_name), first_name=VALUES(first_name),
           phone=VALUES(phone), phone2=VALUES(phone2), cin=VALUES(cin), birth_date=VALUES(birth_date),
@@ -414,7 +444,7 @@ if ($method === 'POST') {
           localisation_xy=VALUES(localisation_xy), code_postal=VALUES(code_postal),
           partner=VALUES(partner), cabinet=VALUES(cabinet), signature_date=VALUES(signature_date),
           effective_date=VALUES(effective_date), validation_date=VALUES(validation_date),
-          premium=VALUES(premium), billing_status=VALUES(billing_status),
+          premium=VALUES(premium), debit=VALUES(debit), billing_status=VALUES(billing_status),
           source=VALUES(source), assigned_to=VALUES(assigned_to), type_id=VALUES(type_id),
           comment1=VALUES(comment1), comment2=VALUES(comment2){$refUpdate}");
 
@@ -517,6 +547,7 @@ if ($method === 'POST') {
                 ':ed'  => $ed,
                 ':vd'  => $vd,
                 ':pr'  => (float)($r['premium'] ?? 0),
+                ':dbt' => (isset($r['debit']) && $r['debit'] !== '' && $r['debit'] !== null) ? (int)$r['debit'] : null,
                 ':bs'  => $bs,
                 ':src' => $r['source']      ?? 'Web',
                 ':at'  => $r['assignedTo']  ?? '—',

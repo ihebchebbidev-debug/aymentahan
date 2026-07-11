@@ -23,6 +23,7 @@ import {
 } from "@/lib/geo";
 
 import { RequirePerm } from "@/components/RequirePerm";
+import { DebitSelect } from "@/components/DebitSelect";
 
 export const Route = createFileRoute("/contracts/$contractId_/edit")({
   head: ({ params }) => ({
@@ -82,6 +83,7 @@ function EditContractPage() {
   const [effectiveDate, setEffectiveDate] = useState("");
   const [validationDate, setValidationDate] = useState("");
   const [premium, setPremium] = useState("0");
+  const [debit, setDebit] = useState<number | null>(null);
   const [billingStatus, setBillingStatus] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
 
@@ -111,6 +113,7 @@ function EditContractPage() {
     setEffectiveDate(contract.effectiveDate ?? "");
     setValidationDate(contract.validationDate ?? "");
     setPremium(String(contract.premium ?? 0));
+    setDebit(contract.debit ?? null);
     setBillingStatus(contract.billingStatus ?? "");
     setAssignedTo(contract.assignedTo && contract.assignedTo !== "—" ? contract.assignedTo : "__none__");
     setHydrated(true);
@@ -167,6 +170,7 @@ function EditContractPage() {
         effectiveDate: effectiveDate || undefined,
         validationDate: validationDate || null,
         premium: Number(premium) || 0,
+        debit,
         billingStatus: billingStatus || contract.billingStatus,
         assignedTo: assignedTo === "__none__" ? "" : assignedTo,
       } as any);
@@ -260,6 +264,7 @@ function EditContractPage() {
               <div className="space-y-1.5"><Label>Date effet</Label><DatePicker value={effectiveDate} onChange={setEffectiveDate} /></div>
               <div className="space-y-1.5"><Label>Date validation</Label><DatePicker value={validationDate} onChange={setValidationDate} /></div>
               <div className="space-y-1.5"><Label>Cotisation (TND)</Label><Input type="number" value={premium} onChange={(e) => setPremium(e.target.value)} /></div>
+              <DebitSelect value={debit} onChange={setDebit} />
               <div className="space-y-1.5">
                 <Label>Statut facturation</Label>
                 <Select value={billingStatus || "__keep__"} onValueChange={(v) => v !== "__keep__" && setBillingStatus(v)}>

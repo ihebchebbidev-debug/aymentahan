@@ -244,6 +244,8 @@ export type Contract = {
   effectiveDate: string;
   validationDate: string | null;
   premium: number;
+  /** Débit internet en Mbps (10/20/30/50/100 ou valeur libre). */
+  debit?: number | null;
   // billingStatus est désormais le NOM du stage courant (table crminternet_contract_stages).
   // Conservé en string pour rester rétro-compatible avec les statuts legacy.
   billingStatus: string;
