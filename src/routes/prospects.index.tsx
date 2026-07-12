@@ -832,7 +832,7 @@ function ProspectsPage() {
               return 0;
             })}
             rowClassName={(p) => p.revertedAt ? "bg-warning/15 hover:bg-warning/25" : ""}
-            columns={[...baseColumns, ...customColumns]}
+            columns={colPrefs.filterCols([...baseColumns, ...customColumns])}
             rowKey={(p) => p.id}
             selected={selected}
             onSelectedChange={setSelected}

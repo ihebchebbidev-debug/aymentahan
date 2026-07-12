@@ -194,19 +194,34 @@ function ContractsPage() {
   };
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("contract");
-  const colPrefs = useColumnPrefs("contracts");
-  // Ordered metadata for the built-in columns — powers the picker AND the
-  // "export what you see" projection. Labels use CONTRACT_LABELS so exported
-  // headers match the UI.
+  // Extended set of pickable base columns. Columns that were NOT visible in
+  // the historical default view are hidden by default via `useColumnPrefs`
+  // so existing users don't see their layout change — they can enable them
+  // from the "Colonnes" picker.
   const BASE_COLS_META: { key: string; label: string }[] = [
     { key: "lastName",       label: CONTRACT_LABELS.lastName ?? "Nom" },
+    { key: "firstName",      label: CONTRACT_LABELS.firstName ?? "Prénom" },
+    { key: "phone",          label: "Téléphone" },
+    { key: "cin",            label: "CIN" },
+    { key: "email",          label: "E-mail" },
+    { key: "city",           label: CONTRACT_LABELS.city ?? "Ville" },
+    { key: "address",        label: CONTRACT_LABELS.address ?? "Adresse" },
+    { key: "codePostal",     label: CONTRACT_LABELS.codePostal ?? "Code postal" },
     { key: "partner",        label: CONTRACT_LABELS.partner ?? "Partenaire" },
+    { key: "cabinet",        label: CONTRACT_LABELS.cabinet ?? "Cabinet" },
+    { key: "premium",        label: CONTRACT_LABELS.premium ?? "Cotisation" },
     { key: "debit",          label: "Débit" },
     { key: "signatureDate",  label: CONTRACT_LABELS.signatureDate ?? "Date signature" },
+    { key: "effectiveDate",  label: CONTRACT_LABELS.effectiveDate ?? "Date d'effet" },
     { key: "validationDate", label: CONTRACT_LABELS.validationDate ?? "Date validation" },
     { key: "billingStatus",  label: CONTRACT_LABELS.billingStatus ?? "Statut facturation" },
+    { key: "source",         label: CONTRACT_LABELS.source ?? "Source" },
     { key: "assignedTo",     label: CONTRACT_LABELS.assignedTo ?? "Assigné à" },
   ];
+  const colPrefs = useColumnPrefs("contracts", {
+    // Hide the new optional columns by default to preserve the current layout.
+    hidden: ["firstName", "phone", "cin", "email", "city", "address", "codePostal", "cabinet", "premium", "effectiveDate", "source"],
+  });
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
     setCustomFilters((prev) => {
@@ -608,11 +623,27 @@ function ContractsPage() {
                   <div className="font-medium text-[13px] truncate">{c.lastName} {c.firstName}</div>
                 ),
               },
+              { key: "firstName", header: "Prénom", accessor: (c) => c.firstName ?? "", hideBelow: "md" },
+              { key: "phone", header: "Téléphone", accessor: (c) => (c as any).phone ?? "", hideBelow: "lg",
+                cell: (c) => <span className="text-muted-foreground">{(c as any).phone || "—"}</span> },
+              { key: "cin", header: "CIN", accessor: (c) => c.cin ?? "", hideBelow: "lg",
+                cell: (c) => <span className="text-muted-foreground">{c.cin || "—"}</span> },
+              { key: "email", header: "E-mail", accessor: (c) => c.email ?? "", hideBelow: "lg",
+                cell: (c) => <span className="text-muted-foreground">{c.email || "—"}</span> },
+              { key: "city", header: "Ville", accessor: (c) => c.city ?? "", hideBelow: "lg" },
+              { key: "address", header: "Adresse", accessor: (c) => c.address ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.address || "—"}</span> },
+              { key: "codePostal", header: "Code postal", accessor: (c) => c.codePostal ?? "", hideBelow: "xl" },
               { key: "partner", header: "Partenaire", accessor: (c) => c.partner, hideBelow: "md" },
+              { key: "cabinet", header: "Cabinet", accessor: (c) => c.cabinet ?? "", hideBelow: "lg" },
+              { key: "premium", header: `Cotisation (${currency.symbol})`, accessor: (c) => c.premium ?? 0, hideBelow: "lg",
+                cell: (c) => <span className="tabular-nums">{Number(c.premium ?? 0).toLocaleString("fr-FR")}</span> },
               { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",
                 cell: (c) => <span className="text-muted-foreground">{c.debit ? `${c.debit} Mbps` : "—"}</span>,
                 hideBelow: "md" },
               { key: "signatureDate", header: "Date SI", accessor: (c) => c.signatureDate, hideBelow: "lg" },
+              { key: "effectiveDate", header: "Date effet", accessor: (c) => c.effectiveDate ?? "", hideBelow: "lg",
+                cell: (c) => <span className="text-muted-foreground">{c.effectiveDate || "—"}</span> },
               { key: "validationDate", header: "Date VA", accessor: (c) => c.validationDate ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{c.validationDate ?? "—"}</span> },
               {
@@ -620,6 +651,8 @@ function ContractsPage() {
                 cell: (c) => <Badge variant="outline" className={billingColor[c.billingStatus] ?? ""}>{c.billingStatus}</Badge>,
                 editor: ({ value, setValue }) => <CellSelect value={value} setValue={setValue} options={BILLING.map((s: string) => ({ value: s, label: s }))} />,
               },
+              { key: "source", header: "Source", accessor: (c) => c.source ?? "", hideBelow: "lg",
+                cell: (c) => <span className="text-muted-foreground">{c.source || "—"}</span> },
               { key: "assignedTo", header: "Assigné À", accessor: (c) => c.assignedTo, hideBelow: "md",
                 cell: (c) => <span className="text-muted-foreground">{c.assignedTo}</span> },
             ];
