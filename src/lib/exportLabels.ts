@@ -47,6 +47,7 @@ export const CONTRACT_LABELS: LabelMap = {
   partner: "Partenaire",
   cabinet: "Cabinet",
   premium: "Cotisation",
+  debit: "Débit",
   billingStatus: "Statut facturation",
   signatureDate: "Date signature",
   effectiveDate: "Date d'effet",

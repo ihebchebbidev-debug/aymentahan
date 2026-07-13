@@ -15,12 +15,12 @@
 -- 1) Opportunités sans ligne propre -> hériter du prospect parent.
 INSERT IGNORE INTO crminternet_contract_info
     (entity_type, entity_id, type_conn, reference_tt, tel_ligne, date_activation,
-     etape, interface_type, fsi, motif_retour_tt, etat, remarque,
+     etape, interface_type, fsi, motif_retour_tt, etat, remarque, debit,
      created_by, updated_by, created_at, updated_at)
 SELECT
     'opportunity', o.id,
     ci.type_conn, ci.reference_tt, ci.tel_ligne, ci.date_activation,
-    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque,
+    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque, ci.debit,
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     NOW(), NOW()
@@ -36,12 +36,12 @@ WHERE exist.id IS NULL;
 -- 2) Contrats sans ligne propre -> hériter de l'opportunité parente.
 INSERT IGNORE INTO crminternet_contract_info
     (entity_type, entity_id, type_conn, reference_tt, tel_ligne, date_activation,
-     etape, interface_type, fsi, motif_retour_tt, etat, remarque,
+     etape, interface_type, fsi, motif_retour_tt, etat, remarque, debit,
      created_by, updated_by, created_at, updated_at)
 SELECT
     'contract', c.id,
     ci.type_conn, ci.reference_tt, ci.tel_ligne, ci.date_activation,
-    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque,
+    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque, ci.debit,
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     NOW(), NOW()
@@ -58,12 +58,12 @@ WHERE c.opportunity_id IS NOT NULL
 -- 3) Contrats sans opportunité (mark_won) -> hériter directement du prospect.
 INSERT IGNORE INTO crminternet_contract_info
     (entity_type, entity_id, type_conn, reference_tt, tel_ligne, date_activation,
-     etape, interface_type, fsi, motif_retour_tt, etat, remarque,
+     etape, interface_type, fsi, motif_retour_tt, etat, remarque, debit,
      created_by, updated_by, created_at, updated_at)
 SELECT
     'contract', c.id,
     ci.type_conn, ci.reference_tt, ci.tel_ligne, ci.date_activation,
-    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque,
+    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque, ci.debit,
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     NOW(), NOW()
@@ -81,12 +81,12 @@ WHERE (c.opportunity_id IS NULL OR c.opportunity_id = '')
 -- 4) Repasse (au cas où l'étape 1 vient juste de créer la ligne opportunity).
 INSERT IGNORE INTO crminternet_contract_info
     (entity_type, entity_id, type_conn, reference_tt, tel_ligne, date_activation,
-     etape, interface_type, fsi, motif_retour_tt, etat, remarque,
+     etape, interface_type, fsi, motif_retour_tt, etat, remarque, debit,
      created_by, updated_by, created_at, updated_at)
 SELECT
     'contract', c.id,
     ci.type_conn, ci.reference_tt, ci.tel_ligne, ci.date_activation,
-    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque,
+    ci.etape, ci.interface_type, ci.fsi, ci.motif_retour_tt, ci.etat, ci.remarque, ci.debit,
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     COALESCE(ci.updated_by, ci.created_by, 'backfill'),
     NOW(), NOW()

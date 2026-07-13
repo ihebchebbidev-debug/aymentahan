@@ -22,7 +22,7 @@ import { api, API_ENABLED } from "@/lib/api";
 import { useQuery } from "@/lib/queryClient";
 import { fetchContracts } from "@/lib/contractsApi";
 import { useCurrency } from "@/lib/currency";
-import { exportCSV, exportJSON, exportXLSX, withCustomFields, relabelRows } from "@/lib/exportUtils";
+import { exportCSV, exportJSON, exportXLSX, withCustomFields, relabelRows, toCSV, downloadBlob } from "@/lib/exportUtils";
 import { CONTRACT_LABELS } from "@/lib/exportLabels";
 import { ImportDialog, type ImportField } from "@/components/ImportDialog";
 import { NewContractDialog } from "@/components/NewContractDialog";
@@ -386,6 +386,17 @@ function ContractsPage() {
                   <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1.5" />Exporter</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => {
+                    const labels = [
+                      ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                    ];
+                    const projected = pickColumns(exportRows as any, labels);
+                    downloadBlob("contrats.csv", toCSV(projected as any, labels), "text/csv;charset=utf-8;");
+                    toast.success("Export CSV généré");
+                  }}>
+                    <FileText className="h-4 w-4 mr-2" />CSV ({filtered.length})
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={async () => {
                     try {
                       const labels = [

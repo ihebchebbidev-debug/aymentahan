@@ -36,6 +36,7 @@ function ensure_contract_info_schema(PDO $db): void {
             motif_retour_tt VARCHAR(255) NOT NULL DEFAULT '',
             etat ENUM('','En cours','Basculement','Rejete','Valide') NOT NULL DEFAULT '',
             remarque TEXT NULL,
+            debit INT UNSIGNED NULL,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             created_by VARCHAR(64) NULL,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -60,6 +61,7 @@ function ensure_contract_info_schema(PDO $db): void {
     $addCol('created_by', "created_by VARCHAR(64) NULL");
     $addCol('updated_at', "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     $addCol('updated_by', "updated_by VARCHAR(64) NULL");
+    $addCol('debit', "debit INT UNSIGNED NULL");
 }
 
 function row_to_info(?array $r, string $entity, string $id, ?string $inherited = null): array {
@@ -77,6 +79,7 @@ function row_to_info(?array $r, string $entity, string $id, ?string $inherited =
             'motifRetourTt' => [],
             'etat'          => '',
             'remarque'      => '',
+            'debit'         => null,
             'createdAt'     => null,
             'createdBy'     => null,
             'updatedAt'     => null,
@@ -92,6 +95,12 @@ function row_to_info(?array $r, string $entity, string $id, ?string $inherited =
         // legacy CSV fallback
         return array_values(array_filter(array_map('trim', explode(',', (string)$v)), fn($s) => $s !== ''));
     };
+    $debit = $r['debit'] ?? null;
+    if ($debit !== null && $debit !== '') {
+        $debit = is_numeric($debit) ? (int)$debit : null;
+    } else {
+        $debit = null;
+    }
     return [
         'entity'        => $entity,
         'entityId'      => $id,
@@ -105,6 +114,7 @@ function row_to_info(?array $r, string $entity, string $id, ?string $inherited =
         'motifRetourTt' => $dec($r['motif_retour_tt']),
         'etat'          => $r['etat'] ?? '',
         'remarque'      => $r['remarque'] ?? '',
+        'debit'         => $debit,
         'createdAt'     => $r['created_at'] ?? null,
         'createdBy'     => $r['created_by'] ?? null,
         'updatedAt'     => $r['updated_at'] ?? null,
@@ -204,6 +214,13 @@ if ($method === 'PUT' || $method === 'POST') {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$date)) $date = null;
     }
 
+    $debit = $body['debit'] ?? null;
+    if ($debit === '' || $debit === null) {
+        $debit = null;
+    } else {
+        $debit = is_numeric($debit) && (float)$debit > 0 ? (int)$debit : null;
+    }
+
     // created_at / updated_at are SYSTEM-managed: never accept client overrides.
     // - INSERT  -> created_at = NOW(),  updated_at = NOW(),  created_by = updated_by = current user
     // - UPDATE  -> updated_at = NOW(),  updated_by = current user (created_at/by stay frozen)
@@ -219,6 +236,7 @@ if ($method === 'PUT' || $method === 'POST') {
         'motif_retour_tt' => $enc($body['motifRetourTt'] ?? []),
         'etat'            => $etat,
         'remarque'        => (string)($body['remarque'] ?? ''),
+        'debit'           => $debit,
     ];
     $username = (string)($me['username'] ?? $me['id'] ?? 'system');
 

@@ -13,6 +13,7 @@ import { Pencil, Save, X, Network } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { entityEditPerm } from "@/lib/entityPerms";
+import { DebitSelect } from "@/components/DebitSelect";
 
 export type ContractInfoEntity = "prospect" | "opportunity" | "contract" | "migration";
 
@@ -29,6 +30,7 @@ export type ContractInfo = {
   motifRetourTt: string[];
   etat: "" | "En cours" | "Basculement" | "Rejete" | "Valide";
   remarque: string;
+  debit: number | null;
   createdAt: string | null;
   createdBy: string | null;
   updatedAt: string | null;
@@ -63,6 +65,7 @@ function emptyDraft(entity: ContractInfoEntity, id: string): ContractInfo {
     entity, entityId: id,
     typeConn: [], referenceTt: "", telLigne: "", dateActivation: null,
     etape: [], interfaceType: [], fsi: "", motifRetourTt: [], etat: "", remarque: "",
+    debit: null,
     createdAt: null, createdBy: null, updatedAt: null, updatedBy: null,
     inheritedFrom: null, exists: false,
   };
@@ -219,6 +222,7 @@ function ReadView({ info }: { info: ContractInfo }) {
       <Field label="FSI"><span className="text-sm">{info.fsi || "—"}</span></Field>
       <Field label="État"><span className="text-sm">{info.etat || "—"}</span></Field>
       <Field label="Motif retour TT"><ListBadges values={info.motifRetourTt} /></Field>
+      <Field label="Débit"><span className="text-sm">{info.debit != null ? `${info.debit} Mbps` : "—"}</span></Field>
       <div className="md:col-span-2">
         <Field label="Remarque">
           <p className="text-sm whitespace-pre-wrap">{info.remarque || "—"}</p>
@@ -306,6 +310,9 @@ function EditView({ draft, onChange }: { draft: ContractInfo; onChange: (d: Cont
             {MOTIF_OPTIONS.map((o) => (<SelectItem key={o} value={o}>{o}</SelectItem>))}
           </SelectContent>
         </Select>
+      </Field>
+      <Field label="Débit">
+        <DebitSelect value={draft.debit} onChange={(v) => set("debit", v)} allowNone />
       </Field>
       <div className="md:col-span-2">
         <Field label="Remarque">

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS crminternet_contract_info (
   motif_retour_tt VARCHAR(255) NOT NULL DEFAULT '', -- JSON array : ["Instance com","Instance Tech"]
   etat            ENUM('','En cours','Basculement','Rejete','Valide') NOT NULL DEFAULT '',
   remarque        TEXT NULL,
+  debit           INT UNSIGNED NULL COMMENT 'Débit internet en Mbps',
 
   -- Audit
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
