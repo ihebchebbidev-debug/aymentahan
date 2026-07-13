@@ -164,8 +164,8 @@ function EditContractPage() {
         comment2: comment2.trim() || null,
         source,
         typeId: typeId || null,
-        partner: partner.trim(),
-        cabinet: cabinet.trim(),
+        partner: null,
+        cabinet: null,
         signatureDate: signatureDate || undefined,
         effectiveDate: effectiveDate || undefined,
         validationDate: validationDate || null,
@@ -258,8 +258,6 @@ function EditContractPage() {
           <section className="border-t border-border pt-6">
             <h2 className="text-sm font-semibold mb-3 text-foreground">Détails du contrat</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Partenaire</Label><Input value={partner} onChange={(e) => setPartner(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Cabinet</Label><Input value={cabinet} onChange={(e) => setCabinet(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Date signature</Label><DatePicker value={signatureDate} onChange={setSignatureDate} /></div>
               <div className="space-y-1.5"><Label>Date effet</Label><DatePicker value={effectiveDate} onChange={setEffectiveDate} /></div>
               <div className="space-y-1.5"><Label>Date validation</Label><DatePicker value={validationDate} onChange={setValidationDate} /></div>

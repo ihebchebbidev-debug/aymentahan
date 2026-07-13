@@ -194,7 +194,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
       date: contract.signatureDate,
       type: "signature",
       title: "Contrat signé",
-      description: contract.partner,
+      description: "",
       done: true,
     });
     // Validation
@@ -241,7 +241,6 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
         id: contract.id,
         nom: contract.lastName,
         prenom: contract.firstName,
-        partenaire: contract.partner,
         cotisation: contract.premium,
         statut: contract.billingStatus,
         date_signature: contract.signatureDate,
@@ -267,7 +266,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
     <AppLayout skeleton="detail">
       <PageHeader
         title={`${contract.firstName} ${contract.lastName}`}
-        description={`Contrat ${contract.id}${contract.partner ? ` — ${contract.partner}` : ""}`}
+        description={`Contrat ${contract.id}`}
         icon={<FileText className="h-5 w-5" />}
         actions={
           <>
@@ -405,7 +404,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <CardTitle className="text-base">Résumé du contrat</CardTitle>
-                      <CardDescription>Partenaire et statut de facturation</CardDescription>
+                      <CardDescription>Statut de facturation</CardDescription>
                     </div>
                     <Badge variant="outline" className={billingColor[contract.billingStatus] ?? colorClass(stageByName[contract.billingStatus]?.color)}>
                       {contract.billingStatus}
@@ -414,7 +413,6 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Field label="Partenaire" icon={<Building2 className="h-3.5 w-3.5" />} value={contract.partner} />
                     <Field label="Date signature" icon={<FileSignature className="h-3.5 w-3.5" />} value={contract.signatureDate} />
                     <Field label="Date validation" icon={<CheckCircle2 className="h-3.5 w-3.5" />} value={contract.validationDate ?? "—"} />
                     <Field label="Débit" value={contract.debit ? `${contract.debit} Mbps` : "—"} />
@@ -552,10 +550,6 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                 <Badge variant="outline" className={billingColor[contract.billingStatus] ?? colorClass(stageByName[contract.billingStatus]?.color)}>
                   {contract.billingStatus}
                 </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Partenaire</span>
-                <span className="font-medium truncate">{contract.partner || "—"}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Prime</span>

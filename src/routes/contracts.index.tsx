@@ -207,8 +207,6 @@ function ContractsPage() {
     { key: "city",           label: CONTRACT_LABELS.city ?? "Ville" },
     { key: "address",        label: CONTRACT_LABELS.address ?? "Adresse" },
     { key: "codePostal",     label: CONTRACT_LABELS.codePostal ?? "Code postal" },
-    { key: "partner",        label: CONTRACT_LABELS.partner ?? "Partenaire" },
-    { key: "cabinet",        label: CONTRACT_LABELS.cabinet ?? "Cabinet" },
     { key: "premium",        label: CONTRACT_LABELS.premium ?? "Cotisation" },
     { key: "debit",          label: "Débit" },
     { key: "signatureDate",  label: CONTRACT_LABELS.signatureDate ?? "Date signature" },
@@ -220,7 +218,7 @@ function ContractsPage() {
   ];
   const colPrefs = useColumnPrefs("contracts", {
     // Hide the new optional columns by default to preserve the current layout.
-    hidden: ["firstName", "phone", "cin", "email", "city", "address", "codePostal", "cabinet", "premium", "effectiveDate", "source"],
+    hidden: ["firstName", "phone", "cin", "email", "city", "address", "codePostal", "premium", "effectiveDate", "source"],
   });
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
@@ -634,8 +632,6 @@ function ContractsPage() {
               { key: "address", header: "Adresse", accessor: (c) => c.address ?? "", hideBelow: "xl",
                 cell: (c) => <span className="text-muted-foreground">{c.address || "—"}</span> },
               { key: "codePostal", header: "Code postal", accessor: (c) => c.codePostal ?? "", hideBelow: "xl" },
-              { key: "partner", header: "Partenaire", accessor: (c) => c.partner, hideBelow: "md" },
-              { key: "cabinet", header: "Cabinet", accessor: (c) => c.cabinet ?? "", hideBelow: "lg" },
               { key: "premium", header: `Cotisation (${currency.symbol})`, accessor: (c) => c.premium ?? 0, hideBelow: "lg",
                 cell: (c) => <span className="tabular-nums">{Number(c.premium ?? 0).toLocaleString("fr-FR")}</span> },
               { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",

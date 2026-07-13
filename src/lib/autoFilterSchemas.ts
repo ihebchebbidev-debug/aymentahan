@@ -181,8 +181,6 @@ export function autoFilterSchema(
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, ville)", type: "text" },
         realField("Statut Facturation", "statut", rows, "billingStatus", input.contractBilling ?? ["Brouillon", "Actif", "Résilié", "Suspendu"], true),
-        realField("Partenaire", "partenaire", rows, "partner", ["APRIL", "ALPTIS", "MIEL MUTUELLE", "SPVIE"], true),
-        realField("Cabinet", "cabinet", rows, "cabinet", ["Cabinet Paris 1"], true),
         realField("Source", "source", rows, "source", standardSources, true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
         realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),

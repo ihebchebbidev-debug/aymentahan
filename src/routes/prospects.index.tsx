@@ -197,18 +197,45 @@ function ProspectsPage() {
   const [attachProspect, setAttachProspect] = useState<Prospect | null>(null);
   const [restoredProspectId, setRestoredProspectId] = useState<string | null>(null);
   const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("prospects:list:presetExtra", {});
-  const colPrefs = useColumnPrefs("prospects");
+  // New columns added below are hidden by default so the existing layout is
+  // preserved. Users can enable them from the "Colonnes" picker.
+  const colPrefs = useColumnPrefs("prospects", {
+    hidden: [
+      "civility", "birthDate", "animateur", "source", "city", "address",
+      "zone", "gouvernorat", "delegation", "codePostal", "outcome",
+      "lostReason", "comment", "comment2", "checkValeur", "converted",
+      "opportunityId", "revertedAt",
+    ],
+  });
   const BASE_COLS_META: { key: string; label: string }[] = [
     { key: "lastName",    label: "Nom" },
     { key: "firstName",   label: "Prénom" },
+    { key: "civility",    label: "Civilité" },
     { key: "phone",       label: "Gsm 1" },
     { key: "phone2",      label: "Gsm 2" },
     { key: "ancienLigne", label: "Ancien Ligne" },
     { key: "cin",         label: "CIN" },
+    { key: "birthDate",   label: "Date de naissance" },
     { key: "email",       label: "Mail" },
     { key: "typeId",      label: "Type" },
     { key: "status",      label: "Statut" },
+    { key: "source",      label: "Source" },
+    { key: "animateur",   label: "Animateur" },
     { key: "assignedTo",  label: "Assigné À" },
+    { key: "city",        label: "Ville" },
+    { key: "address",     label: "Adresse" },
+    { key: "zone",        label: "Zone" },
+    { key: "gouvernorat", label: "Gouvernorat" },
+    { key: "delegation",  label: "Délégation" },
+    { key: "codePostal",  label: "Code postal" },
+    { key: "outcome",     label: "Résultat" },
+    { key: "lostReason",  label: "Raison de perte" },
+    { key: "comment",     label: "Observation 1" },
+    { key: "comment2",    label: "Observation 2" },
+    { key: "checkValeur", label: "Check Valeur" },
+    { key: "converted",   label: "Converti" },
+    { key: "opportunityId", label: "Opportunité liée" },
+    { key: "revertedAt",  label: "Récupéré le" },
     { key: "createdAt",   label: "Créé le" },
   ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("prospects:list:customFilters", {});
@@ -418,6 +445,67 @@ function ProspectsPage() {
       cell: (p) => p.assignedTo ?? <span className="italic text-muted-foreground">Non attribué</span>,
       editor: ({ value, setValue }) => <CellSelect value={value} setValue={setValue} options={[{ value: "", label: "—" }, ...agentOptions.map((u) => ({ value: u, label: u }))]} />,
     },
+    {
+      key: "civility", header: "Civilité", accessor: (p) => p.civility ?? "", hideBelow: "lg",
+      editor: ({ value, setValue }) => (
+        <CellSelect value={value ?? ""} setValue={setValue} options={[
+          { value: "", label: "—" }, { value: "M", label: "M" }, { value: "Mme", label: "Mme" }, { value: "Mlle", label: "Mlle" },
+        ]} />
+      ),
+    },
+    { key: "birthDate", header: "Date de naissance", accessor: (p) => p.birthDate ?? "", hideBelow: "lg",
+      cell: (p) => <span className="text-muted-foreground text-[12px]">{p.birthDate ?? "—"}</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} type="date" /> },
+    { key: "animateur", header: "Animateur", accessor: (p) => p.animateur ?? "", hideBelow: "lg",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    {
+      key: "source", header: "Source", accessor: (p) => p.source ?? "", hideBelow: "lg",
+      cell: (p) => p.source ? <Badge variant="outline" className="font-normal text-[11px]">{p.source}</Badge> : <span className="text-muted-foreground italic">—</span>,
+      editor: ({ value, setValue }) => <CellSelect value={value ?? ""} setValue={setValue} options={[{ value: "", label: "—" }, ...sourceOptions.map((s) => ({ value: s, label: s }))]} />,
+    },
+    { key: "city", header: "Ville", accessor: (p) => p.city ?? "", hideBelow: "lg",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "address", header: "Adresse", accessor: (p) => p.address ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px] truncate block max-w-[240px]">{p.address ?? "—"}</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "zone", header: "Zone", accessor: (p) => p.zone ?? "", hideBelow: "xl",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "gouvernorat", header: "Gouvernorat", accessor: (p) => p.gouvernorat ?? "", hideBelow: "lg",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "delegation", header: "Délégation", accessor: (p) => p.delegation ?? "", hideBelow: "xl",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "codePostal", header: "Code postal", accessor: (p) => p.codePostal ?? "", hideBelow: "xl",
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "outcome", header: "Résultat", accessor: (p) => p.outcome ?? "", hideBelow: "lg",
+      cell: (p) => p.outcome ? <Badge variant="outline" className="font-normal text-[11px]">{p.outcome}</Badge> : <span className="text-muted-foreground italic">—</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "lostReason", header: "Raison de perte", accessor: (p) => p.lostReason ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px] truncate block max-w-[200px]">{p.lostReason ?? "—"}</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "comment", header: "Observation 1", accessor: (p) => p.comment ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px] truncate block max-w-[220px]">{p.comment ?? "—"}</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    { key: "comment2", header: "Observation 2", accessor: (p) => p.comment2 ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px] truncate block max-w-[220px]">{p.comment2 ?? "—"}</span>,
+      editor: ({ value, setValue }) => <CellInput value={value ?? ""} setValue={setValue} /> },
+    {
+      key: "checkValeur", header: "Check Valeur", accessor: (p) => (p.checkValeur ? "Oui" : "Non"), hideBelow: "xl",
+      cell: (p) => p.checkValeur
+        ? <Badge variant="outline" className="bg-success/15 text-success border-success/20 font-normal text-[11px]">Oui</Badge>
+        : <span className="text-muted-foreground italic text-[12px]">Non</span>,
+    },
+    {
+      key: "converted", header: "Converti", accessor: (p) => (p.converted ? "Oui" : "Non"), hideBelow: "xl",
+      cell: (p) => p.converted
+        ? <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-normal text-[11px]">Oui</Badge>
+        : <span className="text-muted-foreground italic text-[12px]">Non</span>,
+    },
+    { key: "opportunityId", header: "Opportunité liée", accessor: (p) => p.opportunityId ?? "", hideBelow: "xl",
+      cell: (p) => p.opportunityId
+        ? <Link to="/opportunities/$opportunityId" params={{ opportunityId: p.opportunityId }} className="text-primary hover:underline text-[12px]">{p.opportunityId}</Link>
+        : <span className="text-muted-foreground italic">—</span> },
+    { key: "revertedAt", header: "Récupéré le", accessor: (p) => p.revertedAt ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px]">{p.revertedAt ? p.revertedAt.slice(0, 10) : "—"}</span> },
     {
       key: "createdAt", header: "Créé le", accessor: (p) => p.createdAt, hideBelow: "xl",
       cell: (p) => <span className="text-muted-foreground text-[12px]">{p.createdAt}</span>,

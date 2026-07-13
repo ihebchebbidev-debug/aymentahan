@@ -19,7 +19,7 @@ import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } f
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
 import { DebitSelect } from "./DebitSelect";
 
-const PARTNERS = ["APRIL", "ALPTIS", "MIEL MUTUELLE", "SPVIE"];
+const BILLING_DEFAULT = "Pré-validé";
 const BILLING = ["Pré-validé", "Validé Confirmation", "Annulé"];
 
 export function NewContractDialog({ currency }: { currency: Currency }) {
@@ -36,8 +36,6 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
   const [address, setAddress] = useState("");
   const [localisationXy, setLocalisationXy] = useState("");
   const [codePostal, setCodePostal] = useState("");
-  const [partner, setPartner] = useState(PARTNERS[0]);
-  const [cabinet, setCabinet] = useState("Cabinet Paris 1");
   const [premium, setPremium] = useState("950");
   const [debit, setDebit] = useState<number | null>(50);
   const [billing, setBilling] = useState(BILLING[0]);
@@ -63,7 +61,7 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
     try {
       const r = await importContracts([{
         lastName: lastName.trim(), firstName: firstName.trim(),
-        city: city.trim().toUpperCase(), partner, cabinet,
+        city: city.trim().toUpperCase(), partner: null, cabinet: null,
         address: address.trim(),
         localisationXy: normalizeLocalisationXy(localisationXy) || null,
         codePostal: normalizeCodePostal(codePostal) || null,
@@ -115,11 +113,6 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
               placeholder="75001" maxLength={20} /></div>
           <div className="space-y-1.5"><Label>Cotisation ({currency.symbol}) *</Label><Input type="number" value={premium} onChange={(e) => setPremium(e.target.value)} /></div>
           <DebitSelect value={debit} onChange={setDebit} />
-          <div className="space-y-1.5"><Label>Partenaire</Label>
-            <Select value={partner} onValueChange={setPartner}><SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{PARTNERS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-            </Select></div>
-          <div className="space-y-1.5"><Label>Cabinet</Label><Input value={cabinet} onChange={(e) => setCabinet(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Date signature</Label><DatePicker value={signatureDate} onChange={setSignatureDate} /></div>
           <div className="space-y-1.5"><Label>Date d'effet</Label><DatePicker value={effectiveDate} onChange={setEffectiveDate} /></div>
           <div className="space-y-1.5"><Label>Statut facturation</Label>
