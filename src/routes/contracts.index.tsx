@@ -199,14 +199,20 @@ function ContractsPage() {
   // so existing users don't see their layout change — they can enable them
   // from the "Colonnes" picker.
   const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "civility",       label: "Civilité" },
     { key: "lastName",       label: CONTRACT_LABELS.lastName ?? "Nom" },
     { key: "firstName",      label: CONTRACT_LABELS.firstName ?? "Prénom" },
     { key: "phone",          label: "Téléphone" },
+    { key: "phone2",         label: "Téléphone 2" },
     { key: "cin",            label: "CIN" },
+    { key: "birthDate",      label: "Date de naissance" },
     { key: "email",          label: "E-mail" },
+    { key: "gouvernorat",    label: "Gouvernorat" },
+    { key: "delegation",     label: "Délégation" },
     { key: "city",           label: CONTRACT_LABELS.city ?? "Ville" },
     { key: "address",        label: CONTRACT_LABELS.address ?? "Adresse" },
     { key: "codePostal",     label: CONTRACT_LABELS.codePostal ?? "Code postal" },
+    { key: "localisationXy", label: "Localisation (lat,lng)" },
     { key: "premium",        label: CONTRACT_LABELS.premium ?? "Cotisation" },
     { key: "debit",          label: "Débit" },
     { key: "signatureDate",  label: CONTRACT_LABELS.signatureDate ?? "Date signature" },
@@ -215,10 +221,16 @@ function ContractsPage() {
     { key: "billingStatus",  label: CONTRACT_LABELS.billingStatus ?? "Statut facturation" },
     { key: "source",         label: CONTRACT_LABELS.source ?? "Source" },
     { key: "assignedTo",     label: CONTRACT_LABELS.assignedTo ?? "Assigné à" },
+    { key: "comment1",       label: "Observation 1" },
+    { key: "comment2",       label: "Observation 2" },
   ];
   const colPrefs = useColumnPrefs("contracts", {
     // Hide the new optional columns by default to preserve the current layout.
-    hidden: ["firstName", "phone", "cin", "email", "city", "address", "codePostal", "premium", "effectiveDate", "source"],
+    hidden: [
+      "civility", "firstName", "phone", "phone2", "cin", "birthDate", "email",
+      "gouvernorat", "delegation", "city", "address", "codePostal", "localisationXy",
+      "premium", "effectiveDate", "source", "comment1", "comment2",
+    ],
   });
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
   const setCustomFilter = (k: string, v: string) =>
@@ -626,6 +638,8 @@ function ContractsPage() {
 
           {(() => {
             const baseColumns: DataGridColumn<Contract>[] = [
+              { key: "civility", header: "Civ.", accessor: (c) => c.civility ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.civility || "—"}</span> },
               {
                 key: "lastName", header: "Nom", accessor: (c) => c.lastName,
                 cell: (c) => (
@@ -635,14 +649,24 @@ function ContractsPage() {
               { key: "firstName", header: "Prénom", accessor: (c) => c.firstName ?? "", hideBelow: "md" },
               { key: "phone", header: "Téléphone", accessor: (c) => (c as any).phone ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{(c as any).phone || "—"}</span> },
+              { key: "phone2", header: "Tél. 2", accessor: (c) => (c as any).phone2 ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{(c as any).phone2 || "—"}</span> },
               { key: "cin", header: "CIN", accessor: (c) => c.cin ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{c.cin || "—"}</span> },
+              { key: "birthDate", header: "Naissance", accessor: (c) => c.birthDate ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.birthDate || "—"}</span> },
               { key: "email", header: "E-mail", accessor: (c) => c.email ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{c.email || "—"}</span> },
+              { key: "gouvernorat", header: "Gouvernorat", accessor: (c) => c.gouvernorat ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.gouvernorat || "—"}</span> },
+              { key: "delegation", header: "Délégation", accessor: (c) => c.delegation ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.delegation || "—"}</span> },
               { key: "city", header: "Ville", accessor: (c) => c.city ?? "", hideBelow: "lg" },
               { key: "address", header: "Adresse", accessor: (c) => c.address ?? "", hideBelow: "xl",
                 cell: (c) => <span className="text-muted-foreground">{c.address || "—"}</span> },
               { key: "codePostal", header: "Code postal", accessor: (c) => c.codePostal ?? "", hideBelow: "xl" },
+              { key: "localisationXy", header: "GPS", accessor: (c) => c.localisationXy ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground truncate">{c.localisationXy || "—"}</span> },
               { key: "premium", header: `Cotisation (${currency.symbol})`, accessor: (c) => c.premium ?? 0, hideBelow: "lg",
                 cell: (c) => <span className="tabular-nums">{Number(c.premium ?? 0).toLocaleString("fr-FR")}</span> },
               { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",
@@ -662,6 +686,10 @@ function ContractsPage() {
                 cell: (c) => <span className="text-muted-foreground">{c.source || "—"}</span> },
               { key: "assignedTo", header: "Assigné À", accessor: (c) => c.assignedTo, hideBelow: "md",
                 cell: (c) => <span className="text-muted-foreground">{c.assignedTo}</span> },
+              { key: "comment1", header: "Obs. 1", accessor: (c) => c.comment1 ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground truncate">{c.comment1 || "—"}</span> },
+              { key: "comment2", header: "Obs. 2", accessor: (c) => c.comment2 ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground truncate">{c.comment2 || "—"}</span> },
             ];
             const customColumns: DataGridColumn<Contract>[] = customDefs
               .filter((d) => colPrefs.isVisible(d.key))
