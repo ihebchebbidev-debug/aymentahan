@@ -16,7 +16,8 @@ import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "@/components/CustomFieldsInline";
-import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
+import { compressImageToBudget, formatAttachmentLimitLabel, isCompressibleImage, MAX_ATTACHMENT_BYTES, maxAttachmentBytesForFile } from "@/lib/compressImage";
+import { attachmentAcceptAttribute, isSupportedAttachmentFile } from "@/lib/attachmentRules";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
 import { normalizeGouvernorat } from "@/lib/tunisiaGovernorates";
 import { GouvernoratSelect } from "@/components/GouvernoratSelect";
@@ -70,16 +71,18 @@ type DupMatch = {
 type StagedFile = { original: File; toUpload: File; status: "ready" | "too_big" | "rejected"; reason?: string };
 
 async function stageFile(f: File): Promise<StagedFile> {
+  if (!isSupportedAttachmentFile(f)) {
+    return { original: f, toUpload: f, status: "rejected", reason: "Format refusé (PDF, image ou audio uniquement)" };
+  }
   const mime = (f.type || "").toLowerCase();
-  const isPdf = mime === "application/pdf";
   const isImg = mime.startsWith("image/");
-  if (!isPdf && !isImg) return { original: f, toUpload: f, status: "rejected", reason: "Format refusé (PDF ou image uniquement)" };
   let toUpload = f;
   if (isImg && f.size > MAX_ATTACHMENT_BYTES && isCompressibleImage(f)) {
     try { toUpload = await compressImageToBudget(f); } catch { /* fall back */ }
   }
-  if (toUpload.size > MAX_ATTACHMENT_BYTES) {
-    return { original: f, toUpload, status: "too_big", reason: `Trop volumineux (${Math.round(toUpload.size / 1024)} Ko > 100 Ko)` };
+  const maxBytes = maxAttachmentBytesForFile(f);
+  if (toUpload.size > maxBytes) {
+    return { original: f, toUpload, status: "too_big", reason: `Trop volumineux (${Math.round(toUpload.size / 1024)} Ko > ${formatAttachmentLimitLabel(f)})` };
   }
   return { original: f, toUpload, status: "ready" };
 }
@@ -447,7 +450,7 @@ function NewProspectPage() {
           {/* Pièces jointes */}
           <section className="border-t border-border pt-6 space-y-4">
             <h2 className="text-sm font-semibold text-foreground">
-              Pièces jointes <span className="text-[10px] font-normal text-muted-foreground">(PDF ou images, max 100 Ko après compression — aucun champ obligatoire)</span>
+              Pièces jointes <span className="text-[10px] font-normal text-muted-foreground">(PDF et images : max 100 Ko; audio : max 5 Mo — aucun champ obligatoire)</span>
             </h2>
 
             <CategorizedAttachmentSlots
@@ -468,7 +471,7 @@ function NewProspectPage() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); }}
             >
-              <input ref={fileInputRef} type="file" accept="application/pdf,image/*" multiple className="hidden"
+              <input ref={fileInputRef} type="file" accept={attachmentAcceptAttribute()} multiple className="hidden"
                 onChange={(e) => void addFiles(e.target.files)} />
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 {staging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

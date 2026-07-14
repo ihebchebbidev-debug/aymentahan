@@ -10,7 +10,8 @@ import { api, apiUpload, authenticatedApiUrl, API_ENABLED } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { entityEditPerm } from "@/lib/entityPerms";
 import { toast } from "sonner";
-import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
+import { compressImageToBudget, formatAttachmentLimitLabel, isCompressibleImage, MAX_ATTACHMENT_BYTES, maxAttachmentBytesForFile } from "@/lib/compressImage";
+import { attachmentAcceptAttribute, isAudioAttachmentFile, isSupportedAttachmentFile } from "@/lib/attachmentRules";
 import {
   AttachmentPreviewDialog,
   isAttachmentPreviewable,
@@ -36,6 +37,7 @@ function categoryOf(mime: string): TypeFilter {
   const m = (mime || "").toLowerCase();
   if (m.startsWith("image/")) return "image";
   if (m === "application/pdf") return "pdf";
+  if (m.startsWith("audio/")) return "other";
   if (m.includes("word") || m.includes("msword") || m.includes("officedocument.wordprocessing") || m === "text/plain") return "doc";
   if (m.includes("sheet") || m.includes("excel") || m === "text/csv") return "sheet";
   if (m.includes("zip") || m.includes("compressed") || m.includes("rar") || m.includes("tar")) return "archive";
@@ -241,14 +243,14 @@ export function AttachmentsCard({
     setUploading(true);
     try {
       for (const f of list) {
-        const mime = (f.type || "").toLowerCase();
-        const isPdf = mime === "application/pdf";
-        const isImg = mime.startsWith("image/");
-        if (!isPdf && !isImg) {
-          toast.error(`${f.name}: format refusé (PDF ou image uniquement)`);
+        if (!isSupportedAttachmentFile(f)) {
+          toast.error(`${f.name}: format refusé (PDF, image ou audio uniquement)`);
           continue;
         }
         let toUpload = f;
+        const mime = (f.type || "").toLowerCase();
+        const isImg = mime.startsWith("image/");
+        const maxBytes = maxAttachmentBytesForFile(f);
         if (isImg && f.size > MAX_ATTACHMENT_BYTES && isCompressibleImage(f)) {
           try {
             toUpload = await compressImageToBudget(f);
@@ -259,8 +261,9 @@ export function AttachmentsCard({
             }
           } catch {/* fall back to original; backend will reject if too big */}
         }
-        if (toUpload.size > MAX_ATTACHMENT_BYTES) {
-          toast.error(`${f.name}: fichier trop volumineux (max 100 Ko${isImg ? " après compression" : ""})`);
+        if (toUpload.size > maxBytes) {
+          const label = formatAttachmentLimitLabel(f);
+          toast.error(`${f.name}: fichier trop volumineux (max ${label}${isImg ? " après compression" : ""})`);
           continue;
         }
         await apiUpload("/attachments.php", {
@@ -284,21 +287,22 @@ export function AttachmentsCard({
     if (!API_ENABLED) { toast.error("API non configurée"); return; }
     if (!hasTarget) { toast.error("Enregistrez d'abord la fiche avant d'ajouter des pièces jointes"); return; }
     const label = categoryLabelOf(categoryKey);
-    const mime = (file.type || "").toLowerCase();
-    const isPdf = mime === "application/pdf";
-    const isImg = mime.startsWith("image/");
-    if (!isPdf && !isImg) {
-      setSlots((s) => ({ ...s, [categoryKey]: { file, status: "error", message: "Format refusé (PDF ou image)" } }));
+    if (!isSupportedAttachmentFile(file)) {
+      setSlots((s) => ({ ...s, [categoryKey]: { file, status: "error", message: "Format refusé (PDF, image ou audio)" } }));
       return;
     }
     setSlots((s) => ({ ...s, [categoryKey]: { file, status: "uploading" } }));
     try {
+      const mime = (file.type || "").toLowerCase();
+      const isImg = mime.startsWith("image/");
+      const maxBytes = maxAttachmentBytesForFile(file);
       let toUpload = file;
       if (isImg && file.size > MAX_ATTACHMENT_BYTES && isCompressibleImage(file)) {
         try { toUpload = await compressImageToBudget(file); } catch {/* keep original */}
       }
-      if (toUpload.size > MAX_ATTACHMENT_BYTES) {
-        setSlots((s) => ({ ...s, [categoryKey]: { file, status: "error", message: "Fichier trop volumineux (max 100 Ko)" } }));
+      if (toUpload.size > maxBytes) {
+        const label = formatAttachmentLimitLabel(file);
+        setSlots((s) => ({ ...s, [categoryKey]: { file, status: "error", message: `Fichier trop volumineux (max ${label})` } }));
         return;
       }
       const prefixed = withCategoryPrefix(toUpload, label);
@@ -331,21 +335,22 @@ export function AttachmentsCard({
   };
 
   const prepareUploadFile = async (f: File): Promise<File | null> => {
-    const mime = (f.type || "").toLowerCase();
-    const isPdf = mime === "application/pdf";
-    const isImg = mime.startsWith("image/");
-    if (!isPdf && !isImg) {
-      toast.error(`${f.name}: format refusé (PDF ou image uniquement)`);
+    if (!isSupportedAttachmentFile(f)) {
+      toast.error(`${f.name}: format refusé (PDF, image ou audio uniquement)`);
       return null;
     }
+    const mime = (f.type || "").toLowerCase();
+    const isImg = mime.startsWith("image/");
     let toUpload = f;
     if (isImg && f.size > MAX_ATTACHMENT_BYTES && isCompressibleImage(f)) {
       try {
         toUpload = await compressImageToBudget(f);
       } catch { /* keep original */ }
     }
-    if (toUpload.size > MAX_ATTACHMENT_BYTES) {
-      toast.error(`${f.name}: fichier trop volumineux (max 100 Ko${isImg ? " après compression" : ""})`);
+    const maxBytes = maxAttachmentBytesForFile(f);
+    if (toUpload.size > maxBytes) {
+      const label = formatAttachmentLimitLabel(f);
+      toast.error(`${f.name}: fichier trop volumineux (max ${label}${isImg ? " après compression" : ""})`);
       return null;
     }
     return toUpload;
@@ -472,7 +477,7 @@ export function AttachmentsCard({
             <CardTitle className="text-base flex items-center gap-2">
               <Paperclip className="h-4 w-4" /> Pièces jointes
             </CardTitle>
-            <CardDescription>PDF et images — max 100 Ko / fichier (les images sont compressées automatiquement)</CardDescription>
+            <CardDescription>PDF et images — max 100 Ko / fichier; enregistrements audio — max 5 Mo (les images sont compressées automatiquement)</CardDescription>
           </div>
           <Badge variant="outline" className="bg-primary/5">
             {hasActiveFilter ? `${filtered.length}/${items.length}` : items.length}
@@ -509,7 +514,7 @@ export function AttachmentsCard({
             ref={inputRef}
             type="file"
             multiple
-            accept="application/pdf,image/*"
+            accept={attachmentAcceptAttribute()}
             className="hidden"
             onChange={(e) => void handleFiles(e.target.files)}
             disabled={!API_ENABLED || uploading}
@@ -524,7 +529,7 @@ export function AttachmentsCard({
               {uploading ? "Envoi en cours…" : "Glissez vos fichiers ici ou cliquez"}
             </span>
             <span className="text-xs text-muted-foreground">
-              PDF ou images — max 100 Ko (compression auto)
+              PDF, images ou audio — limites adaptées au type de fichier
             </span>
           </div>
         </div>

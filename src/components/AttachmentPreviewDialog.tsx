@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { attachmentAcceptAttribute, isAudioAttachmentFile } from "@/lib/attachmentRules";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ function fmtSize(b: number) {
 }
 
 export function isAttachmentPreviewable(mime: string) {
-  return mime?.startsWith("image/") || mime === "application/pdf";
+  return mime?.startsWith("image/") || mime === "application/pdf" || mime?.startsWith("audio/");
 }
 
 export function AttachmentPreviewDialog({
@@ -92,7 +93,7 @@ export function AttachmentPreviewDialog({
       <input
         ref={replaceRef}
         type="file"
-        accept="application/pdf,image/*"
+        accept={attachmentAcceptAttribute()}
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -132,6 +133,19 @@ export function AttachmentPreviewDialog({
                   title={item.filename}
                   className="w-full h-[75vh] bg-white"
                 />
+              ) : isAudioAttachmentFile({ name: item.filename, type: item.mimeType } as File) ? (
+                <div className="p-8 text-sm text-muted-foreground text-center">
+                  <div className="mb-3 text-base font-medium text-foreground">Enregistrement vocal</div>
+                  <p className="mb-4">Cet audio peut être téléchargé et lu depuis votre lecteur local.</p>
+                  <div className="mt-3">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={item.downloadUrl ?? item.previewUrl} target="_blank" rel="noreferrer">
+                        <Download className="h-4 w-4 mr-1.5" />
+                        Télécharger
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="p-8 text-sm text-muted-foreground text-center">
                   Aperçu indisponible pour ce format.

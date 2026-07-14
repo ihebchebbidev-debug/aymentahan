@@ -3,7 +3,8 @@
 // Returns the original File if it already fits, or a new File when compressed.
 // Throws when the file is not an image we can decode (caller decides).
 
-export const MAX_ATTACHMENT_BYTES = 100 * 1024; // 100 KB — must match backend.
+export const MAX_ATTACHMENT_BYTES = 100 * 1024; // 100 KB — images/PDFs.
+export const MAX_AUDIO_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB — vocal/audio files.
 
 // MIMEs the browser canvas can decode reliably. HEIC/HEIF are excluded because
 // most desktop browsers can't decode them — we detect them separately so the UI
@@ -56,6 +57,19 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number):
       quality,
     );
   });
+}
+
+export function maxAttachmentBytesForFile(file: File): number {
+  const mime = (file.type || "").toLowerCase();
+  const ext = (file.name || "").split(".").pop()?.toLowerCase() ?? "";
+  const isAudio = mime.startsWith("audio/") || ["aac", "mp3", "wav", "ogg", "oga", "m4a", "mp4", "m4b", "flac", "webm"].includes(ext);
+  return isAudio ? MAX_AUDIO_ATTACHMENT_BYTES : MAX_ATTACHMENT_BYTES;
+}
+
+export function formatAttachmentLimitLabel(file: File): string {
+  const maxBytes = maxAttachmentBytesForFile(file);
+  if (maxBytes >= 1024 * 1024) return `${(maxBytes / (1024 * 1024)).toFixed(0)} Mo`;
+  return `${Math.round(maxBytes / 1024)} Ko`;
 }
 
 export async function compressImageToBudget(

@@ -1,7 +1,8 @@
 import { useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, X, FileText, Image as ImageIcon, Loader2, Check, Eye } from "lucide-react";
+import { Upload, X, FileText, Image as ImageIcon, Loader2, Check, Eye, AudioLines } from "lucide-react";
+import { attachmentAcceptAttribute, isAudioAttachmentFile } from "@/lib/attachmentRules";
 
 export const ATTACHMENT_CATEGORIES = [
   { key: "cin_recto", label: "CIN Recto" },
@@ -9,6 +10,7 @@ export const ATTACHMENT_CATEGORIES = [
   { key: "contrat_tt", label: "Contrat TT" },
   { key: "contrat_topnet", label: "Contrat TOPNET" },
   { key: "cgv", label: "CGV" },
+  { key: "enregistrement_vocal", label: "Enregistrement vocal" },
 ] as const;
 
 export type AttachmentCategoryKey = typeof ATTACHMENT_CATEGORIES[number]["key"];
@@ -91,6 +93,7 @@ function SlotCard({
   const file = state?.file;
   const status = state?.status ?? "idle";
   const isImg = file?.type.startsWith("image/") || linked?.mimeType?.startsWith("image/");
+  const isAudio = isAudioAttachmentFile(file as File | undefined) || linked?.mimeType?.startsWith("audio/");
   const hasContent = status === "done" || !!file;
   const displayName = file?.name ?? linked?.filename?.replace(/^\[[^\]]+\]\s*/, "") ?? state?.message ?? label;
 
@@ -108,7 +111,7 @@ function SlotCard({
       <input
         ref={ref}
         type="file"
-        accept="application/pdf,image/*"
+        accept={attachmentAcceptAttribute()}
         className="hidden"
         disabled={disabled || status === "uploading"}
         onChange={(e) => {
@@ -163,7 +166,7 @@ function SlotCard({
                 : "bg-muted/30"
           }`}
         >
-          {isImg ? <ImageIcon className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+          {isImg ? <ImageIcon className="h-3 w-3 shrink-0" /> : isAudio ? <AudioLines className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
           <span className="truncate flex-1" title={file.name}>{file.name}</span>
           <span className="text-[10px] opacity-70">{Math.round(file.size / 1024)} Ko</span>
           {onView && <Eye className="h-3.5 w-3.5 shrink-0 opacity-70" />}
@@ -210,6 +213,7 @@ const LEGACY_CATEGORY_PREFIXES: Array<{ prefix: string; key: AttachmentCategoryK
   { prefix: "_contrat_tt__", key: "contrat_tt" },
   { prefix: "_contrat_topnet__", key: "contrat_topnet" },
   { prefix: "_cgv__", key: "cgv" },
+  { prefix: "_enregistrement_vocal__", key: "enregistrement_vocal" },
 ];
 
 export function detectCategoryFromFilename(filename: string): AttachmentCategoryKey | null {

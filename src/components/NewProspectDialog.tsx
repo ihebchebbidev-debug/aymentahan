@@ -21,7 +21,8 @@ import { toast } from "sonner";
 import { CustomFieldsInline, validateRequiredCustomValues } from "./CustomFieldsInline";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle } from "lucide-react";
-import { compressImageToBudget, isCompressibleImage, MAX_ATTACHMENT_BYTES } from "@/lib/compressImage";
+import { compressImageToBudget, formatAttachmentLimitLabel, isCompressibleImage, MAX_ATTACHMENT_BYTES, maxAttachmentBytesForFile } from "@/lib/compressImage";
+import { attachmentAcceptAttribute, isSupportedAttachmentFile } from "@/lib/attachmentRules";
 import { normalizeLocalisationXy, normalizeCodePostal, isValidLocalisationXy } from "@/lib/geo";
 import { normalizeGouvernorat } from "@/lib/tunisiaGovernorates";
 import { GouvernoratSelect } from "@/components/GouvernoratSelect";
@@ -52,11 +53,13 @@ type DupMatch = {
 type StagedFile = { original: File; toUpload: File; status: "ready" | "too_big" | "rejected"; reason?: string };
 
 async function stageFile(f: File): Promise<StagedFile> {
+  if (!isSupportedAttachmentFile(f)) {
+    return { original: f, toUpload: f, status: "rejected", reason: "Format refusé (PDF, image ou audio uniquement)" };
+  }
   const mime = (f.type || "").toLowerCase();
   const ext = (f.name.split(".").pop() || "").toLowerCase();
   const isPdf = mime === "application/pdf" || ext === "pdf";
   const isImg = mime.startsWith("image/") || ["png","jpg","jpeg","webp","gif","bmp","heic","heif"].includes(ext);
-  if (!isPdf && !isImg) return { original: f, toUpload: f, status: "rejected", reason: "Format refusé (PDF ou image uniquement)" };
   let toUpload = f;
   if (isImg && f.size > MAX_ATTACHMENT_BYTES) {
     if (isCompressibleImage(f)) {
@@ -68,8 +71,9 @@ async function stageFile(f: File): Promise<StagedFile> {
       return { original: f, toUpload: f, status: "rejected", reason: "Format image non supporté (HEIC ?). Convertir en JPG/PNG." };
     }
   }
-  if (toUpload.size > MAX_ATTACHMENT_BYTES) {
-    return { original: f, toUpload, status: "too_big", reason: `Trop volumineux après compression (${Math.round(toUpload.size / 1024)} Ko > 100 Ko)` };
+  const maxBytes = maxAttachmentBytesForFile(f);
+  if (toUpload.size > maxBytes) {
+    return { original: f, toUpload, status: "too_big", reason: `Trop volumineux après compression (${Math.round(toUpload.size / 1024)} Ko > ${formatAttachmentLimitLabel(f)})` };
   }
   return { original: f, toUpload, status: "ready" };
 }
@@ -409,14 +413,14 @@ export function NewProspectDialog() {
 
           {/* File upload zone (autres fichiers libres) */}
           <div className="col-span-2 space-y-1.5">
-            <Label>Autres pièces jointes <span className="text-[10px] text-muted-foreground">(PDF ou images, max 100 Ko après compression)</span></Label>
+            <Label>Autres pièces jointes <span className="text-[10px] text-muted-foreground">(PDF et images : max 100 Ko; audio : max 5 Mo)</span></Label>
             <div
               className="rounded-lg border-2 border-dashed border-border hover:bg-muted/30 p-3 text-center cursor-pointer transition-colors"
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); void addFiles(e.dataTransfer.files); }}
             >
-              <input ref={fileInputRef} type="file" accept="application/pdf,image/*" multiple className="hidden"
+              <input ref={fileInputRef} type="file" accept={attachmentAcceptAttribute()} multiple className="hidden"
                 onChange={(e) => void addFiles(e.target.files)} />
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 {staging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}

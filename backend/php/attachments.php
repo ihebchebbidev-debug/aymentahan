@@ -22,11 +22,14 @@ try {
 $method = $_SERVER['REQUEST_METHOD'];
 $ENTITIES = ['prospect', 'opportunity', 'contract', 'migration'];
 // Limite max par fichier (100 Ko). Aligné avec le frontend (les images sont
-// compressées côté navigateur avant envoi). Seuls PDF + images sont acceptés.
+// compressées côté navigateur avant envoi). PDF, images et audios sont acceptés.
 const ATTACHMENT_MAX_BYTES = 100 * 1024;
+const ATTACHMENT_AUDIO_MAX_BYTES = 5 * 1024 * 1024;
 const ATTACHMENT_ALLOWED_MIMES = [
   'application/pdf',
-  'image/png','image/jpeg','image/jpg','image/webp','image/gif',
+  'image/png','image/jpeg','image/jpg','image/webp','image/gif','image/bmp',
+  'audio/mpeg','audio/mp3','audio/aac','audio/x-aac','audio/wav','audio/x-wav',
+  'audio/ogg','audio/oga','audio/mp4','audio/x-m4a','audio/m4a','audio/flac','audio/webm',
 ];
 
 $UPLOAD_DIR = __DIR__ . '/uploads';
@@ -54,7 +57,7 @@ if ($method === 'GET') {
         if (!$r || !is_file($r['storage_path'])) fail('Fichier introuvable', 404);
         audit_log($db, $me, 'attachment.download', $r['entity'], $r['entity_id'], ['attachmentId' => $r['id'], 'filename' => $r['filename']]);
         $mime = (string)$r['mime_type'];
-        $inline = !empty($_GET['inline']) && (strpos($mime, 'image/') === 0 || $mime === 'application/pdf');
+        $inline = !empty($_GET['inline']) && (strpos($mime, 'image/') === 0 || $mime === 'application/pdf' || strpos($mime, 'audio/') === 0);
         header('Content-Type: ' . $mime);
         header('Content-Length: ' . filesize($r['storage_path']));
         header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . addslashes($r['filename']) . '"');
@@ -76,10 +79,42 @@ if ($method === 'POST') {
     if (!in_array($entity, $ENTITIES, true) || !$eid) fail('entity & entity_id requis', 422);
     if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) fail('Fichier requis', 422);
     $f = $_FILES['file'];
-    if ($f['size'] > ATTACHMENT_MAX_BYTES) fail('Fichier trop volumineux (max 100 Ko)', 413);
     $detected = @mime_content_type($f['tmp_name']) ?: ($f['type'] ?? '');
-    if (!in_array(strtolower($detected), ATTACHMENT_ALLOWED_MIMES, true)) {
-        fail('Type de fichier non autorisé (PDF ou image uniquement)', 415);
+    $detectedMime = strtolower((string)$detected);
+    $ext = strtolower(pathinfo($f['name'] ?? '', PATHINFO_EXTENSION));
+    $extensionMimeMap = [
+        'aac' => 'audio/aac',
+        'mp3' => 'audio/mpeg',
+        'wav' => 'audio/wav',
+        'ogg' => 'audio/ogg',
+        'oga' => 'audio/ogg',
+        'm4a' => 'audio/mp4',
+        'mp4' => 'audio/mp4',
+        'm4b' => 'audio/mp4',
+        'flac' => 'audio/flac',
+        'webm' => 'audio/webm',
+        'pdf' => 'application/pdf',
+        'png' => 'image/png',
+        'jpg' => 'image/jpeg',
+        'jpeg' => 'image/jpeg',
+        'webp' => 'image/webp',
+        'gif' => 'image/gif',
+        'bmp' => 'image/bmp',
+    ];
+    if (isset($extensionMimeMap[$ext])) {
+        $fallbackMime = $extensionMimeMap[$ext];
+        if ($detectedMime === '' || $detectedMime === 'application/octet-stream' || $detectedMime === 'binary/octet-stream' || !in_array($detectedMime, ATTACHMENT_ALLOWED_MIMES, true)) {
+            $detectedMime = $fallbackMime;
+        }
+    }
+    $isAudio = strpos($detectedMime, 'audio/') === 0 || isset($extensionMimeMap[$ext]) && strpos($extensionMimeMap[$ext], 'audio/') === 0;
+    $maxBytes = $isAudio ? ATTACHMENT_AUDIO_MAX_BYTES : ATTACHMENT_MAX_BYTES;
+    if ($f['size'] > $maxBytes) {
+        $limitLabel = $isAudio ? '5 Mo' : '100 Ko';
+        fail('Fichier trop volumineux (max ' . $limitLabel . ')', 413);
+    }
+    if (!in_array($detectedMime, ATTACHMENT_ALLOWED_MIMES, true)) {
+        fail('Type de fichier non autorisé (PDF, image ou audio uniquement)', 415);
     }
 
     $safeName = attachment_sanitize_filename((string) $f['name']);
@@ -89,7 +124,7 @@ if ($method === 'POST') {
     $dest = $sub . '/' . $id . '_' . $safeName;
     if (!move_uploaded_file($f['tmp_name'], $dest)) fail('Échec écriture fichier', 500);
 
-    $mime = mime_content_type($dest) ?: ($f['type'] ?? 'application/octet-stream');
+    $mime = $detectedMime ?: (mime_content_type($dest) ?: ($f['type'] ?? 'application/octet-stream'));
     $s = $db->prepare('INSERT INTO crminternet_attachments (id,entity,entity_id,filename,mime_type,size_bytes,storage_path,uploaded_by)
                        VALUES (:id,:e,:ei,:fn,:mt,:sz,:sp,:u)');
     $s->execute([
