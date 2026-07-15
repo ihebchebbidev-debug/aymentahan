@@ -31,6 +31,8 @@ export type Prospect = {
   status: string;
   assignedTo: string | null;
   createdAt: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
   city: string;
   address?: string;
   zone?: string;

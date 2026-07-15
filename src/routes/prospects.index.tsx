@@ -237,6 +237,8 @@ function ProspectsPage() {
     { key: "opportunityId", label: "Opportunité liée" },
     { key: "revertedAt",  label: "Récupéré le" },
     { key: "createdAt",   label: "Créé le" },
+    { key: "createdBy",   label: "Créé par" },
+    { key: "updatedBy",   label: "Modifié par" },
   ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("prospects:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
@@ -509,6 +511,14 @@ function ProspectsPage() {
     {
       key: "createdAt", header: "Créé le", accessor: (p) => p.createdAt, hideBelow: "xl",
       cell: (p) => <span className="text-muted-foreground text-[12px]">{p.createdAt}</span>,
+    },
+    {
+      key: "createdBy", header: "Créé par", accessor: (p) => p.createdBy ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px]">{p.createdBy || "—"}</span>,
+    },
+    {
+      key: "updatedBy", header: "Modifié par", accessor: (p) => p.updatedBy ?? "", hideBelow: "xl",
+      cell: (p) => <span className="text-muted-foreground text-[12px]">{p.updatedBy || "—"}</span>,
     },
   ];
   const customColumns: DataGridColumn<Prospect>[] = customDefs

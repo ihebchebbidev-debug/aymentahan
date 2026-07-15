@@ -35,6 +35,8 @@ function ensure_prospects_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_prospects ADD COLUMN type_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_prospects ADD COLUMN reverted_at DATETIME NULL",
         "ALTER TABLE crminternet_prospects ADD COLUMN reverted_from VARCHAR(20) NULL",
+        "ALTER TABLE crminternet_prospects ADD COLUMN created_by VARCHAR(80) NULL",
+        "ALTER TABLE crminternet_prospects ADD COLUMN updated_by VARCHAR(80) NULL",
         // updated_at est requis pour que l'ETag de la liste (compute_list_etag)
         // change après chaque PATCH/PUT — sinon les éditions remontent un 304
         // avec un corps vide, et le client conserve l'ancien snapshot
@@ -68,6 +70,8 @@ function row_to_prospect(array $r): array {
         'status'          => $r['status']           ?? '',
         'assignedTo'      => $r['assigned_to']      ?? null,
         'createdAt'       => $r['created_at']       ?? null,
+        'createdBy'       => $r['created_by']       ?? null,
+        'updatedBy'       => $r['updated_by']       ?? null,
         'city'            => $r['city']             ?? '',
         'address'         => $r['address']          ?? '',
         'zone'            => $r['zone']             ?? '',
@@ -335,9 +339,9 @@ if ($method === 'POST') {
             if (!user_has_permission($db, $me, 'prospect.edit')) require_permission($db, $me, 'prospect.assign');
             $to = trim($in['assignedTo'] ?? '');
             if ($to === '') fail('assignedTo requis', 422);
-            $sql = "UPDATE crminternet_prospects SET assigned_to = ? WHERE id IN ($place)";
+            $sql = "UPDATE crminternet_prospects SET assigned_to = ?, updated_by = ? WHERE id IN ($place)";
             $st = $db->prepare($sql);
-            $st->execute(array_merge([$to], $ids));
+            $st->execute(array_merge([$to, $me['username'] ?? null], $ids));
             $writeBulkLog('assigned_to', $to);
             audit_log($db, $me, 'prospect.bulk_assign', 'prospect', implode(',', array_slice($ids,0,10)), ['to' => $to, 'count' => $st->rowCount()]);
             ok(['updated' => $st->rowCount()]);
@@ -351,9 +355,9 @@ if ($method === 'POST') {
                 $oldStatus = $beforeMap[$pid]['status'] ?? '';
                 pipeline_assert_transition($db, 'lead', $oldStatus, $st_v);
             }
-            $sql = "UPDATE crminternet_prospects SET status = ? WHERE id IN ($place)";
+            $sql = "UPDATE crminternet_prospects SET status = ?, updated_by = ? WHERE id IN ($place)";
             $st = $db->prepare($sql);
-            $st->execute(array_merge([$st_v], $ids));
+            $st->execute(array_merge([$st_v, $me['username'] ?? null], $ids));
             $writeBulkLog('status', $st_v);
             // Auto-action par lead si applicable.
             $autos = [];
@@ -368,9 +372,9 @@ if ($method === 'POST') {
             if (!user_has_permission($db, $me, 'prospect.edit')) require_permission($db, $me, 'prospect.edit');
             $cv = $in['checkValeur'] ?? 'pending';
             if (!in_array($cv, ['valid','invalid','pending'], true)) fail('checkValeur invalide', 422);
-            $sql = "UPDATE crminternet_prospects SET check_valeur = ? WHERE id IN ($place)";
+            $sql = "UPDATE crminternet_prospects SET check_valeur = ?, updated_by = ? WHERE id IN ($place)";
             $st = $db->prepare($sql);
-            $st->execute(array_merge([$cv], $ids));
+            $st->execute(array_merge([$cv, $me['username'] ?? null], $ids));
             $writeBulkLog('check_valeur', $cv);
             audit_log($db, $me, 'prospect.bulk_check', 'prospect', implode(',', array_slice($ids,0,10)), ['check' => $cv, 'count' => $st->rowCount()]);
             ok(['updated' => $st->rowCount()]);
@@ -388,9 +392,9 @@ if ($method === 'POST') {
             $selT->execute($ids);
             $beforeT = [];
             foreach ($selT->fetchAll() as $r) $beforeT[$r['id']] = $r['type_id'];
-            $sql = "UPDATE crminternet_prospects SET type_id = ? WHERE id IN ($place)";
+            $sql = "UPDATE crminternet_prospects SET type_id = ?, updated_by = ? WHERE id IN ($place)";
             $st = $db->prepare($sql);
-            $st->execute(array_merge([$tid], $ids));
+            $st->execute(array_merge([$tid, $me['username'] ?? null], $ids));
             foreach ($ids as $pid) {
                 log_field_changes($db, 'prospect', (string)$pid, ['type_id' => $beforeT[$pid] ?? null], ['type_id' => $tid], $me['username'] ?? '');
             }
@@ -402,6 +406,7 @@ if ($method === 'POST') {
             foreach ($ids as $pid) {
                 log_field_changes($db, 'prospect', (string)$pid, ['exists' => 1], ['exists' => 0, 'reason' => 'bulk_delete'], $me['username']);
             }
+            $st = null;
             $db->beginTransaction();
             try {
                 foreach ($ids as $pid) {
@@ -416,8 +421,8 @@ if ($method === 'POST') {
                 $db->rollBack();
                 fail('Erreur suppression: ' . $e->getMessage(), 500);
             }
-            audit_log($db, $me, 'prospect.bulk_delete', 'prospect', implode(',', array_slice($ids,0,10)), ['count' => $st->rowCount()]);
-            ok(['deleted' => $st->rowCount()]);
+            audit_log($db, $me, 'prospect.bulk_delete', 'prospect', implode(',', array_slice($ids,0,10)), ['count' => $st?->rowCount() ?? 0]);
+            ok(['deleted' => $st?->rowCount() ?? 0]);
         }
         fail('op invalide', 422);
     }
@@ -429,13 +434,13 @@ if ($method === 'POST') {
     $added = 0; $updated = 0; $skipped = 0; $ids = []; $blocked = [];
 
     $ins = $db->prepare('INSERT INTO crminternet_prospects
-        (id,civility,last_name,first_name,phone,phone2,ancien_ligne,animateur,cin,birth_date,email,source,status,assigned_to,created_at,city,address,zone,gouvernorat,delegation,localisation_xy,code_postal,outcome,lost_reason,comment,comment2,check_valeur,type_id)
-        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:al,:anim,:cin,:bd,:em,:src,:st,:at,:ca,:city,:addr,:zone,:gov,:deleg,:loc,:cp,:oc,:lr,:cm,:cm2,:cv,:tid)
+        (id,civility,last_name,first_name,phone,phone2,ancien_ligne,animateur,cin,birth_date,email,source,status,assigned_to,created_at,created_by,updated_by,city,address,zone,gouvernorat,delegation,localisation_xy,code_postal,outcome,lost_reason,comment,comment2,check_valeur,type_id)
+        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:al,:anim,:cin,:bd,:em,:src,:st,:at,:ca,:cb,:ub,:city,:addr,:zone,:gov,:deleg,:loc,:cp,:oc,:lr,:cm,:cm2,:cv,:tid)
         ON DUPLICATE KEY UPDATE
           civility=VALUES(civility), last_name=VALUES(last_name), first_name=VALUES(first_name),
           phone=VALUES(phone), phone2=VALUES(phone2), ancien_ligne=VALUES(ancien_ligne), animateur=VALUES(animateur), cin=VALUES(cin), birth_date=VALUES(birth_date),
           email=VALUES(email), source=VALUES(source), status=VALUES(status),
-          assigned_to=VALUES(assigned_to), city=VALUES(city), address=VALUES(address), zone=VALUES(zone),
+          assigned_to=VALUES(assigned_to), created_by=VALUES(created_by), updated_by=VALUES(updated_by), city=VALUES(city), address=VALUES(address), zone=VALUES(zone),
           gouvernorat=VALUES(gouvernorat), delegation=VALUES(delegation),
           localisation_xy=VALUES(localisation_xy), code_postal=VALUES(code_postal),
           outcome=VALUES(outcome), lost_reason=VALUES(lost_reason),
@@ -571,6 +576,8 @@ if ($method === 'POST') {
                 ':st' => $st,
                 ':at' => $assignedTo,
                 ':ca' => $ca,
+                ':cb' => $me['username'] ?? null,
+                ':ub' => $me['username'] ?? null,
                 ':city' => strtoupper(trim($r['gouvernorat'] ?? $r['city'] ?? '')),
                 ':addr'=> trim($r['address'] ?? ''),
                 ':zone'=> trim($r['delegation'] ?? $r['zone'] ?? ''),
@@ -665,6 +672,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     ];
     $sets = [];
     $params = [':id' => $id];
+    $params[':updated_by'] = $me['username'] ?? null;
     $before = []; $after = [];
     $needsEdit = false;
     $needsType = false;
@@ -708,6 +716,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         }
     }
     if (!$sets) fail('Aucun champ à mettre à jour', 422);
+    $sets[] = 'updated_by = :updated_by';
     $canEdit = user_has_permission($db, $me, 'prospect.edit');
     if (isset($needsType) ? $needsType : false) {
         if (!$canEdit) require_permission($db, $me, 'prospect.type');
