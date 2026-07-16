@@ -126,8 +126,8 @@ function ProspectDetailPage() {
     );
   }
 
-  // Agents cannot view leads not assigned to them
-  if (isAgent && prospect.assignedTo && prospect.assignedTo !== user?.username) {
+  // Agents cannot view leads not assigned to them, except sales agents who can work across the portfolio.
+  if (isAgent && user?.role !== "AgentVente" && prospect.assignedTo && prospect.assignedTo !== user?.username) {
     return (
       <AppLayout skeleton="detail">
         <div className="p-10 text-center">

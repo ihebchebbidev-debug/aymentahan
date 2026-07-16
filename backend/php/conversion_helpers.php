@@ -351,7 +351,13 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
     if (($opts['checkAgent'] ?? true) && $isAgent) {
         $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
         $own->execute([':id' => $pid]);
-        if ((string) $own->fetchColumn() !== $username) {
+        $assignedTo = (string) $own->fetchColumn();
+
+        if ($role === 'AgentVente') {
+            if ($assignedTo === $username) {
+                return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
+            }
+        } elseif ($assignedTo !== $username) {
             return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
         }
     }
