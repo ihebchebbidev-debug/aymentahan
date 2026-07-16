@@ -41,7 +41,7 @@ export type ContractInfo = {
 
 export const TYPE_OPTIONS = ["ADSL", "VdsL", "GPON", "Box"];
 export const ETAPE_OPTIONS = ["2", "3", "4"];
-export const INTERFACE_OPTIONS = ["Animacom", "AHLANET", "AYNET", "Franchise AK", "autre"];
+export const INTERFACE_OPTIONS = ["Animacom", "AHLANET", "AYNET", "Franchise AK", "autre" ,"Younet"];
 export const MOTIF_OPTIONS = ["Instance com", "Instance Tech"];
 export const FSI_OPTIONS = ["Topnet"];
 export const ETAT_OPTIONS: ContractInfo["etat"][] = ["En cours", "Basculement", "Rejete", "Valide"];

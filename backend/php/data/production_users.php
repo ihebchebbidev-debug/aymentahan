@@ -505,7 +505,7 @@ return array (
     'job_title' => 'Agent guichet',
     'birth_date' => '1993-09-05',
     'cin' => '12345679',
-    'company' => 'ahlanet',
+    'company' => 'net',
     'contract_type' => 'CDI',
     'salary' => 400.0,
     'salary_increase' => 550.0,
