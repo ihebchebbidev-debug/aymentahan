@@ -264,6 +264,10 @@ export function canViewMigrationsData(hasPermission: (key: string) => boolean): 
   return hasPermission("migration.view") || hasPermission("page.migrations");
 }
 
+export function canConvertProspectToOpportunity(hasPermission: (key: string) => boolean): boolean {
+  return hasPermission("prospect.convert") || hasPermission("opportunity.convert");
+}
+
 export function canConvertOpportunityToMigration(hasPermission: (key: string) => boolean): boolean {
   return hasPermission("opportunity.convert_migration") || hasPermission("opportunity.convert");
 }

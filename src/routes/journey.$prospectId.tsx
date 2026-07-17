@@ -20,6 +20,7 @@ import { printPage } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { FileSignature, Paperclip, ArrowRightCircle, ArrowRightLeft } from "lucide-react";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { canConvertProspectToOpportunity } from "@/lib/permissions";
 
 export const Route = createFileRoute("/journey/$prospectId")({
   head: ({ params }) => ({
@@ -142,7 +143,7 @@ function JourneyPage() {
         icon={<History className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
-            {prospect && !prospect.opportunityId && (
+            {prospect && !prospect.opportunityId && canConvertProspectToOpportunity(hasPermission) && (
               <Button size="sm" variant="outline" className="border-primary/30 text-primary hover:bg-primary/10"
                 disabled={converting} onClick={convertToOpportunity}>
                 <ArrowRightCircle className="h-4 w-4 mr-1.5" />Convertir en opportunité

@@ -627,6 +627,15 @@ function user_has_permission(PDO $db, array $me, string $permission): bool {
     }
 }
 
+function user_has_any_permission(PDO $db, array $me, array $permissions): bool {
+    foreach ($permissions as $permission) {
+        if (user_has_permission($db, $me, (string) $permission)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** Throws 403 if the user lacks the given permission. */
 function require_permission(PDO $db, array $me, string $permission): void {
     if (!user_has_permission($db, $me, $permission)) {

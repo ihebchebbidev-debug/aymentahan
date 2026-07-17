@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import type { ProspectType } from "@/lib/types";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { canConvertProspectToOpportunity } from "@/lib/permissions";
 
 export const Route = createFileRoute("/prospects/$prospectId")({
   head: ({ params }) => ({
@@ -59,7 +60,7 @@ function ProspectDetailPage() {
   const { prospects, users, updateProspect, deleteProspect, refresh } = useErp();
   const { user, hasPermission } = useAuth();
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
-  const canConvert = hasPermission("opportunity.convert");
+  const canConvert = canConvertProspectToOpportunity(hasPermission);
   // Lead change history: Admin always granted; others need the explicit `lead.history` permission.
   const canViewHistory = hasPermission("lead.history");
   const isAdmin = user?.role === "Administrateur";
