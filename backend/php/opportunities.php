@@ -205,9 +205,7 @@ if ($method === 'POST') {
 
     // ---- Convert prospect -> opportunity --------------------------------
     if ($action === 'convert_from_prospect') {
-        if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
-            fail('Accès refusé (permission requise : prospect.convert ou opportunity.convert)', 403);
-        }
+        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $pid = (string)($in['prospectId'] ?? '');
         if ($pid === '') fail('prospectId requis', 422);
 

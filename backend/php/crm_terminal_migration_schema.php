@@ -43,8 +43,7 @@ function user_can_convert_opportunity_to_migration(PDO $db, array $me): bool
     if (($me['role'] ?? '') === 'Administrateur') {
         return true;
     }
-    return user_has_permission($db, $me, 'opportunity.convert_migration')
-        || user_has_permission($db, $me, 'opportunity.convert');
+    return user_has_any_permission($db, $me, ['opportunity.convert_migration', 'opportunity.convert']);
 }
 
 function require_convert_opportunity_to_migration(PDO $db, array $me): void

@@ -20,7 +20,7 @@ import { printPage } from "@/lib/exportUtils";
 import { toast } from "sonner";
 import { FileSignature, Paperclip, ArrowRightCircle, ArrowRightLeft } from "lucide-react";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
-import { canConvertProspectToOpportunity } from "@/lib/permissions";
+import { canConvertProspectToOpportunity, hasAnyPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/journey/$prospectId")({
   head: ({ params }) => ({
@@ -155,7 +155,7 @@ function JourneyPage() {
                 <FileSignature className="h-4 w-4 mr-1.5" />Convertir en contrat
               </Button>
             )}
-            {opp && !oppTerminal && (hasPermission("opportunity.convert_migration") || hasPermission("opportunity.convert")) && (
+            {opp && !oppTerminal && hasAnyPermission(hasPermission, ["opportunity.convert_migration", "opportunity.convert"]) && (
               <Button size="sm" variant="outline" className="border-primary/40 text-primary hover:bg-primary/10"
                 disabled={converting} onClick={convertToMigration}>
                 <ArrowRightLeft className="h-4 w-4 mr-1.5" />Convertir en migration

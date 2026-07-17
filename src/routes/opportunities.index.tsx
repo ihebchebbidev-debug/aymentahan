@@ -36,6 +36,7 @@ import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { DynamicFilterBar } from "@/components/DynamicFilterBar";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { canConvertOpportunityToMigration } from "@/lib/permissions";
 
 const opportunitiesSearchSchema = z.object({
   stage: fallback(z.string().optional(), undefined),
@@ -66,8 +67,7 @@ function OpportunitiesPage() {
   const isAdmin = user?.role === "Administrateur";
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
   const canConvert = hasPermission("opportunity.convert");
-  const canConvertMigration =
-    hasPermission("opportunity.convert_migration") || hasPermission("opportunity.convert");
+  const canConvertMigration = canConvertOpportunityToMigration(hasPermission);
   const canRevert = hasPermission("opportunity.revert");
   const canDelete = hasPermission("opportunity.delete");
   const canExport = hasPermission("opportunity.export");

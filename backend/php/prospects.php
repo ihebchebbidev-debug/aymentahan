@@ -270,9 +270,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'convert_to_opportunity') {
-        if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
-            fail('Accès refusé (permission requise : prospect.convert ou opportunity.convert)', 403);
-        }
+        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $pid = $in['id'] ?? '';
         if (!$pid) fail('id requis', 422);
 

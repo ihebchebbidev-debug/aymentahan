@@ -99,8 +99,8 @@ function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, str
             if ($entity !== 'lead') {
                 return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
             }
-            if (!user_has_permission($db, $me, 'opportunity.convert')) {
-                return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+            if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
+                return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
             }
             $r = conversion_prospect_to_opportunity($db, $entityId, $me, [
                 'source' => 'pipeline:' . $stageName,

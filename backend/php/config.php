@@ -67,7 +67,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 // ---------- DATABASE --------------------------------------------------
 class Database {
     private $host = "ttshopmuser.mysql.db";
-    private $username = "ttshopvente";
+    private $username = "ttshopmuser";
     private $password = "Ttshop2026";
     private $database = "ttshopmuser";
     public $conn;
@@ -592,9 +592,11 @@ function role_has_any_permission(PDO $db, string $role): bool {
 }
 
 function user_has_permission(PDO $db, array $me, string $permission): bool {
+    $permission = trim($permission);
+    if ($permission === '') return false;
     if (($me['role'] ?? '') === 'Administrateur') return true;
     $username = (string)($me['username'] ?? '');
-    $role     = (string)($me['role'] ?? '');
+    $role     = trim((string)($me['role'] ?? ''));
 
     // Per-user deny override always wins — explicit admin action.
     $ov = user_overrides_for($db, $username);
@@ -640,6 +642,13 @@ function user_has_any_permission(PDO $db, array $me, array $permissions): bool {
 function require_permission(PDO $db, array $me, string $permission): void {
     if (!user_has_permission($db, $me, $permission)) {
         fail("Accès refusé (permission requise : $permission)", 403);
+    }
+}
+
+function require_any_permission(PDO $db, array $me, array $permissions): void {
+    if (!user_has_any_permission($db, $me, $permissions)) {
+        $joined = implode(', ', array_filter($permissions, static fn ($p) => is_string($p) && trim($p) !== ''));
+        fail("Accès refusé (permission requise : $joined)", 403);
     }
 }
 
