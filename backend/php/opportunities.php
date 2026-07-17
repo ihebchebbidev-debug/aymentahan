@@ -242,7 +242,7 @@ if ($method === 'POST') {
 
     // ---- Convert opportunity -> contract --------------------------------
     if ($action === 'convert_to_contract') {
-        require_permission($db, $me, 'opportunity.convert');
+        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
 

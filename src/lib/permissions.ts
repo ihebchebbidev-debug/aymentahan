@@ -314,6 +314,25 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/guichet_/analytics": "page.guichet",  // guichet analytics sub-page
 };
 
+export const ROUTE_PERMISSION_ALTERNATIVES: Record<string, string[]> = {
+  "/prospects": ["page.prospects", "prospect.view"],
+  "/journey": ["page.prospects", "prospect.view"],
+  "/opportunities": ["page.opportunities", "opportunity.view"],
+  "/contracts": ["page.contracts", "contract.view"],
+  "/migrations": ["page.migrations", "migration.view"],
+  "/reclamations": ["page.reclamations", "reclamation.view_all", "reclamation.manage"],
+  "/users": ["page.users", "user.view"],
+  "/roles": ["page.roles", "role.view"],
+  "/audit": ["page.audit", "audit.view"],
+  "/security": ["page.security", "security.ip.manage"],
+  "/hr/attendance": ["page.hr.attendance", "hr.attendance.clock", "hr.attendance.export"],
+  "/hr/payroll": ["page.hr.payroll", "hr.payroll.edit", "hr.payroll.export"],
+  "/hr/commissions": ["page.hr.commissions", "hr.commissions.edit", "hr.commissions.export"],
+  "/hr/external-agents": ["page.hr.external-agents", "hr.external_agents.add", "hr.external_agents.edit", "hr.external_agents.delete"],
+  "/guichet": ["page.guichet", "guichet.read_own", "guichet.read_all"],
+  "/guichet_/analytics": ["page.guichet", "guichet.read_own", "guichet.read_all"],
+};
+
 // Routes always available (login flow, profile fallback, etc.)
 export const PUBLIC_AUTH_ROUTES = new Set<string>([
   "/profile",
@@ -338,4 +357,20 @@ export function permissionForPath(path: string): string | null {
     segments.pop();
   }
   return ROUTE_PERMISSION["/"] ?? null;
+}
+
+export function hasRouteAccess(hasPermission: (key: string) => boolean, path: string): boolean {
+  const exact = ROUTE_PERMISSION_ALTERNATIVES[path];
+  if (exact) return exact.some((permission) => hasPermission(permission));
+
+  const segments = path.split("/").filter(Boolean);
+  while (segments.length) {
+    const candidate = "/" + segments.join("/");
+    const alt = ROUTE_PERMISSION_ALTERNATIVES[candidate];
+    if (alt) return alt.some((permission) => hasPermission(permission));
+    segments.pop();
+  }
+
+  const fallback = ROUTE_PERMISSION_ALTERNATIVES["/"];
+  return !fallback || fallback.some((permission) => hasPermission(permission));
 }

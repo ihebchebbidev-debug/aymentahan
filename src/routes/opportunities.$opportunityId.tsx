@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import type { Opportunity, PipelineStage } from "@/lib/types";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { LastModifiedInfo } from "@/components/LastModifiedInfo";
-import { canConvertOpportunityToMigration } from "@/lib/permissions";
+import { canConvertOpportunityToMigration, hasAnyPermission } from "@/lib/permissions";
 
 export const Route = createFileRoute("/opportunities/$opportunityId")({
   head: ({ params }) => ({
@@ -50,7 +50,7 @@ function OpportunityDetailPage() {
   const { user, hasPermission } = useAuth();
   const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("opportunity.edit");
-  const canConvert = hasPermission("opportunity.convert");
+  const canConvert = hasAnyPermission(hasPermission, ["prospect.convert", "opportunity.convert"]);
   const canConvertMigration = canConvertOpportunityToMigration(hasPermission);
   const canRevert = hasPermission("opportunity.revert");
   const canDelete = hasPermission("opportunity.delete");

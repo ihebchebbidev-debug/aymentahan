@@ -248,7 +248,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'mark_won') {
-        require_permission($db, $me, 'opportunity.convert');
+        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $pid     = $in['id'] ?? '';
         $premium = (float)($in['premium'] ?? 950);
         $partner = trim($in['partner'] ?? '');

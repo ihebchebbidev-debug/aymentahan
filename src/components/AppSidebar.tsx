@@ -36,7 +36,7 @@ import { useOpportunityStages } from "@/hooks/use-opportunity-stages";
 import { useContractStages } from "@/hooks/use-contract-stages";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { useGuichetEntities } from "@/hooks/use-guichet-entities";
-import { permissionForPath, PUBLIC_AUTH_ROUTES, HR_PRIV_ROUTES } from "@/lib/permissions";
+import { hasRouteAccess, PUBLIC_AUTH_ROUTES, HR_PRIV_ROUTES } from "@/lib/permissions";
 import { roleLabel, isAgentRole } from "@/lib/roleLabels";
 import { useChat } from "@/lib/chatStore";
 
@@ -104,10 +104,7 @@ export function useNavVisibility() {
   return (url: string) => {
     if (isGuichet) {
       if (GUICHET_ALLOWED.has(url)) return true;
-      // Honor additional granted roles/permissions on top of base AgentGuichet
-      const perm = permissionForPath(url);
-      if (perm && hasPermission(perm)) return true;
-      return false;
+      return hasRouteAccess(hasPermission, url);
     }
     if (url === "/documentation" || url === "/configuration" || url === "/security")
       return user?.role === "Administrateur";
@@ -116,14 +113,11 @@ export function useNavVisibility() {
     if (url === "/reports")
       return hasPermission("report.view");
     if (HR_PRIV_ROUTES.has(url)) {
-      const perm = permissionForPath(url);
-      return user?.role === "Administrateur" || (!!perm && hasPermission(perm));
+      return user?.role === "Administrateur" || hasRouteAccess(hasPermission, url);
     }
     if (isAgent && AGENT_HIDDEN.has(url)) return false;
     if (PUBLIC_AUTH_ROUTES.has(url)) return true;
-    const perm = permissionForPath(url);
-    if (!perm) return true;
-    return hasPermission(perm);
+    return hasRouteAccess(hasPermission, url);
   };
 }
 
@@ -142,9 +136,7 @@ export function AppSidebar() {
   const isVisible = (url: string) => {
     if (isGuichet) {
       if (GUICHET_ALLOWED.has(url)) return true;
-      const perm = permissionForPath(url);
-      if (perm && hasPermission(perm)) return true;
-      return false;
+      return hasRouteAccess(hasPermission, url);
     }
     if (url === "/documentation" || url === "/configuration" || url === "/security")
       return user?.role === "Administrateur";
@@ -153,14 +145,11 @@ export function AppSidebar() {
     if (url === "/reports")
       return hasPermission("report.view");
     if (HR_PRIV_ROUTES.has(url)) {
-      const perm = permissionForPath(url);
-      return user?.role === "Administrateur" || (!!perm && hasPermission(perm));
+      return user?.role === "Administrateur" || hasRouteAccess(hasPermission, url);
     }
     if (isAgent && AGENT_HIDDEN.has(url)) return false;
     if (PUBLIC_AUTH_ROUTES.has(url)) return true;
-    const perm = permissionForPath(url);
-    if (!perm) return true;
-    return hasPermission(perm);
+    return hasRouteAccess(hasPermission, url);
   };
 
   const [collapsed] = useSidebarCollapsed();

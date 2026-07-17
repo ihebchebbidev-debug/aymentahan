@@ -110,8 +110,8 @@ function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, str
 
         case 'convert_contract':
             if ($entity === 'lead') {
-                if (!user_has_permission($db, $me, 'opportunity.convert')) {
-                    return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+                if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
+                    return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
                 }
                 $r = conversion_mark_won_to_contract($db, $entityId, $me, [
                     'source' => 'pipeline:' . $stageName,
@@ -120,8 +120,8 @@ function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, str
                 return pipeline_auto_action_result($action, $r, 'contractId');
             }
             if ($entity === 'opportunity') {
-                if (!user_has_permission($db, $me, 'opportunity.convert')) {
-                    return ['action' => $action, 'error' => 'Permission opportunity.convert requise'];
+                if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
+                    return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
                 }
                 $r = conversion_opportunity_to_contract($db, $entityId, $me, [
                     'source' => 'pipeline:' . $stageName,

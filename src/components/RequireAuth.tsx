@@ -5,6 +5,7 @@ import { Loader2, ShieldAlert, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ALL_PERMISSION_KEYS,
+  hasRouteAccess,
   permissionForPath,
   PUBLIC_AUTH_ROUTES,
   ROUTE_PERMISSION,
@@ -66,8 +67,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       "/security",
     ];
     for (const r of order) {
-      const p = ROUTE_PERMISSION[r];
-      if (!p || hasPermission(p)) return r;
+      if (hasRouteAccess(hasPermission, r)) return r;
     }
     // Last-resort: always-available routes so we never loop on a forbidden page.
     return "/profile";
@@ -80,7 +80,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (loading || !user) return;
     if (user.role === "Administrateur") return;
     if (permissionsLoading) return;
-    if (requiredPerm && !hasPermission(requiredPerm) && firstAllowed !== path) {
+    if (requiredPerm && !hasRouteAccess(hasPermission, path) && firstAllowed !== path) {
       navigate({ to: firstAllowed, replace: true } as any);
     }
   }, [loading, permissionsLoading, user, requiredPerm, hasPermission, path, firstAllowed, navigate]);
@@ -140,7 +140,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
 
   // Explicit "access denied" screen when the user lacks the required permission.
-  if (requiredPerm && !hasPermission(requiredPerm)) {
+  if (requiredPerm && !hasRouteAccess(hasPermission, path)) {
     const isHome = path === firstAllowed;
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-6">

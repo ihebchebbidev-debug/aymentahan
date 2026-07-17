@@ -94,6 +94,7 @@ $isAgent = in_array($role, ['Agent','AgentSuivi','AgentActivation','AgentVente']
 /* GET                                                                 */
 /* ================================================================== */
 if ($method === 'GET') {
+    require_any_permission($db, $me, ['page.contracts', 'contract.view']);
     $id = $_GET['id'] ?? null;
     if ($id) {
         $s = $db->prepare('SELECT * FROM crminternet_contracts WHERE id = :id');
