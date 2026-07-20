@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
+import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { type ProspectType } from "@/lib/types";
 import { useLeadStatusNames } from "@/hooks/use-lead-stages";
@@ -35,6 +36,12 @@ export const Route = createFileRoute("/prospects/$prospectId_/edit")({
 });
 
 function GuardedEditProspectPage() {
+  const { user } = useAuth();
+
+  if (user?.role === "AgentVente") {
+    return <EditProspectPage />;
+  }
+
   return (
     <RequirePerm perm="prospect.edit" backTo="/prospects" backLabel="Retour aux prospects">
       <EditProspectPage />

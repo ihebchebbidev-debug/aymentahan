@@ -60,16 +60,17 @@ function ProspectDetailPage() {
   const { prospects, users, updateProspect, deleteProspect, refresh } = useErp();
   const { user, hasPermission } = useAuth();
   const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
+  const isSalesAgent = user?.role === "AgentVente";
   const canConvert = canConvertProspectToOpportunity(hasPermission);
   // Lead change history: Admin always granted; others need the explicit `lead.history` permission.
   const canViewHistory = hasPermission("lead.history");
   const isAdmin = user?.role === "Administrateur";
-  const canEdit = hasPermission("prospect.edit");
+  const canEdit = user?.role === "AgentVente" || hasPermission("prospect.edit");
   const canDelete = hasPermission("prospect.delete");
-  const canChangeType = canEdit || hasPermission("prospect.type");
-  const canChangeStatus = canEdit || hasPermission("prospect.status");
-  const canChangeSource = canEdit || hasPermission("prospect.source");
-  const canAssign = canEdit || hasPermission("prospect.assign");
+  const canChangeType = user?.role === "AgentVente" || canEdit || hasPermission("prospect.type");
+  const canChangeStatus = user?.role === "AgentVente" || canEdit || hasPermission("prospect.status");
+  const canChangeSource = user?.role === "AgentVente" || canEdit || hasPermission("prospect.source");
+  const canAssign = user?.role === "AgentVente" || canEdit || hasPermission("prospect.assign");
 
   const prospect = useMemo(() => prospects.find((p) => p.id === prospectId), [prospects, prospectId]);
 
@@ -128,7 +129,7 @@ function ProspectDetailPage() {
   }
 
   // Agents cannot view leads not assigned to them, except sales agents who can work across the portfolio.
-  if (isAgent && user?.role !== "AgentVente" && prospect.assignedTo && prospect.assignedTo !== user?.username) {
+  if (isAgent && !isSalesAgent && prospect.assignedTo && prospect.assignedTo !== user?.username) {
     return (
       <AppLayout skeleton="detail">
         <div className="p-10 text-center">
