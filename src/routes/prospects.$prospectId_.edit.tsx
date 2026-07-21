@@ -90,6 +90,8 @@ function EditProspectPage() {
   const [comment2, setComment2] = useState("");
   const [typeId, setTypeId] = useState<string>("");
   const [lostReason, setLostReason] = useState("");
+  const [outcome, setOutcome] = useState<"pending" | "won" | "lost">("pending");
+  const [checkValeur, setCheckValeur] = useState<"valid" | "invalid" | "pending">("pending");
 
   const [hydrated, setHydrated] = useState(false);
   const [formTouched, setFormTouched] = useState(false);
@@ -121,6 +123,8 @@ function EditProspectPage() {
     setComment2(prospect.comment2 ?? "");
     setTypeId(prospect.typeId ?? "");
     setLostReason(prospect.lostReason ?? "");
+    setOutcome((prospect.outcome as any) ?? "pending");
+    setCheckValeur((prospect.checkValeur as any) ?? "pending");
     setHydrated(true);
   }, [prospect, hydrated]);
 
@@ -154,9 +158,7 @@ function EditProspectPage() {
   }, [prospect, customLoaded]);
 
   const agents = users.filter((u) => ["Agent","Manager","AgentSuivi","AgentActivation","AgentVente"].includes(u.role));
-  const currentTypeName = (types.find((t) => t.id === typeId)?.name ?? "").trim().toLowerCase();
-  const isStreetType = currentTypeName === "street";
-  const showAncienLigne = currentTypeName === "résiliation" || currentTypeName === "resiliation" || currentTypeName === "migration";
+
 
   if (!prospect) {
     return (
@@ -185,8 +187,8 @@ function EditProspectPage() {
         firstName: firstName.trim(),
         phone: phone.trim(),
         phone2: phone2.trim(),
-        ancienLigne: showAncienLigne ? (ancienLigne.trim() || null) : null,
-        animateur: isStreetType ? (animateur.trim() || null) : null,
+        ancienLigne: ancienLigne.trim() || null,
+        animateur: animateur.trim() || null,
         cin: cin.trim(),
         birthDate: birthDate || null,
         email: email.trim(),
@@ -204,6 +206,8 @@ function EditProspectPage() {
         comment2: comment2.trim() || null,
         typeId: typeId || null,
         lostReason: lostReason.trim() || undefined,
+        outcome,
+        checkValeur,
       } as any);
 
       // Persist custom field values.
@@ -310,15 +314,13 @@ function EditProspectPage() {
                 <Label>Gsm 2</Label>
                 <Input value={phone2} onChange={(e) => setPhone2(e.target.value)} />
               </div>
-              {showAncienLigne && (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Ancien Ligne</Label>
-                  <Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} />
-                </div>
-              )}
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Ancien Ligne <span className="text-[10px] text-muted-foreground">(récupération / migration / résiliation)</span></Label>
+                <Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} placeholder="Ancien numéro" />
+              </div>
               <div className="space-y-1.5">
                 <Label>Gouvernorat</Label>
-                <Input value={gouvernorat} onChange={(e) => setGouvernorat(e.target.value)} />
+                <GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} />
               </div>
               <div className="space-y-1.5">
                 <Label>Délégation</Label>
@@ -361,7 +363,6 @@ function EditProspectPage() {
           <section className="border-t border-border pt-6">
             <h2 className="text-sm font-semibold mb-3 text-foreground">Qualification</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Source retirée de l'UI — déduite désormais du type de prospect. Valeur existante préservée au save. */}
               <div className="space-y-1.5">
                 <Label>Statut</Label>
                 <Select value={status || "__blank__"} onValueChange={(v) => setStatus(v === "__blank__" ? "" : v)}>
@@ -369,6 +370,28 @@ function EditProspectPage() {
                   <SelectContent>
                     <SelectItem value="__blank__">—</SelectItem>
                     {STATUSES.map((s: string) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Résultat</Label>
+                <Select value={outcome} onValueChange={(v) => setOutcome(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">En cours</SelectItem>
+                    <SelectItem value="won">Gagné</SelectItem>
+                    <SelectItem value="lost">Perdu</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Check valeur</Label>
+                <Select value={checkValeur} onValueChange={(v) => setCheckValeur(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">En attente</SelectItem>
+                    <SelectItem value="valid">Valide</SelectItem>
+                    <SelectItem value="invalid">Invalide</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -382,12 +405,10 @@ function EditProspectPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {isStreetType && (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Animateur</Label>
-                  <Input value={animateur} onChange={(e) => setAnimateur(e.target.value)} />
-                </div>
-              )}
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Animateur</Label>
+                <Input value={animateur} onChange={(e) => setAnimateur(e.target.value)} />
+              </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Observation 1</Label>
                 <Textarea rows={2} value={comment} onChange={(e) => setComment(e.target.value)} />
