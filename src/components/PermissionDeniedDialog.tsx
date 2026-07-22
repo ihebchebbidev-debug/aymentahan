@@ -25,6 +25,8 @@ const PERM_INDEX: Record<string, { label: string; section: string }> = (() => {
 
 export type PermissionDeniedPayload = {
   perm?: string;
+  /** When multiple permissions could unlock the action (any-of). */
+  perms?: string[];
   /** Optional action description, e.g. "Supprimer ce prospect". */
   action?: string;
   /** Optional extra context line shown to the user (in French, plain text). */
@@ -71,25 +73,42 @@ export function PermissionDeniedDialogProvider({ children }: { children: ReactNo
     };
   }, [show]);
 
-  const info = payload?.perm ? PERM_INDEX[payload.perm] : undefined;
-  const label = info?.label ?? payload?.perm ?? "Permission requise";
-  const section = info?.section;
+  // Normalise to a list: prefer explicit perms[], else fall back to single perm.
+  const permKeys = useMemo(() => {
+    const list = payload?.perms?.length ? payload.perms : payload?.perm ? [payload.perm] : [];
+    // Dedupe while preserving order.
+    return Array.from(new Set(list.map((k) => k.trim()).filter(Boolean)));
+  }, [payload]);
+
+  const permItems = permKeys.map((key) => {
+    const info = PERM_INDEX[key];
+    return { key, label: info?.label ?? key, section: info?.section };
+  });
+
+  const anyOf = permItems.length > 1;
+  const primaryLabel = permItems[0]?.label ?? "Permission requise";
 
   const copyMessage = useMemo(() => {
+    const permLines = permItems.length
+      ? permItems.map((p) =>
+          `  • « ${p.label} » (clé technique : ${p.key}${p.section ? ` — ${p.section}` : ""})`,
+        )
+      : ["  • (permission inconnue)"];
+    const intro = anyOf
+      ? "Permissions à m'accorder (au moins une suffit) :"
+      : "Permission à m'accorder :";
     const lines = [
       "Bonjour,",
       "",
       "Je ne parviens pas à effectuer une action dans le CRM car il me manque une permission.",
       payload?.action ? `Action souhaitée : ${payload.action}` : "",
-      payload?.perm
-        ? `Permission à m'accorder : « ${label} » (clé technique : ${payload.perm})`
-        : `Permission à m'accorder : « ${label} »`,
-      section ? `Catégorie : ${section}` : "",
+      intro,
+      ...permLines,
       "",
       "Merci de me l'attribuer dans Rôles & Permissions, ou via mes accès personnels.",
     ].filter(Boolean);
     return lines.join("\n");
-  }, [payload, label, section]);
+  }, [payload, permItems, anyOf]);
 
   const onCopy = async () => {
     try {
@@ -128,23 +147,49 @@ export function PermissionDeniedDialogProvider({ children }: { children: ReactNo
               </div>
             )}
 
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3">
-              <div className="text-[11px] uppercase tracking-wide text-destructive/80 mb-1">
-                Permission manquante
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 space-y-2">
+              <div className="text-[11px] uppercase tracking-wide text-destructive/80">
+                {anyOf
+                  ? `Permissions manquantes (au moins une requise)`
+                  : "Permission manquante"}
               </div>
-              <div className="font-semibold text-sm">{label}</div>
-              {section && (
-                <Badge variant="outline" className="mt-2 text-[10px]">
-                  {section}
-                </Badge>
+              {permItems.length === 0 ? (
+                <div className="text-sm text-muted-foreground italic">
+                  Permission non identifiée par le serveur.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {permItems.map((p) => (
+                    <li
+                      key={p.key}
+                      className="rounded-md bg-background/60 border border-destructive/20 px-2.5 py-2"
+                    >
+                      <div className="font-semibold text-sm">{p.label}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <code className="px-1.5 py-0.5 rounded bg-muted text-foreground text-[11px] font-mono">
+                          {p.key}
+                        </code>
+                        {p.section && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {p.section}
+                          </Badge>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 
             <div className="text-sm text-muted-foreground leading-relaxed">
               Pour débloquer cette action, veuillez contacter votre{" "}
               <span className="font-medium text-foreground">administrateur</span>{" "}
-              et lui demander de vous attribuer la permission{" "}
-              <span className="font-medium text-foreground">« {label} »</span>.
+              {anyOf ? (
+                <>et lui demander de vous attribuer <span className="font-medium text-foreground">l'une</span> des permissions listées ci-dessus.</>
+              ) : (
+                <>et lui demander de vous attribuer la permission{" "}
+                <span className="font-medium text-foreground">« {primaryLabel} »</span>.</>
+              )}{" "}
               Il pourra le faire depuis la page{" "}
               <span className="font-medium text-foreground">Rôles &amp; Permissions</span>{" "}
               ou directement dans vos accès personnels.
@@ -154,6 +199,7 @@ export function PermissionDeniedDialogProvider({ children }: { children: ReactNo
               <div className="text-xs text-muted-foreground italic">{payload.details}</div>
             )}
           </div>
+
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button variant="outline" onClick={onCopy} className="gap-2">

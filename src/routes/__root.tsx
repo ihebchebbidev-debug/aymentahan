@@ -12,7 +12,7 @@ import { VersionWatcher } from "@/components/VersionWatcher";
 import { createAppQueryClient } from "@/lib/queryClient";
 import { bindAppQueryClient } from "@/lib/appQueryClient";
 import { setForbiddenHandler } from "@/lib/api";
-import { notifyMissingPermission, inferPermissionFromUrl } from "@/lib/permissionGuard";
+import { notifyMissingPermission, inferPermissionFromUrl, extractPermissionsFromMessage } from "@/lib/permissionGuard";
 
 function NotFoundComponent() {
   return (
@@ -49,7 +49,15 @@ function RootComponent() {
   }, [queryClient]);
   // Wire global 403 → French permission toast.
   useEffect(() => {
-    setForbiddenHandler(({ url }) => {
+    setForbiddenHandler(({ url, message }) => {
+      // Prefer the exact permission keys the backend named in its 403 message,
+      // fall back to a URL-based guess so the dialog still surfaces something
+      // concrete when the backend didn't spell it out.
+      const fromMsg = extractPermissionsFromMessage(message);
+      if (fromMsg.length > 0) {
+        notifyMissingPermission(fromMsg[0], { perms: fromMsg });
+        return;
+      }
       const inferred = inferPermissionFromUrl(url);
       notifyMissingPermission(inferred);
     });

@@ -22,13 +22,29 @@ export function permissionLabel(key: string): string {
  */
 export function notifyMissingPermission(
   perm?: string,
-  opts?: { description?: string; action?: string },
+  opts?: { description?: string; action?: string; perms?: string[] },
 ) {
   showPermissionDenied({
     perm,
+    perms: opts?.perms,
     action: opts?.action,
     details: opts?.description,
   });
+}
+
+/**
+ * Parse permission keys from a backend 403 message such as
+ *   "Accès refusé (permission requise : contract.delete)"
+ *   "Accès refusé (permission requise : a, b, c)"
+ */
+export function extractPermissionsFromMessage(msg?: string): string[] {
+  if (!msg) return [];
+  const m = msg.match(/permission\s+requise\s*:\s*([^\)\n]+)/i);
+  if (!m) return [];
+  return m[1]
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter((s) => /^[a-z][a-z0-9._-]*$/i.test(s));
 }
 
 /**

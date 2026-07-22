@@ -95,7 +95,7 @@ export function autoFilterSchema(
     case "prospects":
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, tél, email, CIN)", type: "text" },
-        realField("Statut", "statut", rows, "status", input.prospectStatuses ?? [], true),
+        realField("Statut d'appel", "statut", rows, "status", input.prospectStatuses ?? [], true),
         realField("Source", "source", rows, "source", standardSources, true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
         realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
