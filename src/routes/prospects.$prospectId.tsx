@@ -34,6 +34,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useLeadStatusNames } from "@/hooks/use-lead-stages";
 import type { ProspectType } from "@/lib/types";
+import { LEAD_STATUSES } from "@/lib/types";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { canConvertProspectToOpportunity } from "@/lib/permissions";
 
@@ -47,11 +48,7 @@ export const Route = createFileRoute("/prospects/$prospectId")({
   component: ProspectDetailPage,
 });
 
-const STATUS_FALLBACK = [
-  "Ok","Att cin","Att confirmation","Rappel","refuse","migration","Basculement",
-  "Ing","Nrp","Pas de rep","Pas intersse","Déjà connecté","Autr dde encor","Autre",
-  "A réinjecter","Réinjecté",
-];
+const STATUS_FALLBACK = LEAD_STATUSES;
 
 function ProspectDetailPage() {
   const { prospectId } = Route.useParams();
@@ -109,7 +106,11 @@ function ProspectDetailPage() {
       .then((r) => setTypes((r.types ?? []).slice().sort((a, b) => a.position - b.position)))
       .catch(() => {});
   }, []);
-  const STATUS_OPTIONS = catalogStatusNames.length ? catalogStatusNames : STATUS_FALLBACK;
+  const STATUS_OPTIONS = useMemo(() => {
+    const set = new Set<string>(catalogStatusNames.length ? catalogStatusNames : STATUS_FALLBACK);
+    if (prospect?.status) set.add(prospect.status);
+    return [...set].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [catalogStatusNames, prospect?.status]);
   const currentTypeName = (types.find((t) => t.id === prospect?.typeId)?.name ?? "").trim().toLowerCase();
   const isStreetType = currentTypeName === "street";
   const showAncienLigne = currentTypeName === "résiliation" || currentTypeName === "resiliation" || currentTypeName === "migration";
