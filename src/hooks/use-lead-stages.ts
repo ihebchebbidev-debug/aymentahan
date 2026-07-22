@@ -38,6 +38,9 @@ export function useLeadStages(): PipelineStage[] {
 /** Ordered status names from API, or LEAD_STATUSES fallback when offline. */
 export function useLeadStatusNames(): string[] {
   const stages = useLeadStages();
-  if (stages.length) return stages.map((s) => s.name);
-  return LEAD_STATUSES;
+  const names = stages.map((s) => s.name);
+  for (const status of LEAD_STATUSES) {
+    if (!names.includes(status)) names.push(status);
+  }
+  return names;
 }
