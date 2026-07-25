@@ -118,7 +118,7 @@ function MigrationsPage() {
       "city", "gouvernorat", "delegation", "zone", "address", "codePostal", "localisationXy",
       "animateur", "ancienLigne", "leadStatus", "migrationType",
       "completedDate", "externalRef", "source", "notes", "validatedAt", "updatedAt",
-      "comment1", "comment2",
+      "comment1", "comment2", "createdBy", "updatedBy", "debit",
     ],
   });
   const BASE_COLS_META: { key: string; label: string }[] = [
@@ -157,6 +157,9 @@ function MigrationsPage() {
     { key: "validatedAt",    label: "Validée le" },
     { key: "createdAt",      label: "Créée" },
     { key: "updatedAt",      label: "Modifiée" },
+    { key: "createdBy",      label: "Créé par" },
+    { key: "updatedBy",      label: "Modifié par" },
+    { key: "debit",          label: "Débit" },
   ];
   // Export label mapping — matches the header names used in `baseExportRows`.
   const BASE_EXPORT_LABELS: Record<string, string> = {
@@ -172,6 +175,7 @@ function MigrationsPage() {
     assignedTo: "Assigné à", notes: "Notes", comment1: "Observation 1", comment2: "Observation 2",
     requestedDate: "Date demande", completedDate: "Date complétée",
     validatedAt: "Validée le", createdAt: "Créée le", updatedAt: "Modifiée le",
+    createdBy: "Créé par", updatedBy: "Modifié par", debit: "Débit",
   };
 
   useEffect(() => {
@@ -295,6 +299,9 @@ function MigrationsPage() {
     { key: "validatedAt", header: "Validée le", cell: (m) => m.validatedAt?.slice(0, 10) ?? "—" },
     { key: "createdAt", header: "Créée", cell: (m) => m.createdAt?.slice(0, 10) ?? "—" },
     { key: "updatedAt", header: "Modifiée", cell: (m) => m.updatedAt?.slice(0, 10) ?? "—" },
+    { key: "createdBy", header: "Créé par", cell: (m) => <span className="text-muted-foreground text-[12px]">{m.createdBy || "—"}</span> },
+    { key: "updatedBy", header: "Modifié par", cell: (m) => <span className="text-muted-foreground text-[12px]">{m.updatedBy || "—"}</span> },
+    { key: "debit", header: "Débit", cell: (m) => <span className="text-muted-foreground">{m.debit ? `${m.debit} Mbps` : "—"}</span> },
     ...customDefs.map<DataGridColumn<Migration>>((d) => ({
       key: `cf_${d.key}`,
       header: d.label,
@@ -363,6 +370,9 @@ function MigrationsPage() {
     "Validée le": m.validatedAt ?? "",
     "Créée le": m.createdAt ?? "",
     "Modifiée le": m.updatedAt ?? "",
+    "Créé par": m.createdBy ?? "",
+    "Modifié par": m.updatedBy ?? "",
+    "Débit": m.debit ?? "",
     id: m.id,
   }));
   const exportRowsFull = withCustomFields(baseExportRows, customDefs, customValuesById);

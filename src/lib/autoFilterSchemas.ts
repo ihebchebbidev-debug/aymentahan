@@ -132,6 +132,16 @@ export function autoFilterSchema(
         { key: "dateTo", label: "Créé au", type: "date" },
         { key: "dateCree", label: "Créé le (exact)", type: "date" },
         { key: "birthDate", label: "Date de naissance", type: "date" },
+        realField("Créé par", "createdBy", rows, "createdBy", input.agents ?? []),
+        realField("Modifié par", "updatedBy", rows, "updatedBy", input.agents ?? []),
+        { key: "debit", label: "Débit (Mbps)", type: "select", options: [
+          { value: "10", label: "10 Mbps" },
+          { value: "20", label: "20 Mbps" },
+          { value: "30", label: "30 Mbps" },
+          { value: "50", label: "50 Mbps" },
+          { value: "100", label: "100 Mbps" },
+        ]},
+        { key: "ancienLigne", label: "Ancien Ligne", type: "text" },
       ]);
 
     case "opportunities":
@@ -161,6 +171,16 @@ export function autoFilterSchema(
         { key: "dateTo", label: "Créée au", type: "date" },
         { key: "dateCree", label: "Créée le (exact)", type: "date" },
         { key: "expectedCloseDate", label: "Date de clôture prévue", type: "date" },
+        realField("Créé par", "createdBy", rows, "createdBy", input.agents ?? []),
+        realField("Modifié par", "updatedBy", rows, "updatedBy", input.agents ?? []),
+        { key: "debit", label: "Débit (Mbps)", type: "select", options: [
+          { value: "10", label: "10 Mbps" },
+          { value: "20", label: "20 Mbps" },
+          { value: "30", label: "30 Mbps" },
+          { value: "50", label: "50 Mbps" },
+          { value: "100", label: "100 Mbps" },
+        ]},
+        { key: "ancienLigne", label: "Ancien Ligne", type: "text" },
       ]);
 
     case "migrations":
@@ -175,6 +195,16 @@ export function autoFilterSchema(
         { key: "dateTo", label: "Créée au", type: "date" },
         { key: "portingNumber", label: "N° portabilité", type: "text" },
         { key: "externalRef", label: "Réf. externe", type: "text" },
+        realField("Créé par", "createdBy", rows, "createdBy", input.agents ?? []),
+        realField("Modifié par", "updatedBy", rows, "updatedBy", input.agents ?? []),
+        { key: "debit", label: "Débit (Mbps)", type: "select", options: [
+          { value: "10", label: "10 Mbps" },
+          { value: "20", label: "20 Mbps" },
+          { value: "30", label: "30 Mbps" },
+          { value: "50", label: "50 Mbps" },
+          { value: "100", label: "100 Mbps" },
+        ]},
+        { key: "ancienLigne", label: "Ancien Ligne", type: "text" },
       ]);
 
     case "contracts":
@@ -210,6 +240,9 @@ export function autoFilterSchema(
         { key: "dateVal", label: "Date Validation", type: "date" },
         { key: "dateFrom", label: "Signature du", type: "date" },
         { key: "dateTo", label: "Signature au", type: "date" },
+        realField("Créé par", "createdBy", rows, "createdBy", input.agents ?? []),
+        realField("Modifié par", "updatedBy", rows, "updatedBy", input.agents ?? []),
+        { key: "ancienLigne", label: "Ancien Ligne", type: "text" },
       ]);
 
     case "guichet":

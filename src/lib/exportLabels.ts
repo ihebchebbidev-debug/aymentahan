@@ -33,6 +33,9 @@ export const PROSPECT_LABELS: LabelMap = {
   typeId: "Type de prospect",
   opportunityId: "Opportunité liée",
   contractId: "Contrat lié",
+  createdBy: "Créé par",
+  updatedBy: "Modifié par",
+  debit: "Débit",
 };
 
 export const CONTRACT_LABELS: LabelMap = {
@@ -67,6 +70,9 @@ export const CONTRACT_LABELS: LabelMap = {
   status: "Statut",
   stage: "Statut",
   createdAt: "Créé le",
+  createdBy: "Créé par",
+  updatedBy: "Modifié par",
+  ancienLigne: "Ancien Ligne",
 };
 
 export const OPPORTUNITY_LABELS: LabelMap = {
@@ -106,6 +112,10 @@ export const OPPORTUNITY_LABELS: LabelMap = {
   revertedAt: "Rebasculé le",
   notes: "Notes",
   comment: "Observation",
+  createdBy: "Créé par",
+  updatedBy: "Modifié par",
+  debit: "Débit",
+  ancienLigne: "Ancien Ligne",
 };
 
 export const RECLAMATION_LABELS: LabelMap = {

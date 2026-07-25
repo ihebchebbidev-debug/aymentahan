@@ -29,9 +29,17 @@ import type { ProspectType } from "@/lib/types";
 import { IdleTimeoutsPanel } from "@/components/IdleTimeoutsPanel";
 import { ObjectivesPanel, EntitiesPanel } from "@/components/GuichetAdmin";
 import { TeamsPanel } from "@/components/TeamsPanel";
+import { LeadStagesPanel } from "@/components/LeadStagesPanel";
 import { Can } from "@/components/Can";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+
+const configSearchSchema = z.object({
+  tab: fallback(z.string().optional(), undefined),
+});
 
 export const Route = createFileRoute("/configuration")({
+  validateSearch: zodValidator(configSearchSchema),
   head: () => ({
     meta: [
       { title: "Configuration — CRM" },
@@ -602,6 +610,8 @@ function CurrencySettings() {
 
 function ConfigPage() {
   const { user } = useAuth();
+  const search = Route.useSearch();
+  const activeTab = search.tab || "general";
   const isAdmin = user?.role === "Administrateur";
 
   if (!isAdmin) {
@@ -627,10 +637,11 @@ function ConfigPage() {
         icon={<Settings className="h-5 w-5" />}
       />
 
-      <Tabs defaultValue="general" className="mt-6">
-        <TabsList>
+      <Tabs defaultValue={activeTab} key={activeTab} className="mt-6">
+        <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="general">Général</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="lead-stages">Statuts Appel</TabsTrigger>
           <TabsTrigger value="types">Types de prospect</TabsTrigger>
           <TabsTrigger value="prospect">Prospects</TabsTrigger>
           <TabsTrigger value="opportunity">Opportunités</TabsTrigger>
@@ -649,6 +660,7 @@ function ConfigPage() {
           <CurrencySettings />
         </TabsContent>
         <TabsContent value="sessions" className="space-y-4 mt-4"><IdleTimeoutsPanel /></TabsContent>
+        <TabsContent value="lead-stages" className="space-y-4 mt-4"><LeadStagesPanel /></TabsContent>
         <TabsContent value="types" className="space-y-0 mt-4"><ProspectTypesPanel /></TabsContent>
         <TabsContent value="prospect" className="space-y-0 mt-4"><FieldList tab="prospect" /></TabsContent>
         <TabsContent value="opportunity" className="space-y-0 mt-4"><FieldList tab="opportunity" /></TabsContent>

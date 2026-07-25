@@ -64,6 +64,8 @@ function row_to_migration(array $r): array
         'createdBy' => $r['created_by'] ?? null,
         'createdAt' => $r['created_at'] ?? null,
         'updatedAt' => $r['updated_at'] ?? null,
+        'updatedBy' => $r['updated_by'] ?? null,
+        'debit'     => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
     ];
 }
 

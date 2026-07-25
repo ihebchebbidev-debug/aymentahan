@@ -28,7 +28,7 @@ import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useProspectTypes } from "@/hooks/use-prospect-types";
-import { useLeadStatusNames } from "@/hooks/use-lead-stages";
+import { useLeadStatusNames, useLeadStages, STAGE_COLOR_CLASSES } from "@/hooks/use-lead-stages";
 import type { Prospect, ProspectType } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -204,7 +204,7 @@ function ProspectsPage() {
       "civility", "birthDate", "animateur", "source", "city", "address",
       "zone", "gouvernorat", "delegation", "codePostal", "outcome",
       "lostReason", "comment", "comment2", "checkValeur", "converted",
-      "opportunityId", "revertedAt",
+      "opportunityId", "revertedAt", "debit"
     ],
   });
   const BASE_COLS_META: { key: string; label: string }[] = [
@@ -239,6 +239,7 @@ function ProspectsPage() {
     { key: "createdAt",   label: "Créé le" },
     { key: "createdBy",   label: "Créé par" },
     { key: "updatedBy",   label: "Modifié par" },
+    { key: "debit",       label: "Débit" },
   ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("prospects:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
@@ -249,6 +250,17 @@ function ProspectsPage() {
     });
 
   const leadStatusNames = useLeadStatusNames();
+  const leadStages = useLeadStages();
+
+  const stageColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of leadStages) {
+      if (s.name && s.color) {
+        map.set(s.name, STAGE_COLOR_CLASSES[s.color] || STAGE_COLOR_CLASSES.muted);
+      }
+    }
+    return map;
+  }, [leadStages]);
 
   // -------- Dynamic options --------
   const statusOptions = useMemo(() => {
@@ -419,6 +431,8 @@ function ProspectsPage() {
       editor: ({ value, setValue }) => <CellInput value={value} setValue={setValue} /> },
     { key: "ancienLigne", header: "Ancien Ligne", accessor: (p) => p.ancienLigne ?? "", hideBelow: "lg",
       editor: ({ value, setValue }) => <CellInput value={value} setValue={setValue} /> },
+    { key: "debit", header: "Débit", accessor: (p) => p.debit ?? "", hideBelow: "lg",
+      editor: ({ value, setValue }) => <CellInput value={value} setValue={setValue} /> },
     { key: "cin", header: "CIN", accessor: (p) => p.cin ?? "", hideBelow: "lg",
       editor: ({ value, setValue }) => <CellInput value={value} setValue={setValue} /> },
     { key: "email", header: "Mail", accessor: (p) => p.email, hideBelow: "lg",
@@ -439,7 +453,7 @@ function ProspectsPage() {
     },
     {
       key: "status", header: "Statut", accessor: (p) => p.status,
-      cell: (p) => <Badge variant="outline" className={`${statusColor[p.status] ?? ""} font-normal text-[11px]`}>{p.status}</Badge>,
+      cell: (p) => <Badge variant="outline" className={`${stageColorMap.get(p.status) ?? statusColor[p.status] ?? "bg-muted text-muted-foreground border-border"} font-normal text-[11px]`}>{p.status}</Badge>,
       editor: ({ value, setValue }) => <CellSelect value={value} setValue={setValue} options={statusOptions.map((s: string) => ({ value: s, label: s }))} />,
     },
     {

@@ -42,6 +42,7 @@ function ensure_prospects_runtime_schema(PDO $db): void {
         // avec un corps vide, et le client conserve l'ancien snapshot
         // ("édition réussie mais aucun changement visible").
         "ALTER TABLE crminternet_prospects ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+        "ALTER TABLE crminternet_prospects ADD COLUMN debit INT UNSIGNED NULL",
     ];
     foreach ($stmts as $sql) { try { $db->exec($sql); } catch (Throwable $e) {} }
 }
@@ -72,6 +73,7 @@ function row_to_prospect(array $r): array {
         'createdAt'       => $r['created_at']       ?? null,
         'createdBy'       => $r['created_by']       ?? null,
         'updatedBy'       => $r['updated_by']       ?? null,
+        'debit'           => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
         'city'            => $r['city']             ?? '',
         'address'         => $r['address']          ?? '',
         'zone'            => $r['zone']             ?? '',

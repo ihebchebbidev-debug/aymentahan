@@ -223,6 +223,9 @@ function ContractsPage() {
     { key: "assignedTo",     label: CONTRACT_LABELS.assignedTo ?? "Assigné à" },
     { key: "comment1",       label: "Observation 1" },
     { key: "comment2",       label: "Observation 2" },
+    { key: "createdBy",      label: CONTRACT_LABELS.createdBy ?? "Créé par" },
+    { key: "updatedBy",      label: CONTRACT_LABELS.updatedBy ?? "Modifié par" },
+    { key: "ancienLigne",    label: CONTRACT_LABELS.ancienLigne ?? "Ancien Ligne" },
   ];
   const colPrefs = useColumnPrefs("contracts", {
     // Hide the new optional columns by default to preserve the current layout.
@@ -230,6 +233,7 @@ function ContractsPage() {
       "civility", "firstName", "phone", "phone2", "cin", "birthDate", "email",
       "gouvernorat", "delegation", "city", "address", "codePostal", "localisationXy",
       "premium", "effectiveDate", "source", "comment1", "comment2",
+      "createdBy", "updatedBy", "ancienLigne"
     ],
   });
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>(pk("customFilters"), {});
@@ -690,6 +694,12 @@ function ContractsPage() {
                 cell: (c) => <span className="text-muted-foreground truncate">{c.comment1 || "—"}</span> },
               { key: "comment2", header: "Obs. 2", accessor: (c) => c.comment2 ?? "", hideBelow: "xl",
                 cell: (c) => <span className="text-muted-foreground truncate">{c.comment2 || "—"}</span> },
+              { key: "createdBy", header: "Créé par", accessor: (c) => c.createdBy ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground text-[12px]">{c.createdBy || "—"}</span> },
+              { key: "updatedBy", header: "Modifié par", accessor: (c) => c.updatedBy ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground text-[12px]">{c.updatedBy || "—"}</span> },
+              { key: "ancienLigne", header: "Ancien Ligne", accessor: (c) => c.ancienLigne ?? "", hideBelow: "xl",
+                cell: (c) => <span className="text-muted-foreground">{c.ancienLigne || "—"}</span> },
             ];
             const customColumns: DataGridColumn<Contract>[] = customDefs
               .filter((d) => colPrefs.isVisible(d.key))

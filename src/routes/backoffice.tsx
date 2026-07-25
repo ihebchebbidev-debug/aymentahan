@@ -37,7 +37,7 @@ function BackofficePage() {
       { label: "Produit Santé", icon: Stethoscope, count: 0 },
       { label: "Garantie", icon: CheckCircle2, count: 0 },
       { label: "Source Prospect", icon: Tag, count: sources.size },
-      { label: "Statut Appel", icon: ListChecks, count: statuses.size },
+      { label: "Statut Appel", icon: ListChecks, count: statuses.size, link: "/configuration", search: { tab: "lead-stages" } },
       { label: "Statut Facturation", icon: Receipt, count: billingStatuses.size },
     ];
   }, [users, contracts, prospects]);
@@ -67,7 +67,7 @@ function BackofficePage() {
             </Card>
           );
           return it.link ? (
-            <Link key={it.label} to={it.link}>{inner}</Link>
+            <Link key={it.label} to={it.link as any} search={it.search}>{inner}</Link>
           ) : (
             <div key={it.label}>{inner}</div>
           );

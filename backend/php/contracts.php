@@ -34,10 +34,17 @@ function ensure_contracts_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_contracts ADD COLUMN opportunity_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN type_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN debit INT UNSIGNED NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN created_at DATETIME NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN created_by VARCHAR(80) NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN updated_by VARCHAR(80) NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN ancien_ligne VARCHAR(40) NULL",
     ];
     foreach ($stmts as $sql) {
         try { $db->exec($sql); } catch (Throwable $e) { /* column may already exist */ }
     }
+    try {
+        $db->exec("UPDATE crminternet_contracts SET created_at = CONCAT(signature_date, ' 00:00:00') WHERE created_at IS NULL AND signature_date IS NOT NULL");
+    } catch (Throwable $e) {}
     conv_backfill_contract_references($db);
 }
 schema_ensure_once('contracts', '20260513', function () use ($db) {
@@ -84,6 +91,9 @@ function row_to_contract(array $r): array {
         'source'         => $r['source']            ?? '',
         'assignedTo'     => $r['assigned_to']       ?? '',
         'typeId'         => $r['type_id']           ?? null,
+        'createdAt'      => $r['created_at']        ?? ($r['signature_date'] ? $r['signature_date']." 00:00:00" : null),
+        'createdBy'      => $r['created_by']        ?? null,
+        'updatedBy'      => $r['updated_by']        ?? null,
     ];
 }
 

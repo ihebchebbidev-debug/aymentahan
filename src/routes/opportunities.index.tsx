@@ -132,6 +132,7 @@ function OpportunitiesPage() {
       "gouvernorat", "delegation", "address", "codePostal", "localisationXy",
       "source", "title", "amount", "expectedCloseDate", "notes",
       "convertedToContract", "convertedAt", "revertedAt", "comment1", "comment2",
+      "createdBy", "updatedBy", "debit", "ancienLigne",
     ],
   });
   const BASE_COLS_META: { key: string; label: string }[] = [
@@ -163,6 +164,10 @@ function OpportunitiesPage() {
     { key: "convertedAt", label: "Converti le" },
     { key: "revertedAt",  label: "Rebasculé le" },
     { key: "createdAt",   label: "Créé le" },
+    { key: "createdBy",   label: OPPORTUNITY_LABELS.createdBy ?? "Créé par" },
+    { key: "updatedBy",   label: OPPORTUNITY_LABELS.updatedBy ?? "Modifié par" },
+    { key: "debit",       label: "Débit" },
+    { key: "ancienLigne", label: OPPORTUNITY_LABELS.ancienLigne ?? "Ancien Ligne" },
   ];
   const [customFilters, setCustomFilters] = usePersistedState<Record<string, string>>("opportunities:list:customFilters", {});
   const setCustomFilter = (k: string, v: string) =>
@@ -419,6 +424,14 @@ function OpportunitiesPage() {
       key: "createdAt", header: "Date", accessor: (o) => o.createdAt, hideBelow: "xl",
       cell: (o) => <span className="text-muted-foreground text-[12px]">{o.createdAt?.slice(0, 10)}</span>,
     },
+    { key: "createdBy", header: "Créé par", accessor: (o) => o.createdBy ?? "", hideBelow: "xl",
+      cell: (o) => <span className="text-muted-foreground text-[12px]">{o.createdBy || "—"}</span> },
+    { key: "updatedBy", header: "Modifié par", accessor: (o) => o.updatedBy ?? "", hideBelow: "xl",
+      cell: (o) => <span className="text-muted-foreground text-[12px]">{o.updatedBy || "—"}</span> },
+    { key: "debit", header: "Débit", accessor: (o) => o.debit ?? "", hideBelow: "xl",
+      cell: (o) => <span className="text-muted-foreground">{o.debit ? `${o.debit} Mbps` : "—"}</span> },
+    { key: "ancienLigne", header: "Ancien Ligne", accessor: (o) => o.ancienLigne ?? "", hideBelow: "xl",
+      cell: (o) => <span className="text-muted-foreground">{o.ancienLigne || "—"}</span> },
   ];
   const customColumns: DataGridColumn<Opportunity>[] = customDefs
     .filter((d) => colPrefs.isVisible(d.key))

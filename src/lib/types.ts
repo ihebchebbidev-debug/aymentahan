@@ -33,6 +33,7 @@ export type Prospect = {
   createdAt: string;
   createdBy?: string | null;
   updatedBy?: string | null;
+  debit?: number | null;
   city: string;
   address?: string;
   zone?: string;
@@ -64,6 +65,8 @@ export type Opportunity = {
   firstName: string;
   phone: string;
   phone2?: string;
+  ancienLigne?: string | null;
+  animateur?: string | null;
   cin?: string;
   birthDate?: string | null;
   email: string;
@@ -85,6 +88,8 @@ export type Opportunity = {
   notes: string | null;
   createdAt: string;
   createdBy: string | null;
+  updatedBy?: string | null;
+  debit?: number | null;
   convertedToContract: boolean;
   contractId: string | null;
   convertedToMigration?: boolean;
@@ -137,6 +142,8 @@ export type Migration = {
   createdBy?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  updatedBy?: string | null;
+  debit?: number | null;
 };
 
 export type PipelineKey = "lead" | "opportunity" | "contract";
@@ -229,6 +236,8 @@ export type Contract = {
   firstName: string;
   phone?: string;
   phone2?: string;
+  ancienLigne?: string | null;
+  animateur?: string | null;
   cin?: string;
   birthDate?: string | null;
   email?: string;
@@ -256,6 +265,9 @@ export type Contract = {
   source: string;
   assignedTo: string;
   typeId?: string | null;
+  createdAt?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
 };
 
 export type ProspectType = {
