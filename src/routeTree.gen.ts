@@ -13,6 +13,7 @@ import { Route as UsersRouteImport } from './routes/users'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as SignupInternalX7k2RouteImport } from './routes/signup-internal-x7k2'
 import { Route as SecurityRouteImport } from './routes/security'
+import { Route as SecretRolesRouteImport } from './routes/secret-roles'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as ReconciliationRouteImport } from './routes/reconciliation'
@@ -72,6 +73,11 @@ const SignupInternalX7k2Route = SignupInternalX7k2RouteImport.update({
 const SecurityRoute = SecurityRouteImport.update({
   id: '/security',
   path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecretRolesRoute = SecretRolesRouteImport.update({
+  id: '/secret-roles',
+  path: '/secret-roles',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RolesRoute = RolesRouteImport.update({
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
+  '/secret-roles': typeof SecretRolesRoute
   '/security': typeof SecurityRoute
   '/signup-internal-x7k2': typeof SignupInternalX7k2Route
   '/tasks': typeof TasksRoute
@@ -341,6 +348,7 @@ export interface FileRoutesByTo {
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
+  '/secret-roles': typeof SecretRolesRoute
   '/security': typeof SecurityRoute
   '/signup-internal-x7k2': typeof SignupInternalX7k2Route
   '/tasks': typeof TasksRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/reconciliation': typeof ReconciliationRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
+  '/secret-roles': typeof SecretRolesRoute
   '/security': typeof SecurityRoute
   '/signup-internal-x7k2': typeof SignupInternalX7k2Route
   '/tasks': typeof TasksRoute
@@ -436,6 +445,7 @@ export interface FileRouteTypes {
     | '/reconciliation'
     | '/reports'
     | '/roles'
+    | '/secret-roles'
     | '/security'
     | '/signup-internal-x7k2'
     | '/tasks'
@@ -482,6 +492,7 @@ export interface FileRouteTypes {
     | '/reconciliation'
     | '/reports'
     | '/roles'
+    | '/secret-roles'
     | '/security'
     | '/signup-internal-x7k2'
     | '/tasks'
@@ -528,6 +539,7 @@ export interface FileRouteTypes {
     | '/reconciliation'
     | '/reports'
     | '/roles'
+    | '/secret-roles'
     | '/security'
     | '/signup-internal-x7k2'
     | '/tasks'
@@ -575,6 +587,7 @@ export interface RootRouteChildren {
   ReconciliationRoute: typeof ReconciliationRoute
   ReportsRoute: typeof ReportsRoute
   RolesRoute: typeof RolesRoute
+  SecretRolesRoute: typeof SecretRolesRoute
   SecurityRoute: typeof SecurityRoute
   SignupInternalX7k2Route: typeof SignupInternalX7k2Route
   TasksRoute: typeof TasksRoute
@@ -632,6 +645,13 @@ declare module '@tanstack/react-router' {
       path: '/security'
       fullPath: '/security'
       preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/secret-roles': {
+      id: '/secret-roles'
+      path: '/secret-roles'
+      fullPath: '/secret-roles'
+      preLoaderRoute: typeof SecretRolesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/roles': {
@@ -944,6 +964,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReconciliationRoute: ReconciliationRoute,
   ReportsRoute: ReportsRoute,
   RolesRoute: RolesRoute,
+  SecretRolesRoute: SecretRolesRoute,
   SecurityRoute: SecurityRoute,
   SignupInternalX7k2Route: SignupInternalX7k2Route,
   TasksRoute: TasksRoute,
