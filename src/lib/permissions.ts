@@ -62,6 +62,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Prospects — actions",
     perms: [
       { key: "prospect.view", label: "Voir prospects" },
+      { key: "prospect.view_all", label: "Voir tous les prospects" },
       { key: "prospect.add", label: "Ajouter prospect" },
       { key: "prospect.edit", label: "Éditer prospect" },
       { key: "prospect.type", label: "Modifier le type du prospect" },
@@ -72,12 +73,15 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "prospect.export", label: "Exporter prospects" },
       { key: "prospect.import", label: "Importer prospects" },
       { key: "prospect.convert", label: "Convertir → Opportunité" },
+      { key: "prospect_type.edit", label: "Créer/Éditer types de prospects" },
+      { key: "prospect_type.delete", label: "Supprimer types de prospects" },
     ],
   },
   {
     title: "Opportunités — actions",
     perms: [
       { key: "opportunity.view", label: "Voir opportunités" },
+      { key: "opportunity.view_all", label: "Voir toutes les opportunités" },
       { key: "opportunity.edit", label: "Éditer opportunité" },
       { key: "opportunity.delete", label: "Supprimer opportunité" },
       { key: "opportunity.convert", label: "Convertir → Contrat" },
@@ -91,6 +95,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Contrats — actions",
     perms: [
       { key: "contract.view", label: "Voir contrats" },
+      { key: "contract.view_all", label: "Voir tous les contrats" },
       { key: "contract.add", label: "Créer contrat" },
       { key: "contract.edit", label: "Éditer contrat" },
       { key: "contract.assign", label: "Assiger contrat" },
@@ -107,6 +112,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     title: "Migrations — actions",
     perms: [
       { key: "migration.view", label: "Voir migrations" },
+      { key: "migration.view_all", label: "Voir toutes les migrations" },
       { key: "migration.add", label: "Créer migration" },
       { key: "migration.edit", label: "Éditer migration" },
       { key: "migration.delete", label: "Supprimer migration" },

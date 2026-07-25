@@ -86,7 +86,7 @@ function MigrationDetailPage() {
   const [busy, setBusy] = useState(false);
 
   const canLoad = canViewMigrationsData(hasPermission);
-  const isAgent = ["Agent", "AgentSuivi", "AgentActivation", "AgentVente"].includes(user?.role ?? "");
+
   const canEdit = hasPermission("migration.edit");
   const canRevert = hasPermission("migration.revert");
   const canDelete = hasPermission("migration.delete");
@@ -134,7 +134,7 @@ function MigrationDetailPage() {
     );
   }
 
-  if (isAgent && m.assignedTo !== user?.username) {
+  if (m.assignedTo && m.assignedTo !== user?.username && !hasPermission("migration.view_all")) {
     return (
       <AppLayout skeleton="detail">
         <div className="p-10 text-center">

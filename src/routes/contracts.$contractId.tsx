@@ -42,7 +42,7 @@ import { LayoutGrid, Paperclip, ListChecks, Sparkles, RotateCcw } from "lucide-r
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { LastModifiedInfo } from "@/components/LastModifiedInfo";
-import { isAgentRole } from "@/lib/roleLabels";
+
 
 export const Route = createFileRoute("/contracts/$contractId")({
   head: ({ params }) => ({
@@ -138,7 +138,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
   const { prospects, users, events: calendarEvents, updateContractBilling, updateContractPremium, getContractActivity, logActivity, refresh } = useErp();
   const { revertContract } = useCrmListSync();
   const { user, hasPermission } = useAuth();
-  const isAgent = isAgentRole(user?.role);
+
   const canRevert = hasPermission("contract.revert");
   const canEdit = hasPermission("contract.edit");
   const canDelete = hasPermission("contract.delete");
@@ -221,7 +221,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
     return items.sort((a, b) => (a.date === "—" ? 1 : b.date === "—" ? -1 : a.date.localeCompare(b.date)));
   }, [contract, linkedProspect, calendarEvents]);
 
-  if (isAgent && contract.assignedTo !== user?.username) {
+  if (contract.assignedTo && contract.assignedTo !== user?.username && !hasPermission("contract.view_all")) {
     return (
       <AppLayout skeleton="detail">
         <div className="p-10 text-center">
