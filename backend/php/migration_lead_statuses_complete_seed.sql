@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS crminternet_lead_stages (
   auto_action VARCHAR(40) NOT NULL DEFAULT 'none'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO crminternet_lead_stages (id, name, color, position, is_initial, is_won, is_lost, auto_action)
+INSERT IGNORE INTO crminternet_lead_stages (id, name, color, position, is_initial, is_won, is_lost, auto_action)
 SELECT * FROM (
   SELECT 'S-1' AS id, 'Ok' AS name, 'success' AS color, 1 AS position, 0 AS is_initial, 1 AS is_won, 0 AS is_lost, 'none' AS auto_action UNION ALL
   SELECT 'S-2', 'Att cin', 'warning', 2, 0, 0, 0, 'none' UNION ALL

@@ -313,7 +313,7 @@ function Dashboard() {
   // names that don't match the legacy {Nouveau, En cours, Rappel, Vendu, Refus}
   // set (which left 31k+ leads unaccounted for).
   const isWonStatusFn  = (s?: string | null) => /^(vendu|ok)$/i.test((s ?? "").trim());
-  const isLostStatusFn = (s?: string | null) => /^(refus|refuse|pas\s*int|pas\s*intersse|déjà\s*conn|deja\s*conn|autre|autr\s*dde)/i.test((s ?? "").trim());
+  const isLostStatusFn = (s?: string | null) => /^(refus|refuse|pas\s*int|pas\s*intersse|déjà\s*conn|deja\s*conn|autre|autr\s*dde|deja\s*migré|déjà\s*migré|facture\s*impayé|facture\s*impayee)/i.test((s ?? "").trim());
   const isPendingStatusFn = (s?: string | null) => {
     const v = (s ?? "").trim();
     if (!v) return true; // empty status = brand-new lead

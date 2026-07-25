@@ -5,9 +5,9 @@
 export type Outcome = "pending" | "won" | "lost";
 export type LeadStatus = string;
 export const LEAD_STATUSES: string[] = [
-  "Ok","Att cin","Att confirmation","Rappel","refuse","migration","Basculement",
+  "Ok","Att cin","Att confirmation","Rappel","deja migré","migration","Basculement",
   "Ing","Nrp","Pas de rep","Pas intersse","Déjà connecté","Autr dde encor","Autre",
-  "A réinjecter","Réinjecté",
+  "A réinjecter","Réinjecté", "facture impayé",
 ];
 export const LEAD_SOURCES = ["Terrain","Facebook","Base de donné","Technicien"] as const;
 export const LEAD_ACTION_TYPES = ["appel","visite","relance","note","terrain","reseaux","technicien"] as const;
