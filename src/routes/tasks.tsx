@@ -43,7 +43,6 @@ const PRIO_BADGE: Record<string, string> = {
 
 function TasksPage() {
   const auth = useAuth();
-  const isAdmin = auth.user?.role === "Administrateur";
   const canEditTask = auth.hasPermission("task.edit");
   const canCompleteTask = auth.hasPermission("task.complete");
   const canDeleteTask = auth.hasPermission("task.delete");
@@ -108,7 +107,7 @@ function TasksPage() {
             </div>
             <div className="space-y-1">
               <Label>Assigné à</Label>
-              <Select value={assignee} onValueChange={setAssignee} disabled={auth.user?.role !== "Administrateur"}>
+              <Select value={assignee} onValueChange={setAssignee} disabled={!auth.hasPermission("task.edit")}>
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                 <SelectContent>
                   {users.map((u) => <SelectItem key={u.username} value={u.username}>{u.fullName} ({u.username})</SelectItem>)}

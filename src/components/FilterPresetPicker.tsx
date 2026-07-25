@@ -60,10 +60,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
   const data = q.data;
 
   // Server tells us if the current user can manage presets; fall back to role check.
-  const canManage =
-    data?.canManage ??
-    (user?.role === "Administrateur" ||
-      hasPermission?.("filter_preset.manage"));
+  const canManage = data?.canManage ?? hasPermission?.("filter_preset.manage");
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const autoApplied = useRef(false);
@@ -304,7 +301,7 @@ export function FilterPresetPicker({ scope, current, onApply, onReset, onActiveC
           currentFilters={current}
           filterKeys={filterKeys}
           filterSchema={filterSchema}
-          canDelete={user?.role === "Administrateur"}
+          canDelete={canManage}
           onCreate={async (input) => { await actions.create(input); }}
           onUpdate={async (id, patch) => { await actions.update(id, patch); }}
           onDelete={async (id) => { await actions.remove(id); if (activeId === id) { setActiveId(null); onActiveChange?.(null); } }}

@@ -106,8 +106,6 @@ function ProspectsPage() {
   const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { typeId: filterTypeId } = Route.useSearch();
-  const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
-  const isAdmin = user?.role === "Administrateur";
   const canDelete = hasPermission("prospect.delete");
   const canExport = hasPermission("prospect.export");
   const canImport = hasPermission("prospect.import");

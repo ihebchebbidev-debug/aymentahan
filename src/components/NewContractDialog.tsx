@@ -24,8 +24,8 @@ const BILLING = ["Pré-validé", "Validé Confirmation", "Annulé"];
 
 export function NewContractDialog({ currency }: { currency: Currency }) {
   const { importContracts, users } = useErp();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
+  const { user, hasPermission } = useAuth();
+  const canAssign = hasPermission("contract.assign");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
@@ -120,7 +120,7 @@ export function NewContractDialog({ currency }: { currency: Currency }) {
               <SelectContent>{BILLING.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
             </Select></div>
           {/* Source retirée de l'UI — déduite du type de prospect. */}
-          {isAdmin && (
+          {canAssign && (
             <div className="space-y-1.5 col-span-2"><Label>Assigné à</Label>
               <Select value={assignedTo} onValueChange={setAssignedTo}><SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

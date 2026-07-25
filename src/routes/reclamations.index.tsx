@@ -109,7 +109,6 @@ function fmtDateTime(s: string | null): string {
 function ReclamationsPage() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
   const canAdd    = hasPermission("reclamation.add");
   const canEdit   = hasPermission("reclamation.edit");
   const canDelete = hasPermission("reclamation.delete");

@@ -93,6 +93,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "contract.view", label: "Voir contrats" },
       { key: "contract.add", label: "Créer contrat" },
       { key: "contract.edit", label: "Éditer contrat" },
+      { key: "contract.assign", label: "Assiger contrat" },
       { key: "contract.validate", label: "Valider contrat" },
       { key: "contract.cancel", label: "Annuler contrat" },
       { key: "contract.delete", label: "Supprimer contrat" },
@@ -126,6 +127,9 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "calendar.event.add", label: "Créer évènement" },
       { key: "calendar.event.edit", label: "Éditer évènement" },
       { key: "calendar.event.delete", label: "Supprimer évènement" },
+      { key: "chat.group.create", label: "Créer des groupes de discussion" },
+      { key: "chat.group.manage", label: "Gérer les groupes (admin)" },
+      { key: "chat.broadcast", label: "Faire des annonces globales" },
     ],
   },
   {
@@ -217,23 +221,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "guichet.manage_filter_presets", label: "Gérer les modèles de filtres guichet" },
     ],
   },
-  // Backward-compat keys still referenced in legacy code
-  {
-    title: "Anciennes clés (compatibilité)",
-    perms: [
-      { key: "dashboard", label: "(legacy) dashboard" },
-      { key: "prospect", label: "(legacy) prospect" },
-      { key: "contract", label: "(legacy) contract" },
-      { key: "calendar", label: "(legacy) calendar" },
-      { key: "users", label: "(legacy) users" },
-      { key: "role", label: "(legacy) role" },
-      { key: "backoffice", label: "(legacy) backoffice" },
-      { key: "dispatch", label: "(legacy) dispatch" },
-      { key: "leads.prospection", label: "(legacy) leads.prospection" },
-      { key: "leads.opportunite", label: "(legacy) leads.opportunite" },
-      { key: "leads.contrat", label: "(legacy) leads.contrat" },
-    ],
-  },
+
 ];
 
 export const ALL_PERMISSION_KEYS: string[] = PERMISSION_SECTIONS.flatMap((s) =>

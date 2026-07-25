@@ -42,8 +42,7 @@ export function CommandPalette() {
   const navigate = useNavigate();
   const { prospects, contracts, users, events } = useErp();
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
-  const can = (perm: string) => isAdmin || hasPermission(perm);
+  const can = (perm: string) => hasPermission(perm);
 
   const canViewProspects = can("page.prospects");
   const canViewOpportunities = can("page.opportunities");

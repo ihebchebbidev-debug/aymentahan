@@ -32,9 +32,9 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const { user, changePassword, updateProfile } = useAuth();
+  const { user, changePassword, updateProfile, hasPermission } = useAuth();
 
-  const isAdmin = user?.role === "Administrateur";
+  const canEdit = hasPermission("user.edit");
 
   const [edit, setEdit] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -129,7 +129,7 @@ function ProfilePage() {
               <CardDescription>Vos informations de compte.</CardDescription>
             </div>
             {!edit ? (
-              isAdmin ? (
+              canEdit ? (
                 <Button variant="outline" size="sm" onClick={() => setEdit(true)}>
                   <Pencil className="h-3.5 w-3.5 mr-1.5" /> Modifier
                 </Button>
@@ -154,7 +154,7 @@ function ProfilePage() {
               )}
             </div>
 
-            {!edit || !isAdmin ? (
+            {!edit || !canEdit ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5">
                 <Field icon={<UserIcon className="h-4 w-4" />} label="Nom complet" value={user?.fullName || "—"} />
                 <Field icon={<Mail className="h-4 w-4" />} label="Email" value={user?.email || "—"} />

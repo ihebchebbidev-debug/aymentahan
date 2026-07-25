@@ -106,13 +106,13 @@ function ContractsPage() {
   // after conversions/imports). Fall back to the legacy ERP store only if the
   // query hasn't returned yet (or the API is disabled).
   const allContracts = (API_ENABLED && contractsQ.data) ? contractsQ.data : storeContracts;
-  const isAdmin = user?.role === "Administrateur";
+
   const canDeleteContract = hasPermission("contract.delete");
   const canExport = hasPermission("contract.export");
   const canImport = hasPermission("contract.import");
   const canAddContract = hasPermission("contract.add");
   const canEditContract = hasPermission("contract.edit");
-  const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
+
   const myUsername = user?.username ?? "";
   // Lecture globale : tous les rôles voient l'ensemble des contrats.
   const contracts = allContracts;

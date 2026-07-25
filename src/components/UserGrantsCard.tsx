@@ -46,9 +46,9 @@ function defaultExpiry(): string {
 }
 
 export function UserGrantsCard({ username }: { username: string }) {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { roles } = useErp();
-  const isAdmin = user?.role === "Administrateur";
+  const canGrant = hasPermission("user.grant");
   const isSelf = user?.username === username;
 
   const [grants, setGrants] = useState<Grant[]>([]);
@@ -61,7 +61,7 @@ export function UserGrantsCard({ username }: { username: string }) {
   const [expiresAt, setExpiresAt] = useState(defaultExpiry());
 
   const load = async () => {
-    if (!isAdmin && !isSelf) { setLoading(false); return; }
+    if (!canGrant && !isSelf) { setLoading(false); return; }
     setLoading(true);
     try {
       const r = await api<{ grants: Grant[] }>(`/user_grants.php?user=${encodeURIComponent(username)}`);
@@ -75,6 +75,7 @@ export function UserGrantsCard({ username }: { username: string }) {
 
   const submit = async () => {
     if (!value.trim()) { toast.error("Sélectionnez un rôle ou une permission"); return; }
+    if (!canGrant) { toast.error("Action non autorisée"); return; }
     if (!expiresAt) { toast.error("Date d'expiration requise"); return; }
     setBusy(true);
     try {
@@ -102,7 +103,7 @@ export function UserGrantsCard({ username }: { username: string }) {
     } finally { setBusy(false); }
   };
 
-  if (!isAdmin && !isSelf) return null;
+  if (!canGrant && !isSelf) return null;
 
   return (
     <Card className="shadow-elegant">
@@ -113,7 +114,7 @@ export function UserGrantsCard({ username }: { username: string }) {
         <CardDescription>Rôles ou permissions accordés jusqu'à une date</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isAdmin && (
+        {canGrant && (
           <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/20">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -186,7 +187,7 @@ export function UserGrantsCard({ username }: { username: string }) {
                     {g.reason ? ` · ${g.reason}` : ""}
                   </div>
                 </div>
-                {isAdmin && g.active && (
+                {canGrant && g.active && (
                   <Button size="sm" variant="ghost" onClick={() => revoke(g.id)} disabled={busy} title="Révoquer">
                     <ShieldOff className="h-4 w-4" />
                   </Button>

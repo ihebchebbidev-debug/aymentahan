@@ -36,13 +36,8 @@ export const Route = createFileRoute("/roles")({
 });
 
 function GuardedRolesPage() {
-  const { user } = useAuth();
-  // Only Administrateurs can view/modify the role + permission matrix.
-  // RequirePerm with a never-granted key forces the Access Denied screen
-  // for everyone else (Administrateur bypasses all permission checks).
-  if (user?.role === "Administrateur") return <RolesPage />;
   return (
-    <RequirePerm perm="__admin_only__" backTo="/" backLabel="Retour à l'accueil">
+    <RequirePerm perm="page.roles" backTo="/" backLabel="Retour à l'accueil">
       <RolesPage />
     </RequirePerm>
   );

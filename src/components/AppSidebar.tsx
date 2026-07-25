@@ -94,28 +94,18 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-const GUICHET_ALLOWED = new Set(["/guichet", "/profile"]);
-
 export function useNavVisibility() {
-  const { user, hasPermission } = useAuth();
-  const isAgent = isAgentRole(user?.role);
-  const isGuichet = user?.role === "AgentGuichet";
-  const AGENT_HIDDEN = new Set(["/reconciliation", "/objectives", "/reports"]);
+  const { hasPermission } = useAuth();
   return (url: string) => {
-    if (isGuichet) {
-      if (GUICHET_ALLOWED.has(url)) return true;
-      return hasRouteAccess(hasPermission, url);
-    }
     if (url === "/documentation" || url === "/configuration" || url === "/security")
-      return user?.role === "Administrateur";
+      return hasRouteAccess(hasPermission, url);
     if (url === "/audit")
       return hasPermission("audit.view");
     if (url === "/reports")
       return hasPermission("report.view");
     if (HR_PRIV_ROUTES.has(url)) {
-      return user?.role === "Administrateur" || hasRouteAccess(hasPermission, url);
+      return hasRouteAccess(hasPermission, url);
     }
-    if (isAgent && AGENT_HIDDEN.has(url)) return false;
     if (PUBLIC_AUTH_ROUTES.has(url)) return true;
     return hasRouteAccess(hasPermission, url);
   };
@@ -129,25 +119,17 @@ export function AppSidebar() {
   const displayName = user?.fullName ?? user?.username ?? "Utilisateur";
   const displayRole = roleLabel(user?.role);
   const initials = displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-  const isAgent = isAgentRole(user?.role);
-  const isGuichet = user?.role === "AgentGuichet";
-  const AGENT_HIDDEN = new Set(["/reconciliation", "/objectives", "/reports"]);
 
   const isVisible = (url: string) => {
-    if (isGuichet) {
-      if (GUICHET_ALLOWED.has(url)) return true;
-      return hasRouteAccess(hasPermission, url);
-    }
     if (url === "/documentation" || url === "/configuration" || url === "/security")
-      return user?.role === "Administrateur";
+      return hasRouteAccess(hasPermission, url);
     if (url === "/audit")
       return hasPermission("audit.view");
     if (url === "/reports")
       return hasPermission("report.view");
     if (HR_PRIV_ROUTES.has(url)) {
-      return user?.role === "Administrateur" || hasRouteAccess(hasPermission, url);
+      return hasRouteAccess(hasPermission, url);
     }
-    if (isAgent && AGENT_HIDDEN.has(url)) return false;
     if (PUBLIC_AUTH_ROUTES.has(url)) return true;
     return hasRouteAccess(hasPermission, url);
   };

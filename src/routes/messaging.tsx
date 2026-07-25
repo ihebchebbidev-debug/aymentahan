@@ -45,10 +45,10 @@ export const Route = createFileRoute("/messaging")({
 type Tab = "all" | "unread" | "dm" | "groups";
 
 function MessagingPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const chat = useChat();
-  const isAdmin = user?.role === "Administrateur";
-  const isManager = user?.role === "Manager";
+  const canCreateGroup = hasPermission("chat.group.create");
+  const canBroadcast = hasPermission("chat.broadcast");
   const { conv: convFromUrl } = Route.useSearch();
 
   const [search, setSearch] = useState("");
@@ -114,12 +114,12 @@ function MessagingPage() {
             <Button size="sm" variant="outline" onClick={() => setNewDmOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" /> Message
             </Button>
-            {(isAdmin || isManager) && (
+            {canCreateGroup && (
               <Button size="sm" variant="outline" onClick={() => setNewGroupOpen(true)}>
                 <Users className="h-4 w-4 mr-1.5" /> Groupe
               </Button>
             )}
-            {isAdmin && (
+            {canBroadcast && (
               <Button size="sm" onClick={() => setBroadcastOpen(true)}>
                 <Megaphone className="h-4 w-4 mr-1.5" /> Annonce
               </Button>

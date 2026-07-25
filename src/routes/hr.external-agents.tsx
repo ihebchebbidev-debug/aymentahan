@@ -27,7 +27,6 @@ const empty: Partial<ExternalAgent> = { fullName: "", phone: "", email: "", cin:
 
 function ExternalAgentsPage() {
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
   const canAdd = hasPermission("hr.external_agents.add");
   const canEditAgent = hasPermission("hr.external_agents.edit");
   const canDelete = hasPermission("hr.external_agents.delete");

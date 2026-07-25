@@ -48,7 +48,6 @@ function OpportunityDetailPage() {
   const { users, refresh } = useErp();
   const { toContract, toMigration, revertOpportunity, afterOpportunityAuto } = useCrmListSync();
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("opportunity.edit");
   const canConvert = hasAnyPermission(hasPermission, ["prospect.convert", "opportunity.convert"]);
   const canConvertMigration = canConvertOpportunityToMigration(hasPermission);

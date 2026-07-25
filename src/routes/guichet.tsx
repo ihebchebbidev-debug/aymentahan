@@ -382,7 +382,7 @@ function GuichetPage() {
 
   // AgentGuichet (verrouillé sur sa franchise) sans entityId affecté →
   // message clair au lieu d'un écran vide / spinner infini.
-  if (user?.role === "AgentGuichet" && !assignedEntity) {
+  if (!hasPermission("guichet.read_all") && !assignedEntity) {
     return (
       <AppLayout>
         <PageHeader title="Guichet" icon={<Layers className="h-5 w-5" />} />

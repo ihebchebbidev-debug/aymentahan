@@ -90,11 +90,11 @@ function GuichetAnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   // Admin-only dashboard config (persisted locally per browser).
-  const isAdmin = user?.role === "Administrateur";
+  const canConfig = hasPermission("guichet.manage_objectives");
   const [config, setConfig] = useState<DashConfig>(() => loadConfig());
   useEffect(() => { try { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); } catch {} }, [config]);
   // Non-admins always use the default config (admin choices apply only to admins).
-  const effectiveConfig = isAdmin ? config : DEFAULT_CONFIG;
+  const effectiveConfig = canConfig ? config : DEFAULT_CONFIG;
   const visibleTypes = TYPES.filter((t) => effectiveConfig.types[t]);
 
   useEffect(() => { if (assignedEntity) setEntityId(assignedEntity); }, [assignedEntity]);
@@ -203,7 +203,7 @@ function GuichetAnalyticsPage() {
       <div className="flex items-center justify-between gap-3 mb-3">
         <PageHeader title="Analytics Guichet" icon={<BarChart3 className="h-5 w-5" />} />
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {canConfig && (
             <AdminConfigButton config={config} setConfig={setConfig} />
           )}
           <Button asChild size="sm" variant="outline">

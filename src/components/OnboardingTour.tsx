@@ -25,7 +25,6 @@ export function OnboardingTour() {
 
   // ---- (kept for future re-enable if needed) ----
   const { user } = useAuth();
-  const role = user?.role;
   const navigate = useNavigate();
   const location = useLocation();
   const { hydrated } = useErp();

@@ -36,8 +36,7 @@ function DispatchPage() {
   const currency = useCurrency();
   const auth = useAuth();
   const me = auth.user?.username ?? "";
-  const role = auth.user?.role;
-  const isDispatcher = role === "Administrateur" || role === "Manager" || role === "Backoffice";
+
   const canAssign = auth.hasPermission("prospect.assign");
   const canEditOutcome = auth.hasPermission("prospect.edit");
 
@@ -219,7 +218,7 @@ function DispatchPage() {
                 </span>
               </h3>
               <span className="text-xs text-muted-foreground">
-                {isDispatcher
+                {canAssign
                   ? "Sélectionnez plusieurs leads pour les attribuer en lot."
                   : "Cliquez sur \"Prendre\" pour vous assigner un lead"}
               </span>
@@ -240,7 +239,7 @@ function DispatchPage() {
               </div>
             )}
 
-            {isDispatcher && filteredQueue.length > 0 && (
+            {canAssign && filteredQueue.length > 0 && (
               <div className="px-4 py-2 border-b border-border bg-background flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -294,7 +293,7 @@ function DispatchPage() {
                 <div className="divide-y divide-border">
                   {pagedQueue.map((p) => (
                     <div key={p.id} className="p-4 flex flex-wrap items-center gap-3 hover:bg-muted/20 transition-base">
-                      {isDispatcher && (
+                      {canAssign && (
                         <Checkbox
                           checked={selected.has(p.id)}
                           onCheckedChange={(v) => toggleOne(p.id, !!v)}

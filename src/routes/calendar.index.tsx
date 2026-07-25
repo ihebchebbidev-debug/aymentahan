@@ -53,7 +53,6 @@ function frDate(d: Date) { return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-
 
 function CalendarPage() {
   const auth = useAuth();
-  const isAdmin = auth.user?.role === "Administrateur";
   const canDeleteEvent = auth.hasPermission("calendar.event.delete");
   const today = new Date();
   const [view, setView] = useState<ViewMode>("mois");
@@ -200,7 +199,7 @@ function NewEventDialog({ defaultDate, onSave }: { defaultDate: string; onSave: 
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Agent</Label><Input value={agent} onChange={(e) => setAgent(e.target.value)} disabled={auth.user?.role !== "Administrateur"} /></div>
+            <div className="space-y-1.5"><Label>Agent</Label><Input value={agent} onChange={(e) => setAgent(e.target.value)} disabled={!auth.hasPermission("calendar.event.edit")} /></div>
           </div>
         </div>
         <DialogFooter>

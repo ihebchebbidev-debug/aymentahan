@@ -42,6 +42,7 @@ import { LayoutGrid, Paperclip, ListChecks, Sparkles, RotateCcw } from "lucide-r
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { LastModifiedInfo } from "@/components/LastModifiedInfo";
+import { isAgentRole } from "@/lib/roleLabels";
 
 export const Route = createFileRoute("/contracts/$contractId")({
   head: ({ params }) => ({
@@ -137,8 +138,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
   const { prospects, users, events: calendarEvents, updateContractBilling, updateContractPremium, getContractActivity, logActivity, refresh } = useErp();
   const { revertContract } = useCrmListSync();
   const { user, hasPermission } = useAuth();
-  const isAgent = user?.role === "Agent" || user?.role === "AgentSuivi" || user?.role === "AgentActivation" || user?.role === "AgentVente";
-  const isAdmin = user?.role === "Administrateur";
+  const isAgent = isAgentRole(user?.role);
   const canRevert = hasPermission("contract.revert");
   const canEdit = hasPermission("contract.edit");
   const canDelete = hasPermission("contract.delete");

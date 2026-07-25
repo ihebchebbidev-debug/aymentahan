@@ -36,12 +36,6 @@ export const Route = createFileRoute("/prospects/$prospectId_/edit")({
 });
 
 function GuardedEditProspectPage() {
-  const { user } = useAuth();
-
-  if (user?.role === "AgentVente") {
-    return <EditProspectPage />;
-  }
-
   return (
     <RequirePerm perm="prospect.edit" backTo="/prospects" backLabel="Retour aux prospects">
       <EditProspectPage />

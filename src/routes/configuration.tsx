@@ -609,21 +609,21 @@ function CurrencySettings() {
 }
 
 function ConfigPage() {
-  const { user } = useAuth();
+  const { hasPermission } = useAuth();
   const search = Route.useSearch();
   const activeTab = search.tab || "general";
-  const isAdmin = user?.role === "Administrateur";
+  const canConfig = hasPermission("page.configuration");
 
-  if (!isAdmin) {
+  if (!canConfig) {
     return (
       <AppLayout skeleton="form">
         <PageHeader
           title="Configuration"
-          description="Réservé aux administrateurs"
+          description="Accès restreint"
           icon={<Settings className="h-5 w-5" />}
         />
         <Card className="mt-6 p-8 text-center text-sm text-muted-foreground">
-          Cette page est réservée au rôle <strong>Administrateur</strong>.
+          Vous n'avez pas l'autorisation d'accéder à la configuration.
         </Card>
       </AppLayout>
     );

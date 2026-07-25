@@ -29,7 +29,6 @@ const emptyForm = { userId: "", baseSalary: 0, hoursWorked: 0, hourlyRate: 0, bo
 function PayrollPage() {
   const { user, hasPermission } = useAuth();
   const { users } = useErp();
-  const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("hr.payroll.edit");
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [rows, setRows] = useState<PayrollEntry[]>([]);

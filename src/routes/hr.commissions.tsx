@@ -28,7 +28,6 @@ type Summary = { externalAgentId: string; agentName: string | null; totalPending
 
 function CommissionsPage() {
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission("hr.commissions.edit");
   const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [statusF, setStatusF] = useState<string>("all");

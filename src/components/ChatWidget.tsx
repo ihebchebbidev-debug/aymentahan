@@ -38,9 +38,9 @@ type LauncherTab = "all" | "unread" | "groups";
 
 function ChatWidgetInner() {
   const chat = useChat();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
-  const isManager = user?.role === "Manager";
+  const { user, hasPermission } = useAuth();
+  const canCreateGroup = hasPermission("chat.group.create");
+  const canBroadcast = hasPermission("chat.broadcast");
 
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<LauncherTab>("all");
@@ -148,12 +148,12 @@ function ChatWidgetInner() {
               <button onClick={() => setNewDmOpen(true)} className="h-8 w-8 rounded-md hover:bg-muted/60 inline-flex items-center justify-center" title="Nouveau message">
                 <Plus className="h-4 w-4" />
               </button>
-              {(isAdmin || isManager) && (
+              {canCreateGroup && (
                 <button onClick={() => setNewGroupOpen(true)} className="h-8 w-8 rounded-md hover:bg-muted/60 inline-flex items-center justify-center" title="Nouveau groupe">
                   <Users className="h-4 w-4" />
                 </button>
               )}
-              {isAdmin && (
+              {canBroadcast && (
                 <button onClick={() => setBroadcastOpen(true)} className="h-8 w-8 rounded-md hover:bg-muted/60 inline-flex items-center justify-center" title="Annonce">
                   <Megaphone className="h-4 w-4" />
                 </button>
@@ -668,7 +668,7 @@ export function AddMembersDialog({ open, onOpenChange, conv }: { open: boolean; 
 
 export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boolean) => void }) {
   const { users } = useUsers(open);
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const chat = useChat();
   const [target, setTarget] = useState<"all" | "role" | "team" | "users">("all");
   const [roleVal, setRoleVal] = useState("Agent");
@@ -695,7 +695,7 @@ export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenC
     finally { setSending(false); }
   };
 
-  if (user?.role !== "Administrateur") return null;
+  if (!hasPermission("chat.broadcast")) return null;
 
   const recipientsCount = target === "all" ? users.filter((u) => u.username !== user?.username).length
     : target === "role" ? users.filter((u) => u.role === roleVal && u.username !== user?.username).length
@@ -771,12 +771,12 @@ export function BroadcastDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
 export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean; onOpenChange: (b: boolean) => void; conv: Conversation }) {
   const chat = useChat();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState(conv.name ?? "");
-  const isAppAdmin = user?.role === "Administrateur";
+  const canManageGroup = hasPermission("chat.group.manage");
   useEffect(() => { if (open) { setQ(""); setNewName(conv.name ?? ""); setRenaming(false); } }, [open, conv.name]);
 
   const refresh = async () => { await chat.refreshConversations(); };
@@ -818,7 +818,7 @@ export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean;
         </DialogHeader>
 
         {/* Rename */}
-        {(isAppAdmin || conv.members.find((m) => m.username === user?.username)?.role === "admin") && (
+        {(canManageGroup || conv.members.find((m) => m.username === user?.username)?.role === "admin") && (
           <div className="rounded-md border border-border p-3 space-y-2">
             <div className="text-xs font-medium text-muted-foreground">Nom du groupe</div>
             {renaming ? (
@@ -863,7 +863,7 @@ export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean;
                 </div>
                 <div className="flex items-center gap-1">
                   {m.role === "admin" ? (
-                    <Button size="sm" variant="ghost" disabled={busy === m.username || (me && !isAppAdmin)} onClick={() => setRole(m.username, "member")} title="Rétrograder">
+                    <Button size="sm" variant="ghost" disabled={busy === m.username || (me && !canManageGroup)} onClick={() => setRole(m.username, "member")} title="Rétrograder">
                       <ShieldOff className="h-4 w-4" />
                     </Button>
                   ) : (

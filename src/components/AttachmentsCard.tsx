@@ -92,7 +92,6 @@ export function AttachmentsCard({
   onRemoved?: (a: { filename: string; sizeBytes: number }) => void;
 }) {
   const { user, hasPermission } = useAuth();
-  const isAdmin = user?.role === "Administrateur";
   const canEdit = hasPermission(entityEditPerm(entity));
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
