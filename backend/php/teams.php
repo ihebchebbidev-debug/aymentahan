@@ -60,7 +60,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST' && $action === 'create') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'page.configuration');
     $in = json_input();
     $name = trim((string)($in['name'] ?? ''));
     $description = trim((string)($in['description'] ?? ''));
@@ -94,7 +94,7 @@ if ($method === 'POST' && $action === 'create') {
 }
 
 if ($method === 'PUT' && $action === 'update') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'page.configuration');
     $in = json_input();
     $id = (string)($in['id'] ?? '');
     if ($id === '') fail('id requis', 422);
@@ -129,7 +129,7 @@ if ($method === 'PUT' && $action === 'update') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'page.configuration');
     $id = (string)($_GET['id'] ?? '');
     if ($id === '') fail('id requis', 422);
     try {

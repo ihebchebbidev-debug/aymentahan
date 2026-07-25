@@ -138,7 +138,7 @@ if ($method === 'POST' && $action === 'mark_paid') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'hr.commissions.edit');
     $id = $_GET['id'] ?? '';
     $db->prepare("DELETE FROM crminternet_commissions WHERE id = :id")->execute([':id' => $id]);
     ok(['message' => 'Supprimé']);

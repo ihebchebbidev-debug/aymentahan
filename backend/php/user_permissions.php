@@ -40,7 +40,9 @@ function effective_perms_for(PDO $db, string $username, string $role): array {
 if ($method === 'GET') {
     $user = trim((string)($_GET['user'] ?? ''));
     if ($user === '') fail('user requis', 422);
-    if ($user !== $me['username'] && ($me['role'] ?? '') !== 'Administrateur') fail('Accès refusé', 403);
+    if ($user !== $me['username']) {
+        require_permission($db, $me, 'user.override');
+    }
 
     $u = $db->prepare("SELECT username, role FROM crminternet_users WHERE username = :u");
     $u->execute([':u' => $user]);
@@ -61,7 +63,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'PUT') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'user.override');
     $in = json_input();
     $user = trim((string)($in['user'] ?? ''));
     $overrides = $in['overrides'] ?? [];

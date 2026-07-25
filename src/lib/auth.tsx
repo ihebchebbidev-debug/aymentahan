@@ -117,7 +117,10 @@ function lookupRolePerms(
   return {};
 }
 
-async function loadPermissionsForUser(user: AuthUser): Promise<Record<string, boolean>> {
+async function loadPermissionsForUser(
+  user: AuthUser,
+  fallbackPerms?: Record<string, boolean>,
+): Promise<Record<string, boolean>> {
   if (user.role === "Administrateur") {
     return new Proxy({} as Record<string, boolean>, { get: () => true }) as any;
   }
@@ -134,10 +137,7 @@ async function loadPermissionsForUser(user: AuthUser): Promise<Record<string, bo
       Object.assign(grantedRolePerms, lookupRolePerms(permsMap, role));
     }
 
-    // Security rule: if the user's own role has 0 permissions, do not accept
-    // permissions inherited indirectly from team/effective backend logic. Only
-    // explicit per-user grants/overrides may unlock access later.
-    if (!hasAnyTrue(ownRolePerms)) {
+    if (!hasAnyTrue(ownRolePerms) && (!fallbackPerms || !hasAnyTrue(fallbackPerms))) {
       const scoped: Record<string, boolean> = { ...grantedRolePerms };
       for (const p of user.grantedPermissions ?? []) scoped[p] = true;
       for (const p of user.allowedPermissions ?? []) scoped[p] = true;
@@ -151,8 +151,6 @@ async function loadPermissionsForUser(user: AuthUser): Promise<Record<string, bo
       return scoped;
     }
 
-    // Server-computed effective set is the preferred path once the user's own
-    // role is not empty (or they have explicit per-user access).
     if (isPlainObject(r?.effectivePermissions)) {
       const eff: Record<string, boolean> = {};
       for (const [k, v] of Object.entries(r.effectivePermissions as Record<string, unknown>)) {
@@ -169,8 +167,7 @@ async function loadPermissionsForUser(user: AuthUser): Promise<Record<string, bo
       return eff;
     }
 
-    // Fallback: build from per-role map + temporary grants.
-    const base: Record<string, boolean> = { ...ownRolePerms, ...grantedRolePerms };
+    const base: Record<string, boolean> = { ...fallbackPerms, ...ownRolePerms, ...grantedRolePerms };
     for (const p of user.grantedPermissions ?? []) base[p] = true;
     for (const p of user.allowedPermissions ?? []) base[p] = true;
     for (const p of user.deniedPermissions ?? []) base[p] = false;
@@ -182,13 +179,17 @@ async function loadPermissionsForUser(user: AuthUser): Promise<Record<string, bo
     }
     return base;
   } catch (e: any) {
-    // Fail closed. A stale localStorage permission snapshot is a security bug:
-    // if an admin removes every permission from a role, the user must be blocked
-    // immediately instead of keeping old access on this browser.
-    console.warn("[auth] /roles.php failed, blocking non-admin permissions", {
+    console.warn("[auth] /roles.php failed, preserving initial user permissions", {
       status: e?.status, message: e?.message,
     });
-    return {};
+    if (fallbackPerms && Object.keys(fallbackPerms).length > 0) {
+      return fallbackPerms;
+    }
+    const scoped: Record<string, boolean> = {};
+    for (const p of user.grantedPermissions ?? []) scoped[p] = true;
+    for (const p of user.allowedPermissions ?? []) scoped[p] = true;
+    for (const p of user.deniedPermissions ?? []) scoped[p] = false;
+    return scoped;
   }
 }
 
@@ -199,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissionsLoading, setPermissionsLoading] = useState<boolean>(API_ENABLED && !!getToken());
   const [permissionsHydrated, setPermissionsHydrated] = useState<boolean>(false);
 
-  const applyPermsForUser = useCallback(async (u: AuthUser | null, opts?: { silent?: boolean }) => {
+  const applyPermsForUser = useCallback(async (u: AuthUser | null, opts?: { silent?: boolean; fallbackPerms?: Record<string, boolean> }) => {
     const silent = opts?.silent === true;
     if (!u) {
       setPermissions({});
@@ -209,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (!silent) setPermissionsLoading(true);
     try {
-      const perms = await loadPermissionsForUser(u);
+      const perms = await loadPermissionsForUser(u, opts?.fallbackPerms);
       setPermissions(perms);
       setPermissionsHydrated(true);
     } finally {
@@ -221,20 +222,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!API_ENABLED) { setLoading(false); setPermissionsLoading(false); return; }
     const t = getToken();
     if (!t) { setLoading(false); setPermissionsLoading(false); return; }
-    api<{ user: AuthUser }>("/auth_me.php")
+    api<{ user: AuthUser; permissions?: Record<string, boolean>; effectivePermissions?: Record<string, boolean> }>("/auth_me.php")
       .then((r) => {
-        // Unblock the UI as soon as the user is known.
-        // Permissions hydrate in the background — Administrateurs are granted
-        // everything via the proxy regardless, and other roles fall back to
-        // an empty set until roles.php returns.
         setUser(r.user);
         setLoading(false);
-        void applyPermsForUser(r.user);
+        const mePerms = r.effectivePermissions ?? r.permissions;
+        void applyPermsForUser(r.user, { fallbackPerms: mePerms });
       })
       .catch((e: any) => {
-        // Only drop the session on a real auth failure (401). On 404/500/network
-        // errors we keep the token so a transient backend issue (e.g. missing
-        // column on /auth_me.php) doesn't silently log everyone out.
         const status = Number(e?.status ?? 0);
         console.warn("[auth] /auth_me.php failed", { status, message: e?.message });
         if (status === 401) {
@@ -326,9 +321,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(r.token);
       setUser(r.user);
       try {
-        const me = await api<{ user: AuthUser }>("/auth_me.php");
+        const me = await api<{ user: AuthUser; permissions?: Record<string, boolean>; effectivePermissions?: Record<string, boolean> }>("/auth_me.php");
         setUser(me.user);
-        await applyPermsForUser(me.user);
+        const mePerms = me.effectivePermissions ?? me.permissions;
+        await applyPermsForUser(me.user, { fallbackPerms: mePerms });
       } catch {
         await applyPermsForUser(r.user);
       }
@@ -347,9 +343,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(r.token);
     setUser(r.user);
     try {
-      const me = await api<{ user: AuthUser }>("/auth_me.php");
+      const me = await api<{ user: AuthUser; permissions?: Record<string, boolean>; effectivePermissions?: Record<string, boolean> }>("/auth_me.php");
       setUser(me.user);
-      await applyPermsForUser(me.user);
+      const mePerms = me.effectivePermissions ?? me.permissions;
+      await applyPermsForUser(me.user, { fallbackPerms: mePerms });
     } catch {
       await applyPermsForUser(r.user);
     }

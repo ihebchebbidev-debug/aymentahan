@@ -106,7 +106,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'user.edit');
     $in = json_input();
     $rows = $in['rows'] ?? [$in];
     $added = 0; $updated = 0; $skipped = 0;
@@ -386,7 +386,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'user.delete');
     $id = $_GET['id'] ?? '';
     if (!$id) fail('id requis', 422);
     $s = $db->prepare('DELETE FROM crminternet_users WHERE id = :id');

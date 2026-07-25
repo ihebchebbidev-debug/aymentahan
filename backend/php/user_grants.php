@@ -44,7 +44,7 @@ if ($method === 'GET') {
                            ORDER BY revoked ASC, expires_at DESC");
         $s->execute([':u' => $user]);
     } else {
-        require_auth(['Administrateur']);
+        require_permission($db, $me, 'user.grant');
         $s = $db->query("SELECT * FROM crminternet_user_grants
                          ORDER BY revoked ASC, expires_at DESC");
     }
@@ -52,7 +52,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'user.grant');
     $in = json_input();
     $user      = trim((string)($in['user']  ?? ''));
     $type      = (string)($in['type']       ?? '');
@@ -103,7 +103,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'user.grant');
     $id = trim((string)($_GET['id'] ?? ''));
     if ($id === '') fail('id requis', 422);
     $u = $db->prepare("UPDATE crminternet_user_grants

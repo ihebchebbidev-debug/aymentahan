@@ -102,7 +102,7 @@ if ($method === 'GET') {
 $VALID_AUTO = ['none','convert_opportunity','convert_contract'];
 
 if ($method === 'POST') {
-    require_auth(['Administrateur','Manager']);
+    require_permission($db, $me, 'stage.manage');
     $in = json_input();
     $name = trim($in['name'] ?? '');
     if ($name === '') fail('Le nom du statut est requis', 422);
@@ -138,7 +138,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT' || $method === 'PATCH') {
-    require_auth(['Administrateur','Manager']);
+    require_permission($db, $me, 'stage.manage');
     $in = json_input();
 
     // Reorder action endpoint: PUT /stages.php?action=reorder with body { items: [{ id, position }] }
@@ -191,7 +191,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'stage.manage');
     $id = $_GET['id'] ?? '';
     if (!$id) fail('id requis', 422);
 

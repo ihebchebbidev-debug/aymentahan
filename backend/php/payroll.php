@@ -128,7 +128,7 @@ if ($method === 'POST' && ($action === 'upsert' || $action === '')) {
 }
 
 if ($method === 'POST' && $action === 'mark_paid') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'hr.payroll.edit');
     $in = json_input();
     $id = $in['id'] ?? '';
     if ($id === '') fail('id requis', 422);
@@ -138,7 +138,7 @@ if ($method === 'POST' && $action === 'mark_paid') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'hr.payroll.edit');
     $id = $_GET['id'] ?? '';
     $db->prepare("DELETE FROM crminternet_payroll WHERE id = :id")->execute([':id' => $id]);
     ok(['message' => 'Supprimé']);

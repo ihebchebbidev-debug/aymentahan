@@ -60,7 +60,7 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
-    require_auth(['Administrateur','Manager']);
+    require_permission($db, $me, 'page.configuration');
     $in = json_input();
     $entity = $in['entity'] ?? '';
     $label  = trim($in['label'] ?? '');
@@ -92,7 +92,7 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT' || $method === 'PATCH') {
-    require_auth(['Administrateur','Manager']);
+    require_permission($db, $me, 'page.configuration');
     $in = json_input();
     $id = $in['id'] ?? ($_GET['id'] ?? '');
     if (!$id) fail('id requis', 422);
@@ -114,7 +114,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
 }
 
 if ($method === 'DELETE') {
-    require_auth(['Administrateur']);
+    require_permission($db, $me, 'page.configuration');
     $id = $_GET['id'] ?? '';
     if (!$id) fail('id requis', 422);
     $db->beginTransaction();

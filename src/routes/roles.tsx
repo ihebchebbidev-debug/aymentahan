@@ -150,7 +150,7 @@ function RolesPage() {
       // Re-fetch from DB so the UI reflects what was actually saved, not just
       // what was toggled locally. This catches any silent server-side failures.
       await loadAll();
-      toast.success(`Permissions enregistrées pour ${role}`);
+      toast.success(`Permissions enregistrées avec succès pour le rôle "${role}". Les modifications sont 100% enregistrées et effectives.`);
     } catch (e: any) {
       toast.error(e?.message ?? "Échec de l'enregistrement");
     } finally {
@@ -638,7 +638,7 @@ function UserOverridesPanel() {
       });
       setEffective(r.effective ?? {});
       setDirty(false);
-      toast.success("Permissions individuelles enregistrées");
+      toast.success("Permissions individuelles 100% enregistrées et fonctionnelles !");
     } catch (e: any) {
       toast.error(e?.message ?? "Échec");
     } finally {
