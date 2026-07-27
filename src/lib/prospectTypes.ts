@@ -1,10 +1,10 @@
 import { api, API_ENABLED } from "@/lib/api";
 import type { ProspectType } from "@/lib/types";
 
+// Only types that must always exist by default.
+// "Nouveau" and "Migration" were removed per customer request.
 export const DEFAULT_PROSPECT_TYPES = [
-  "Nouveau",
   "Résiliation",
-  "Migration",
   "Basculement",
 ] as const;
 

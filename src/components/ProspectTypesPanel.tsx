@@ -9,9 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api, API_ENABLED } from "@/lib/api";
 import type { ProspectType } from "@/lib/types";
+import { refreshProspectTypes } from "@/hooks/use-prospect-types";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { useAuth } from "@/lib/auth";
 
 export function ProspectTypesPanel() {
+  const { hasPermission } = useAuth();
+  const canEdit   = hasPermission("prospect_type.edit");
+  const canDelete = hasPermission("prospect_type.delete");
+
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -25,6 +31,7 @@ export function ProspectTypesPanel() {
     try {
       const r = await api<{ types: ProspectType[] }>("/prospect_types.php");
       setTypes((r.types ?? []).slice().sort((a, b) => a.position - b.position));
+      refreshProspectTypes(); // keep sidebar + dropdowns in sync
     } catch (e: any) { toast.error("Chargement impossible", { description: e?.message }); }
   };
   useEffect(() => { void load(); }, []);
@@ -78,28 +85,31 @@ export function ProspectTypesPanel() {
 
   return (
     <>
-      <Card className="p-4 shadow-elegant">
-        <div className="text-sm font-medium mb-1">Ajouter un type de prospect</div>
-        <p className="text-xs text-muted-foreground mb-3">
-          Le type voyage automatiquement avec le prospect lorsqu'il devient opportunité puis contrat.
-          Les champs personnalisés peuvent être <strong>partagés</strong> ou <strong>spécifiques à un type</strong> :
-          changez le type d'un prospect et ses champs personnalisés s'adaptent automatiquement.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-2">
-          <div className="space-y-1">
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Nom</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Campagne Été 2026"
-              onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+      {/* Add form — only visible to users with edit permission */}
+      {canEdit && (
+        <Card className="p-4 shadow-elegant">
+          <div className="text-sm font-medium mb-1">Ajouter un type de prospect</div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Le type voyage automatiquement avec le prospect lorsqu'il devient opportunité puis contrat.
+            Les champs personnalisés peuvent être <strong>partagés</strong> ou <strong>spécifiques à un type</strong> :
+            changez le type d'un prospect et ses champs personnalisés s'adaptent automatiquement.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Nom</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Campagne Été 2026"
+                onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Description</Label>
+              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionnel" />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={add} disabled={busy} className="w-full md:w-auto"><Plus className="h-4 w-4 mr-1.5" />Ajouter</Button>
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Description</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optionnel" />
-          </div>
-          <div className="flex items-end">
-            <Button onClick={add} disabled={busy} className="w-full md:w-auto"><Plus className="h-4 w-4 mr-1.5" />Ajouter</Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       <Card className="mt-4 shadow-elegant overflow-hidden">
         <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
@@ -135,7 +145,7 @@ export function ProspectTypesPanel() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Label className="text-xs text-muted-foreground">Actif</Label>
-                    <Switch checked={t.active} onCheckedChange={() => toggleActive(t)} disabled={isEditing} />
+                    <Switch checked={t.active} onCheckedChange={() => canEdit && toggleActive(t)} disabled={isEditing || !canEdit} />
                   </div>
                   {isEditing ? (
                     <>
@@ -148,10 +158,12 @@ export function ProspectTypesPanel() {
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(t)} aria-label={`Modifier ${t.name}`}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      {t.id !== "PT-DEFAULT" && (
+                      {canEdit && (
+                        <Button variant="ghost" size="icon" onClick={() => startEdit(t)} aria-label={`Modifier ${t.name}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && t.id !== "PT-DEFAULT" && (
                         <Button variant="ghost" size="icon" onClick={() => remove(t)} className="text-destructive hover:bg-destructive/10" aria-label={`Supprimer ${t.name}`}>
                           <Trash2 className="h-4 w-4" />
                         </Button>

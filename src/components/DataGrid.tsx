@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Pencil, Trash2, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +12,7 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100, 500, 1000, 2000, 5000] as const;
  * Reusable Excel-style data grid with:
  *   - sticky header, dense rows
  *   - sortable columns
+ *   - resizable columns (drag handle on th border, saved to localStorage)
  *   - row selection (single / all-on-page)
  *   - per-row inline edit (per-column `editor`)
  *   - delete + custom row actions
@@ -65,7 +66,7 @@ type Props<T> = {
   onSelectedChange?: (next: Set<string>) => void;
   pageSize?: number;
   emptyState?: ReactNode;
-  /** Stable identifier for sort/page resets. */
+  /** Stable identifier for sort/page resets and column-width persistence. */
   storageKey?: string;
   /** Optional per-row class (e.g. highlight). */
   rowClassName?: (row: T) => string | undefined;
@@ -77,6 +78,19 @@ const HIDE_CLASS: Record<NonNullable<DataGridColumn<unknown>["hideBelow"]>, stri
   lg: "hidden lg:table-cell",
   xl: "hidden xl:table-cell",
 };
+
+// ─── Column-width persistence helpers ────────────────────────────────────────
+function loadColWidths(storageKey: string | undefined): Record<string, number> {
+  if (!storageKey || typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(`${storageKey}:colWidths`);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch { return {}; }
+}
+function saveColWidths(storageKey: string | undefined, widths: Record<string, number>) {
+  if (!storageKey || typeof window === "undefined") return;
+  try { localStorage.setItem(`${storageKey}:colWidths`, JSON.stringify(widths)); } catch { /* ignore */ }
+}
 
 export function DataGrid<T>(props: Props<T>) {
   const {
@@ -109,6 +123,47 @@ export function DataGrid<T>(props: Props<T>) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBuffer, setEditBuffer] = useState<Record<string, any>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  // ─── Column resizing ──────────────────────────────────────────────────────
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => loadColWidths(storageKey));
+
+  // Persist whenever widths change (debounced via ref to avoid excessive writes)
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistWidths = useCallback((next: Record<string, number>) => {
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => saveColWidths(storageKey, next), 400);
+  }, [storageKey]);
+
+  const resizeState = useRef<{
+    colKey: string;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+
+  const onResizeMouseDown = useCallback((e: React.MouseEvent, colKey: string, thEl: HTMLTableCellElement) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startWidth = thEl.offsetWidth;
+    resizeState.current = { colKey, startX: e.clientX, startWidth };
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizeState.current) return;
+      const delta = ev.clientX - resizeState.current.startX;
+      const newW = Math.max(50, resizeState.current.startWidth + delta);
+      setColWidths((prev) => {
+        const next = { ...prev, [resizeState.current!.colKey]: newW };
+        persistWidths(next);
+        return next;
+      });
+    };
+    const onUp = () => {
+      resizeState.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [persistWidths]);
 
   // Reset to first page when row count drops below current page.
   useEffect(() => { setPage((p) => Math.min(p, Math.max(0, Math.ceil(rows.length / currentPageSize) - 1))); }, [rows.length, currentPageSize]);
@@ -145,7 +200,7 @@ export function DataGrid<T>(props: Props<T>) {
       ro.observe(el);
       return () => ro.disconnect();
     }
-  }, [pageRows.length, columns.length]);
+  }, [pageRows.length, columns.length, colWidths]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -206,14 +261,44 @@ export function DataGrid<T>(props: Props<T>) {
                 const align = c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left";
                 const sortable = c.sortable ?? !!c.accessor;
                 const active = sortKey === c.key;
+                const savedW = colWidths[c.key];
+                const colStyle: React.CSSProperties = {
+                  position: "relative",
+                  userSelect: "none",
+                  ...(savedW ? { width: savedW, minWidth: savedW } : c.width ? { width: c.width } : {}),
+                };
                 return (
-                  <th key={c.key} className={`${cls} ${align}`} style={c.width ? { width: c.width } : undefined}>
+                  <th
+                    key={c.key}
+                    className={`${cls} ${align}`}
+                    style={colStyle}
+                  >
                     {sortable ? (
-                      <button onClick={() => toggleSort(c.key)} className="inline-flex items-center gap-1 hover:text-foreground">
-                        {c.header}
-                        {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+                      <button onClick={() => toggleSort(c.key)} className="inline-flex items-center gap-1 hover:text-foreground w-full">
+                        <span className="truncate">{c.header}</span>
+                        {active ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ArrowDown className="h-3 w-3 shrink-0" />) : <ArrowUpDown className="h-3 w-3 opacity-40 shrink-0" />}
                       </button>
-                    ) : c.header}
+                    ) : <span className="truncate">{c.header}</span>}
+                    {/* Resize handle */}
+                    <span
+                      onMouseDown={(e) => {
+                        const th = e.currentTarget.closest("th") as HTMLTableCellElement;
+                        onResizeMouseDown(e, c.key, th);
+                      }}
+                      title="Redimensionner"
+                      style={{
+                        position: "absolute",
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 6,
+                        cursor: "col-resize",
+                        zIndex: 10,
+                        background: "transparent",
+                      }}
+                      className="hover:bg-primary/30 transition-colors"
+                      data-no-row-click
+                    />
                   </th>
                 );
               })}
@@ -251,8 +336,12 @@ export function DataGrid<T>(props: Props<T>) {
                   {columns.map((c) => {
                     const cls = c.hideBelow ? HIDE_CLASS[c.hideBelow] : "";
                     const align = c.align === "right" ? "text-right cell-num" : c.align === "center" ? "text-center" : "text-left";
+                    const savedW = colWidths[c.key];
+                    const cellStyle: React.CSSProperties = savedW
+                      ? { maxWidth: savedW, minWidth: savedW, overflow: "hidden" }
+                      : {};
                     return (
-                      <td key={c.key} className={`${cls} ${align} ${c.className ?? ""}`}>
+                      <td key={c.key} className={`${cls} ${align} ${c.className ?? ""}`} style={cellStyle}>
                         {isEditing && c.editor ? (
                           <div data-no-row-click>
                             {c.editor({ row, value: editBuffer[c.key], setValue: (v) => setEditBuffer((b) => ({ ...b, [c.key]: v })) })}
@@ -376,9 +465,6 @@ function TopScrollbar({
     const bot = targetRef.current;
     if (!top || !bot) return;
 
-    // Use a "syncing" flag to break the feedback loop. Whichever element
-    // the user scrolls is the source; we mirror to the other and ignore the
-    // resulting echo scroll event. No driver lock needed.
     let syncing = false;
 
     const onTop = () => {

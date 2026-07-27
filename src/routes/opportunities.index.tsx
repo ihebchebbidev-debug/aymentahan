@@ -18,10 +18,11 @@ import { fetchAllOpportunities } from "@/lib/opportunitiesApi";
 import { useAuth } from "@/lib/auth";
 import { exportCSV, exportJSON, exportXLSX, withCustomFields, relabelRows } from "@/lib/exportUtils";
 import { OPPORTUNITY_LABELS } from "@/lib/exportLabels";
-import { DataGrid, CellSelect, type DataGridColumn } from "@/components/DataGrid";
+import { DataGrid, CellSelect, CellInput, type DataGridColumn } from "@/components/DataGrid";
 import { SavedViews } from "@/components/SavedViews";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
+import { useProspectTypes } from "@/hooks/use-prospect-types";
 import { useColumnPrefs } from "@/lib/useColumnPrefs";
 import { pickColumns } from "@/lib/exportUtils";
 import { useErp } from "@/lib/erpStore";
@@ -111,6 +112,13 @@ function OpportunitiesPage() {
     [users],
   );
 
+  const types = useProspectTypes();
+  const typeNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of types) m.set(t.id, t.name);
+    return m;
+  }, [types]);
+
   const [search, setSearch] = usePersistedState("opportunities:list:search", "");
   const [page, setPage] = usePersistedState("opportunities:list:page", 0);
 
@@ -127,7 +135,7 @@ function OpportunitiesPage() {
   const [presetExtra, setPresetExtra] = usePersistedState<Record<string, unknown>>("opportunities:list:presetExtra", {});
   const colPrefs = useColumnPrefs("opportunities", {
     hidden: [
-      "civility", "firstName", "phone2", "cin", "birthDate", "email",
+      "typeId", "civility", "firstName", "phone2", "cin", "birthDate", "email",
       "gouvernorat", "delegation", "address", "codePostal", "localisationXy",
       "source", "title", "amount", "expectedCloseDate", "notes",
       "convertedToContract", "convertedAt", "revertedAt", "comment1", "comment2",
@@ -135,6 +143,7 @@ function OpportunitiesPage() {
     ],
   });
   const BASE_COLS_META: { key: string; label: string }[] = [
+    { key: "typeId",      label: "Type" },
     { key: "civility",    label: "Civilité" },
     { key: "lastName",    label: "Nom" },
     { key: "firstName",   label: "Prénom" },
@@ -370,6 +379,15 @@ function OpportunitiesPage() {
   }, [filtered, stages]);
 
   const baseColumns: DataGridColumn<Opportunity>[] = [
+    {
+      key: "typeId", header: "Type", accessor: (o) => o.typeId ?? "", hideBelow: "lg",
+      cell: (o) => o.typeId
+        ? <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-normal text-[11px]">{typeNameById.get(o.typeId) ?? "—"}</Badge>
+        : <span className="text-muted-foreground">—</span>,
+      editor: ({ value, setValue }) => (
+        <CellSelect value={value} setValue={setValue} options={types.map((t) => ({ value: t.id, label: t.name }))} />
+      ),
+    },
     { key: "civility", header: "Civ.", accessor: (o) => o.civility ?? "", hideBelow: "xl",
       cell: (o) => <span className="text-muted-foreground">{o.civility || "—"}</span> },
     {
@@ -400,7 +418,11 @@ function OpportunitiesPage() {
     { key: "localisationXy", header: "GPS", accessor: (o) => o.localisationXy ?? "", hideBelow: "xl",
       cell: (o) => <span className="text-muted-foreground truncate">{o.localisationXy || "—"}</span> },
     { key: "source", header: "Source", accessor: (o) => o.source ?? "", hideBelow: "lg",
-      cell: (o) => <span className="text-muted-foreground">{o.source || "—"}</span> },
+      cell: (o) => <span className="text-muted-foreground">{o.source || "—"}</span>,
+      editor: ({ value, setValue }) => (
+        <CellInput value={value ?? ""} setValue={setValue} />
+      ),
+    },
     { key: "title", header: "Titre", accessor: (o) => o.title ?? "", hideBelow: "xl",
       cell: (o) => <span className="text-muted-foreground truncate">{o.title || "—"}</span> },
     {

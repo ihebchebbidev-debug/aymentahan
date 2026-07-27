@@ -24,6 +24,16 @@ async function fetchTypes(): Promise<ProspectType[]> {
   return inflight;
 }
 
+/**
+ * Force-bust the shared cache and re-fetch from the API.
+ * Call this after any create / update / delete in the config panel
+ * so all consumers (sidebar, dropdowns, etc.) refresh instantly.
+ */
+export function refreshProspectTypes(): void {
+  cache = null;
+  void fetchTypes();
+}
+
 /** Active prospect types, cached across components. */
 export function useProspectTypes(): ProspectType[] {
   const [types, setTypes] = useState<ProspectType[]>(cache ?? []);
