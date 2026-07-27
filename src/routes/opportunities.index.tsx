@@ -319,6 +319,21 @@ function OpportunitiesPage() {
         if (k === "amountMin") { if (Number(o.amount) < Number(raw)) return false; continue; }
         if (k === "amountMax") { if (Number(o.amount) > Number(raw)) return false; continue; }
         if (k === "probabilityMin") { if (Number(o.probability) < Number(raw)) return false; continue; }
+        if (k === "dateModif") {
+          const modDate = (o.updatedAt ?? o.createdAt ?? "").slice(0, 10);
+          if (modDate !== String(raw)) return false;
+          continue;
+        }
+        if (k === "dateModifFrom") {
+          const modDate = (o.updatedAt ?? o.createdAt ?? "").slice(0, 10);
+          if (modDate < String(raw)) return false;
+          continue;
+        }
+        if (k === "dateModifTo") {
+          const modDate = (o.updatedAt ?? o.createdAt ?? "").slice(0, 10);
+          if (modDate > String(raw)) return false;
+          continue;
+        }
         const field = KEY_MAP[k] ?? k;
         const val = (o as any)[field];
         const target = String(raw).toLowerCase();

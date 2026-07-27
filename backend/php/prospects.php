@@ -717,9 +717,34 @@ if ($method === 'PATCH' || $method === 'PUT') {
             $after[$col]  = $val;
         }
     }
-    if (!$sets) fail('Aucun champ à mettre à jour', 422);
-    $sets[] = 'updated_by = :updated_by';
+
+    // Process custom fields (keys starting with cf- or passed in customValues object)
+    $customUpdates = [];
+    if (isset($in['customValues']) && is_array($in['customValues'])) {
+        foreach ($in['customValues'] as $ck => $cv) {
+            $customUpdates[$ck] = $cv;
+        }
+    }
+    foreach ($in as $k => $v) {
+        if (strpos($k, 'cf-') === 0) {
+            $fieldKey = substr($k, 3);
+            $customUpdates[$fieldKey] = $v;
+        }
+    }
+
+    if (!$sets && empty($customUpdates)) fail('Aucun champ à mettre à jour', 422);
+
     $canEdit = user_has_permission($db, $me, 'prospect.edit');
+    if (!empty($customUpdates) && !$canEdit) {
+        require_permission($db, $me, 'prospect.edit');
+    }
+
+    if ($sets) {
+        $sets[] = 'updated_by = :updated_by';
+    } else {
+        $sets = ['updated_by = :updated_by'];
+    }
+
     if (isset($needsType) ? $needsType : false) {
         if (!$canEdit) require_permission($db, $me, 'prospect.type');
     }
@@ -758,8 +783,24 @@ if ($method === 'PATCH' || $method === 'PUT') {
 
     $sql = 'UPDATE crminternet_prospects SET ' . implode(', ', $sets) . ' WHERE id = :id';
     $db->prepare($sql)->execute($params);
+
+    if (!empty($customUpdates)) {
+        $cfUpsert = $db->prepare("INSERT INTO crminternet_custom_field_values (entity, entity_id, field_key, value) VALUES ('prospect', :eid, :k, :v) ON DUPLICATE KEY UPDATE value = VALUES(value)");
+        $cfDelete = $db->prepare("DELETE FROM crminternet_custom_field_values WHERE entity = 'prospect' AND entity_id = :eid AND field_key = :k");
+        foreach ($customUpdates as $ck => $cv) {
+            $valStr = is_scalar($cv) ? (string)$cv : ($cv === null ? '' : json_encode($cv));
+            if ($cv === null || trim($valStr) === '') {
+                $cfDelete->execute([':eid' => $id, ':k' => $ck]);
+            } else {
+                $cfUpsert->execute([':eid' => $id, ':k' => $ck, ':v' => $valStr]);
+            }
+            $before["cf-$ck"] = null;
+            $after["cf-$ck"]  = $valStr;
+        }
+    }
+
     log_field_changes($db, 'prospect', $id, $before, $after, $me['username'] ?? '');
-    audit_log($db, $me, 'prospect.update', 'prospect', $id, ['fields' => array_keys(array_intersect_key($in, $map))]);
+    audit_log($db, $me, 'prospect.update', 'prospect', $id, ['fields' => array_merge(array_keys(array_intersect_key($in, $map)), array_keys($customUpdates))]);
 
     if (array_key_exists('status', $in) && ($curRow['status'] ?? '') !== $in['status']) {
         $autoResult = pipeline_run_auto_action($db, 'lead', $id, (string)$in['status'], $me);

@@ -541,6 +541,13 @@ function ProspectsPage() {
       header: d.label,
       accessor: (p) => customValuesById[p.id]?.[d.key] ?? "",
       cell: (p) => <span className="text-muted-foreground text-sm">{formatCustomValue(d, customValuesById[p.id]?.[d.key])}</span>,
+      editor: ({ value, setValue }) => (
+        <CellInput 
+          value={value ?? ""} 
+          setValue={setValue} 
+          type={d.type === "number" ? "number" : d.type === "date" ? "date" : "text"} 
+        />
+      ),
       hideBelow: "lg",
     }));
 

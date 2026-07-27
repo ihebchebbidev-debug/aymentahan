@@ -89,6 +89,7 @@ export type Opportunity = {
   createdAt: string;
   createdBy: string | null;
   updatedBy?: string | null;
+  updatedAt?: string | null;
   debit?: number | null;
   convertedToContract: boolean;
   contractId: string | null;

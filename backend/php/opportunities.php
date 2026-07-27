@@ -39,6 +39,7 @@ function ensure_opportunities_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_opportunities ADD COLUMN comment2 TEXT NULL",
         "ALTER TABLE crminternet_opportunities ADD COLUMN type_id VARCHAR(40) NULL",
         "ALTER TABLE crminternet_opportunities ADD COLUMN updated_by VARCHAR(80) NULL",
+        "ALTER TABLE crminternet_opportunities ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
         "ALTER TABLE crminternet_opportunities ADD COLUMN debit INT UNSIGNED NULL",
         "ALTER TABLE crminternet_opportunities ADD COLUMN ancien_ligne VARCHAR(40) NULL",
     ];
@@ -87,6 +88,7 @@ function row_to_opportunity(array $r): array {
         'createdAt'           => $r['created_at'],
         'createdBy'           => $r['created_by'],
         'updatedBy'           => $r['updated_by'] ?? null,
+        'updatedAt'           => $r['updated_at'] ?? null,
         'debit'               => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
         'convertedToContract' => !empty($r['converted_to_contract']),
         'contractId'          => $r['contract_id'] ?? null,

@@ -76,8 +76,13 @@ export function getToken(): string | null {
 }
 export function setToken(t: string | null) {
   if (typeof window === "undefined") return;
-  if (t) localStorage.setItem(TOKEN_KEY, t);
-  else localStorage.removeItem(TOKEN_KEY);
+  if (t) {
+    localStorage.setItem(TOKEN_KEY, t);
+    try { localStorage.setItem("lastActivityAt", String(Date.now())); } catch { /* ignore */ }
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    try { localStorage.removeItem("lastActivityAt"); } catch { /* ignore */ }
+  }
 }
 
 /**

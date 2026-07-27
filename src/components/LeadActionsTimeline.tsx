@@ -132,7 +132,7 @@ export function LeadActionsTimeline({ prospectId }: { prospectId: string }) {
             {actions.map((a) => {
               const meta = TYPE_META[a.type];
               const Icon = meta.icon;
-              const canDelete = isAdmin || a.agentUsername === user?.username;
+              const canDelete = hasPermission("prospect.delete") || hasPermission("prospect.edit") || a.agentUsername === user?.username;
               return (
                 <li key={a.id} className="relative">
                   <span className="absolute -left-[22px] top-1 h-3 w-3 rounded-full bg-background ring-2 ring-primary/40" />

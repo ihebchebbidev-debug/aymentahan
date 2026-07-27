@@ -226,7 +226,7 @@ function NewProspectPage() {
         firstName: firstName.trim(),
         phone: phone.trim(),
         phone2: phone2.trim(),
-        ancienLigne: showAncienLigne ? (ancienLigne.trim() || null) : null,
+        ancienLigne: ancienLigne.trim() || null,
         cin: cin.trim() || undefined,
         birthDate: birthDate || null,
         email: email.trim(),
@@ -362,12 +362,10 @@ function NewProspectPage() {
                 <Label>Gsm 2</Label>
                 <Input value={phone2} onChange={(e) => setPhone2(e.target.value)} placeholder="20123457" />
               </div>
-              {showAncienLigne && (
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Ancien Ligne <span className="text-[10px] text-muted-foreground">(résiliation / migration)</span></Label>
-                  <Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} placeholder="Ancien numéro" />
-                </div>
-              )}
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Ancien Ligne <span className="text-[10px] text-muted-foreground">(récupération / migration / résiliation)</span></Label>
+                <Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} placeholder="Ancien numéro" />
+              </div>
               <div className="space-y-1.5">
                 <Label>Gouvernorat</Label>
                 <GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} />

@@ -99,8 +99,12 @@ export function IdleLogout() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       const parsed = raw ? Number(raw) : NaN;
-      if (Number.isFinite(parsed) && parsed > 0) initialTs = parsed;
-      else localStorage.setItem(STORAGE_KEY, String(initialTs));
+      if (Number.isFinite(parsed) && parsed > 0 && (Date.now() - parsed) < limitMs && parsed <= Date.now()) {
+        initialTs = parsed;
+      } else {
+        initialTs = Date.now();
+        localStorage.setItem(STORAGE_KEY, String(initialTs));
+      }
     } catch { /* ignore */ }
     scheduleFromActivity(initialTs);
 

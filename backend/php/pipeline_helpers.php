@@ -85,78 +85,11 @@ function pipeline_assert_transition(PDO $db, string $entity, string $currentStag
  * Runs server-side conversions (lead→opportunity, opportunity→contract).
  */
 function pipeline_run_auto_action(PDO $db, string $entity, string $entityId, string $stageName, array $me): ?array {
-    $stages = pipeline_load_stages($db, $entity);
-    $stage  = pipeline_stage_by_name($stages, $stageName);
-    if (!$stage) return null;
-
-    $action = $stage['auto_action'] ?? 'none';
-    if ($action === 'none' || $action === '') return null;
-
-    require_once __DIR__ . '/conversion_helpers.php';
-
-    switch ($action) {
-        case 'convert_opportunity':
-            if ($entity !== 'lead') {
-                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
-            }
-            if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
-                return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
-            }
-            $r = conversion_prospect_to_opportunity($db, $entityId, $me, [
-                'source' => 'pipeline:' . $stageName,
-                'checkAgent' => true,
-            ]);
-            return pipeline_auto_action_result($action, $r, 'opportunityId');
-
-        case 'convert_contract':
-            if ($entity === 'lead') {
-                if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
-                    return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
-                }
-                $r = conversion_mark_won_to_contract($db, $entityId, $me, [
-                    'source' => 'pipeline:' . $stageName,
-                    'checkAgent' => true,
-                ]);
-                return pipeline_auto_action_result($action, $r, 'contractId');
-            }
-            if ($entity === 'opportunity') {
-                if (!user_has_any_permission($db, $me, ['prospect.convert', 'opportunity.convert'])) {
-                    return ['action' => $action, 'error' => 'Permission prospect.convert ou opportunity.convert requise'];
-                }
-                $r = conversion_opportunity_to_contract($db, $entityId, $me, [
-                    'source' => 'pipeline:' . $stageName,
-                ]);
-                return pipeline_auto_action_result($action, $r, 'contractId');
-            }
-            return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
-
-        case 'revert_lead':
-            if ($entity !== 'opportunity') {
-                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
-            }
-            if (!user_has_permission($db, $me, 'opportunity.revert')) {
-                return ['action' => $action, 'error' => 'Permission opportunity.revert requise'];
-            }
-            $r = conversion_revert_opportunity_to_prospect($db, $entityId, $me, [
-                'source' => 'pipeline:' . $stageName,
-            ]);
-            return pipeline_auto_action_result($action, $r, 'prospectId');
-
-        case 'revert_opportunity':
-            if ($entity !== 'contract') {
-                return ['action' => $action, 'skipped' => true, 'reason' => 'wrong_entity'];
-            }
-            if (!user_has_permission($db, $me, 'contract.revert')) {
-                return ['action' => $action, 'error' => 'Permission contract.revert requise'];
-            }
-            $r = conversion_revert_contract_to_opportunity($db, $entityId, $me, [
-                'source' => 'pipeline:' . $stageName,
-            ]);
-            return pipeline_auto_action_result($action, $r, 'opportunityId');
-
-        default:
-            return ['action' => $action, 'stage' => $stageName, 'entity' => $entity, 'id' => $entityId, 'skipped' => true];
-    }
+    // Auto-conversions on status/stage change are DISABLED.
+    // Conversions (prospect→opportunity, opportunity→contract, reverts) must
+    // only happen via the explicit "Convertir" buttons in the UI.
+    // The pipeline stage auto_action configuration is intentionally ignored.
+    return null;
 }
 
 /** Normalize conversion helper result for pipeline auto-action API responses. */
