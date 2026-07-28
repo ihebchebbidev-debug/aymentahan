@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { attachmentAcceptAttribute, isAudioAttachmentFile } from "@/lib/attachmentRules";
 import {
@@ -15,6 +15,8 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { Share2 } from "lucide-react";
+import ShareAttachmentDialog from "@/components/ShareAttachmentDialog";
 
 export type AttachmentPreviewItem = {
   id: string;
@@ -39,7 +41,7 @@ function fmtSize(b: number) {
 }
 
 export function isAttachmentPreviewable(mime: string) {
-  return mime?.startsWith("image/") || mime === "application/pdf" || mime?.startsWith("audio/");
+  return mime?.startsWith("image/") || mime === "application/pdf" || mime?.startsWith("audio/") || mime?.startsWith("video/");
 }
 
 export function AttachmentPreviewDialog({
@@ -65,6 +67,8 @@ export function AttachmentPreviewDialog({
   removing?: boolean;
   replacing?: boolean;
 }) {
+  const [shareOpen, setShareOpen] = useState(false);
+  const [mediaLoading, setMediaLoading] = useState(true);
   const replaceRef = useRef<HTMLInputElement>(null);
   const navItems = items && items.length > 0 ? items : (item ? [item] : []);
   const index = item ? navItems.findIndex((x) => x.id === item.id) : -1;
@@ -85,6 +89,11 @@ export function AttachmentPreviewDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, go]);
 
+  useEffect(() => {
+    // reset loading state when item changes
+    setMediaLoading(true);
+  }, [item?.id, open]);
+
   const editable = canEdit && !item?.readOnly && !!onRemove;
   const replaceable = canEdit && !!onReplaceFile;
 
@@ -102,8 +111,8 @@ export function AttachmentPreviewDialog({
         }}
       />
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden">
-          <DialogHeader className="px-4 py-3 border-b">
+          <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col">
+            <DialogHeader className="px-4 py-3 border-b">
             <DialogTitle className="text-sm truncate pr-8">
               {item ? cleanFilename(item.filename) : ""}
               {navItems.length > 1 && index >= 0 && (
@@ -120,31 +129,28 @@ export function AttachmentPreviewDialog({
             )}
           </DialogHeader>
           {item && (
-            <div className="relative bg-muted/30 flex items-center justify-center min-h-[55vh] max-h-[75vh]">
+            <div className="relative bg-muted/30 flex-1 flex items-center justify-center min-h-[40vh] max-h-[70vh] overflow-auto">
               {item.mimeType?.startsWith("image/") ? (
                 <img
                   src={item.previewUrl}
                   alt={item.filename}
                   className="max-h-[75vh] max-w-full object-contain"
+                  onLoad={() => setMediaLoading(false)}
                 />
               ) : item.mimeType === "application/pdf" ? (
                 <iframe
                   src={item.previewUrl}
                   title={item.filename}
                   className="w-full h-[75vh] bg-white"
+                  onLoad={() => setMediaLoading(false)}
                 />
-              ) : isAudioAttachmentFile({ name: item.filename, type: item.mimeType } as File) ? (
-                <div className="p-8 text-sm text-muted-foreground text-center">
-                  <div className="mb-3 text-base font-medium text-foreground">Enregistrement vocal</div>
-                  <p className="mb-4">Cet audio peut être téléchargé et lu depuis votre lecteur local.</p>
-                  <div className="mt-3">
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={item.downloadUrl ?? item.previewUrl} target="_blank" rel="noreferrer">
-                        <Download className="h-4 w-4 mr-1.5" />
-                        Télécharger
-                      </a>
-                    </Button>
-                  </div>
+              ) : item.mimeType?.startsWith("video/") ? (
+                <video src={item.previewUrl} controls className="max-h-[75vh] w-full bg-black" onLoadedMetadata={() => setMediaLoading(false)} onCanPlay={() => setMediaLoading(false)} />
+              ) : item.mimeType?.startsWith("audio/") ? (
+                <div className="w-full p-6 flex flex-col items-center">
+                  <div className="mb-3 text-base font-medium text-foreground">Lecture audio</div>
+                  <audio src={item.previewUrl} controls className="w-full max-w-2xl" onLoadedMetadata={() => setMediaLoading(false)} onCanPlay={() => setMediaLoading(false)} />
+                  <div className="mt-4 text-sm text-muted-foreground">{cleanFilename(item.filename)} · {fmtSize(item.sizeBytes)}</div>
                 </div>
               ) : (
                 <div className="p-8 text-sm text-muted-foreground text-center">
@@ -179,10 +185,15 @@ export function AttachmentPreviewDialog({
                   </button>
                 </>
               )}
+              {mediaLoading && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30">
+                  <Loader2 className="h-8 w-8 animate-spin text-white" />
+                </div>
+              )}
             </div>
           )}
           {item && (
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t">
+            <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-t bg-card">
               <div className="flex flex-wrap gap-2">
                 {navItems.length > 1 && onNavigate && (
                   <>
@@ -227,6 +238,10 @@ export function AttachmentPreviewDialog({
                     Supprimer
                   </Button>
                 )}
+                <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
+                  <Share2 className="h-4 w-4 mr-1.5" />
+                  Partager
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2 ml-auto">
                 <Button variant="outline" size="sm" asChild>
@@ -248,6 +263,14 @@ export function AttachmentPreviewDialog({
           )}
         </DialogContent>
       </Dialog>
+      {item && (
+        <ShareAttachmentDialog
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          attachmentId={item.id}
+          onShared={() => {/* no-op */}}
+        />
+      )}
     </>
   );
 }

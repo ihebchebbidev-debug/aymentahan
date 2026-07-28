@@ -35,7 +35,7 @@ type Report = {
   teams?: { team: string; agents: number; handled: number; won: number; lost: number; contracts: number; revenue: number; conversion: number }[];
   funnel: { pending: number; won: number; lost: number; total: number };
   monthly: { month: string; contracts: number; revenue: number }[];
-  sources: { source: string; total: number; won: number; conversion: number }[];
+
 };
 
 const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -129,7 +129,6 @@ function ReportsPage() {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.agents), "Agents");
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.monthly), "Mensuel");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.sources), "Sources");
       XLSX.utils.book_append_sheet(
         wb,
         XLSX.utils.json_to_sheet([{ ...data.funnel, from, to }]),
@@ -319,7 +318,7 @@ function ReportsPage() {
             </Table>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-1 gap-4 mt-6">
             <Card className="shadow-elegant">
               <div className="px-4 py-3 border-b font-semibold text-sm">Revenus mensuels (12 mois)</div>
               <Table>
@@ -330,22 +329,6 @@ function ReportsPage() {
                       <TableCell>{m.month}</TableCell>
                       <TableCell className="text-right">{m.contracts}</TableCell>
                       <TableCell className="text-right font-medium">{formatAmount(m.revenue)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-            <Card className="shadow-elegant">
-              <div className="px-4 py-3 border-b font-semibold text-sm">Performance par source</div>
-              <Table>
-                <TableHeader><TableRow><TableHead>Source</TableHead><TableHead className="text-right">Total</TableHead><TableHead className="text-right">Gagnés</TableHead><TableHead className="text-right">Conv. %</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {data.sources.map((s) => (
-                    <TableRow key={s.source}>
-                      <TableCell>{s.source}</TableCell>
-                      <TableCell className="text-right">{s.total}</TableCell>
-                      <TableCell className="text-right text-success">{s.won}</TableCell>
-                      <TableCell className="text-right">{s.conversion}%</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

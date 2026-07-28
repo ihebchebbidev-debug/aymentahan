@@ -21,15 +21,24 @@ try {
 
 $method = $_SERVER['REQUEST_METHOD'];
 $ENTITIES = ['prospect', 'opportunity', 'contract', 'migration'];
-// Limite max par fichier (100 Ko). Aligné avec le frontend (les images sont
-// compressées côté navigateur avant envoi). PDF, images et audios sont acceptés.
-const ATTACHMENT_MAX_BYTES = 100 * 1024;
-const ATTACHMENT_AUDIO_MAX_BYTES = 5 * 1024 * 1024;
+// Limite max par fichier. Augmentée pour permettre partage de vidéos/audio
+// et documents via l'interface (les images continuent d'être compressées côté
+// client quand approprié). Ces limites sont prudentes mais peuvent être
+// ajustées selon l'hébergement et les coûts de stockage/bande passante.
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 Mo
+const ATTACHMENT_AUDIO_MAX_BYTES = 20 * 1024 * 1024; // 20 Mo
 const ATTACHMENT_ALLOWED_MIMES = [
-  'application/pdf',
-  'image/png','image/jpeg','image/jpg','image/webp','image/gif','image/bmp',
-  'audio/mpeg','audio/mp3','audio/aac','audio/x-aac','audio/wav','audio/x-wav',
-  'audio/ogg','audio/oga','audio/mp4','audio/x-m4a','audio/m4a','audio/flac','audio/webm',
+    // Documents
+    'application/pdf', 'application/zip', 'application/x-zip-compressed',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv',
+    // Images
+    'image/png','image/jpeg','image/jpg','image/webp','image/gif','image/bmp',
+    // Audio
+    'audio/mpeg','audio/mp3','audio/aac','audio/x-aac','audio/wav','audio/x-wav',
+    'audio/ogg','audio/oga','audio/mp4','audio/x-m4a','audio/m4a','audio/flac','audio/webm',
+    // Video
+    'video/mp4','video/webm','video/quicktime',
 ];
 
 $UPLOAD_DIR = __DIR__ . '/uploads';
@@ -57,11 +66,52 @@ if ($method === 'GET') {
         if (!$r || !is_file($r['storage_path'])) fail('Fichier introuvable', 404);
         audit_log($db, $me, 'attachment.download', $r['entity'], $r['entity_id'], ['attachmentId' => $r['id'], 'filename' => $r['filename']]);
         $mime = (string)$r['mime_type'];
-        $inline = !empty($_GET['inline']) && (strpos($mime, 'image/') === 0 || $mime === 'application/pdf' || strpos($mime, 'audio/') === 0);
+        // Allow inline rendering for images, pdf, audio and video types when
+        // `inline=1` is provided so browsers can preview/play media directly.
+        $inline = !empty($_GET['inline']) && (
+            strpos($mime, 'image/') === 0 ||
+            $mime === 'application/pdf' ||
+            strpos($mime, 'audio/') === 0 ||
+            strpos($mime, 'video/') === 0
+        );
         header('Content-Type: ' . $mime);
-        header('Content-Length: ' . filesize($r['storage_path']));
+        $filePath = $r['storage_path'];
+        $fileSize = filesize($filePath);
+        // Support HTTP Range requests for streaming/seekable playback of large media.
+        if (!empty($_SERVER['HTTP_RANGE'])) {
+            // Parse the range header, only support a single range like 'bytes=start-end'
+            if (preg_match('/bytes=(\d*)-(\d*)/', $_SERVER['HTTP_RANGE'], $m)) {
+                $start = $m[1] !== '' ? intval($m[1]) : 0;
+                $end = $m[2] !== '' ? intval($m[2]) : ($fileSize - 1);
+                if ($end > $fileSize - 1) $end = $fileSize - 1;
+                if ($start > $end) {
+                    header('HTTP/1.1 416 Range Not Satisfiable');
+                    header("Content-Range: bytes */$fileSize");
+                    exit;
+                }
+                header('HTTP/1.1 206 Partial Content');
+                header("Content-Range: bytes $start-$end/$fileSize");
+                header('Accept-Ranges: bytes');
+                header('Content-Length: ' . ($end - $start + 1));
+                header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . addslashes($r['filename']) . '"');
+                $fp = fopen($filePath, 'rb');
+                if ($fp === false) { fail('Échec lecture fichier', 500); }
+                fseek($fp, $start);
+                $bytesLeft = $end - $start + 1;
+                while ($bytesLeft > 0 && !feof($fp)) {
+                    $chunk = fread($fp, min(8192, $bytesLeft));
+                    if ($chunk === false) break;
+                    echo $chunk;
+                    flush();
+                    $bytesLeft -= strlen($chunk);
+                }
+                fclose($fp);
+                exit;
+            }
+        }
+        header('Content-Length: ' . $fileSize);
         header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . addslashes($r['filename']) . '"');
-        readfile($r['storage_path']);
+        readfile($filePath);
         exit;
     }
     $entity = $_GET['entity'] ?? '';

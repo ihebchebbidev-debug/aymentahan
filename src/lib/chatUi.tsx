@@ -4,6 +4,7 @@ import type { ChatMessage, Conversation, ChatAttachment, SeenEntry } from "./cha
 import { authenticatedApiUrl } from "./api";
 import { chatApi } from "./chat";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { AttachmentPreviewDialog, type AttachmentPreviewItem } from "@/components/AttachmentPreviewDialog";
 
 // ----- Basic helpers -----
 export function initials(name?: string | null) {
@@ -96,24 +97,40 @@ export function AttachmentBubble({ att, mine }: { att: ChatAttachment; mine: boo
   const isImage = att.mimeType?.startsWith("image/");
   const isPdf = att.mimeType === "application/pdf";
   const url = authenticatedApiUrl(att.url, isImage || isPdf ? { inline: 1 } : undefined);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState<AttachmentPreviewItem | null>(null);
   if (isImage) {
+    const openPreview = () => {
+      setPreviewItem({ id: att.id, filename: att.filename, mimeType: att.mimeType, sizeBytes: att.sizeBytes, previewUrl: authenticatedApiUrl(att.url, { inline: 1 }), downloadUrl: authenticatedApiUrl(att.url) });
+      setPreviewOpen(true);
+    };
     return (
-      <a href={url} target="_blank" rel="noreferrer" className={`max-w-full block rounded-2xl overflow-hidden border border-border ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
-        <img src={url} alt={att.filename} className="block max-h-64 w-auto object-cover" loading="lazy" />
-      </a>
+      <>
+        <button onClick={openPreview} className={`max-w-full block rounded-2xl overflow-hidden border border-border ${mine ? "rounded-br-md" : "rounded-bl-md"}`}>
+          <img src={url} alt={att.filename} className="block max-h-64 w-auto object-cover" loading="lazy" />
+        </button>
+        <AttachmentPreviewDialog item={previewItem} open={previewOpen} onOpenChange={(o) => { if (!o) setPreviewItem(null); setPreviewOpen(o); }} />
+      </>
     );
   }
+  const openPreviewNonImage = () => {
+    setPreviewItem({ id: att.id, filename: att.filename, mimeType: att.mimeType, sizeBytes: att.sizeBytes, previewUrl: authenticatedApiUrl(att.url, { inline: 1 }), downloadUrl: authenticatedApiUrl(att.url) });
+    setPreviewOpen(true);
+  };
   return (
-    <a href={url} target="_blank" rel="noreferrer" className={`max-w-full flex items-center gap-2 px-3 py-2 rounded-2xl text-sm border ${mine ? "bg-primary text-primary-foreground border-primary rounded-br-md" : "bg-muted border-border rounded-bl-md"}`}>
-      <div className="h-8 w-8 rounded-md bg-background/40 flex items-center justify-center shrink-0">
-        {isPdf ? <FileText className="h-4 w-4" /> : <FileIcon className="h-4 w-4" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="truncate font-medium">{att.filename}</div>
-        <div className="text-[10px] opacity-70">{(att.sizeBytes / 1024).toFixed(1)} Ko</div>
-      </div>
-      <Download className="h-4 w-4 opacity-70" />
-    </a>
+    <>
+      <button onClick={openPreviewNonImage} className={`max-w-full flex items-center gap-2 px-3 py-2 rounded-2xl text-sm border ${mine ? "bg-primary text-primary-foreground border-primary rounded-br-md" : "bg-muted border-border rounded-bl-md"}`}>
+        <div className="h-8 w-8 rounded-md bg-background/40 flex items-center justify-center shrink-0">
+          {isPdf ? <FileText className="h-4 w-4" /> : <FileIcon className="h-4 w-4" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="truncate font-medium">{att.filename}</div>
+          <div className="text-[10px] opacity-70">{(att.sizeBytes / 1024).toFixed(1)} Ko</div>
+        </div>
+        <Download className="h-4 w-4 opacity-70" />
+      </button>
+      <AttachmentPreviewDialog item={previewItem} open={previewOpen} onOpenChange={(o) => { if (!o) setPreviewItem(null); setPreviewOpen(o); }} />
+    </>
   );
 }
 

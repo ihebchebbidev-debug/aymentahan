@@ -1,5 +1,5 @@
 // Chat API client — wraps backend/php/chat.php
-import { api, apiUpload } from "./api";
+import { api, apiUpload, apiUploadWithProgress } from "./api";
 
 export type ChatType = "dm" | "group" | "broadcast";
 
@@ -82,13 +82,19 @@ export const chatApi = {
   users: () => api<{ users: ChatUser[] }>(PATH, { query: { action: "users" } }),
   send: (conversationId: string, body: string) =>
     api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "send", conversation_id: conversationId, body } }),
-  upload: (conversationId: string, file: File, caption = "") =>
-    apiUpload<{ message: ChatMessage }>(PATH, {
+  upload: (conversationId: string, file: File, caption = "", onProgress?: (p: number) => void) =>
+    // Use XHR-backed upload with progress when a callback is provided.
+    (onProgress ? apiUploadWithProgress<{ message: ChatMessage }>(PATH, {
       action: "upload",
       conversation_id: conversationId,
       body: caption,
       file,
-    }),
+    }, onProgress) : apiUpload<{ message: ChatMessage }>(PATH, {
+      action: "upload",
+      conversation_id: conversationId,
+      body: caption,
+      file,
+    })),
   createDm: (username: string) =>
     api<{ id: string; created: boolean }>(PATH, { method: "POST", body: { action: "create_dm", user: username } }),
   createGroup: (name: string, members: string[]) =>
@@ -109,6 +115,10 @@ export const chatApi = {
     api(PATH, { method: "POST", body: { action: "set_mute", conversation_id: conversationId, muted } }),
   leave: (conversationId: string) =>
     api(PATH, { method: "POST", body: { action: "leave", conversation_id: conversationId } }),
+  forwardAttachment: (attachmentId: string, conversationId: string, caption = "") =>
+    api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_attachment", attachment_id: attachmentId, conversation_id: conversationId, body: caption } }),
+  forwardToUser: (attachmentId: string, user: string, caption = "") =>
+    api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_to_user", attachment_id: attachmentId, user, body: caption } }),
   broadcast: (input: {
     body: string;
     title?: string;

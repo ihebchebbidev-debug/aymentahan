@@ -68,6 +68,47 @@ export async function apiUpload<T = any>(
   return data as T;
 }
 
+/** Upload helper that reports progress via XHR. `onProgress` receives a number 0..1. */
+export function apiUploadWithProgress<T = any>(
+  path: string,
+  fields: Record<string, string | Blob>,
+  onProgress?: (p: number) => void,
+): Promise<T> {
+  if (!API_ENABLED) return Promise.reject(new ApiError("API base URL not configured", 0));
+  const url = BASE + (path.startsWith("/") ? path : `/${path}`);
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v as any);
+  const token = getToken();
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('X-Auth-Token', token);
+    }
+    xhr.responseType = 'json';
+    xhr.onload = () => {
+      const status = xhr.status;
+      const data = xhr.response;
+      if (!data || status < 200 || status >= 300 || data?.success === false) {
+        const msg = (data && data.message) ? data.message : `HTTP ${status}`;
+        if (status === 401 && isAuthValidationEndpoint(url)) handleUnauthorized(url);
+        if (status === 403) notifyForbidden(url, msg, 403);
+        reject(new ApiError(msg, status));
+        return;
+      }
+      resolve(data as T);
+    };
+    xhr.onerror = () => reject(new ApiError('Network error', 0));
+    if (xhr.upload && typeof onProgress === 'function') {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+    }
+    xhr.send(fd);
+  });
+}
+
 const TOKEN_KEY = "protection_erp_token";
 
 export function getToken(): string | null {

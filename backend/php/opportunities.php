@@ -443,6 +443,31 @@ if ($method === 'POST') {
 if ($method === 'PATCH' || $method === 'PUT') {
     require_permission($db, $me, 'opportunity.edit');
     $in = json_input();
+    $action = $in['action'] ?? $action ?? '';
+
+    if ($action === 'append_note') {
+        $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
+        if ($oid === '') fail('id requis', 422);
+
+        $cur = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
+        $cur->execute([':id' => $oid]);
+        $before = $cur->fetch();
+        if (!$before) fail('Not found', 404);
+        if ($isAgent && ($before['assigned_to'] ?? '') !== $username) fail('Accès refusé', 403);
+
+        $note = trim((string)($in['note'] ?? ''));
+        if ($note === '') fail('Commentaire requis', 422);
+
+        $currentNotes = trim((string)($before['notes'] ?? ''));
+        $newEntry = sprintf('[%s] %s: %s', date('Y-m-d H:i'), $username, str_replace(["\r\n", "\r"], "\n", $note));
+        $updatedNotes = $currentNotes !== '' ? ($currentNotes . "\n\n" . $newEntry) : $newEntry;
+
+        $db->prepare('UPDATE crminternet_opportunities SET notes = :notes WHERE id = :id')
+            ->execute([':notes' => $updatedNotes, ':id' => $oid]);
+
+        ok(['message' => 'Commentaire ajouté', 'notes' => $updatedNotes]);
+    }
+
     $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
     if ($oid === '') fail('id requis', 422);
 

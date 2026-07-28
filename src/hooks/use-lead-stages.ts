@@ -47,11 +47,10 @@ export function useLeadStages(): LeadStageWithUsage[] {
 /** Ordered status names from API, or LEAD_STATUSES fallback when offline. */
 export function useLeadStatusNames(): string[] {
   const stages = useLeadStages();
-  const names = stages.map((s) => s.name);
-  for (const status of LEAD_STATUSES) {
-    if (!names.includes(status)) names.push(status);
+  if (stages.length > 0) {
+    return stages.map((s) => s.name);
   }
-  return names;
+  return LEAD_STATUSES;
 }
 
 /** Predefined badge style variants matching color strings. */

@@ -461,7 +461,13 @@ if ($method === 'POST') {
     // memory + time on large imports (was: SELECT lead_stages per row, plus
     // SELECT-id-existence per row).
     $allowedStatus = $db->query('SELECT name FROM crminternet_lead_stages')->fetchAll(PDO::FETCH_COLUMN);
-    if (!$allowedStatus) $allowedStatus = ['Nouveau','En cours','Rappel','Refus','Vendu'];
+    if (!$allowedStatus) {
+        $allowedStatus = [
+            'Ok','Att cin','Att confirmation','Rappel','deja migré','migration','Basculement',
+            'Ing','Nrp','Pas de rep','Pas intersse','Déjà connecté','Autr dde encor','Autre',
+            'A réinjecter','Réinjecté','facture impayé',
+        ];
+    }
     $existingIdsMap = [];
     try {
         foreach ($db->query('SELECT id FROM crminternet_prospects', PDO::FETCH_COLUMN) as $eid) {

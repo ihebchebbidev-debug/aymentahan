@@ -23,6 +23,7 @@ import {
   NewDmDialog, NewGroupDialog, BroadcastDialog,
   AddMembersDialog, ManageGroupDialog,
 } from "@/components/ChatWidget";
+import { attachmentAcceptAttribute } from "@/lib/attachmentRules";
 import {
   timeShort, convTitle, ConvAvatar, MessageList, ScrollToBottomButton, useChatScroll,
   MessageSearchPanel, useJumpToMessage,
@@ -248,6 +249,7 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -282,7 +284,9 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
     try {
       if (pendingFile) {
         if (pendingFile.size > 20 * 1024 * 1024) throw new Error("Fichier trop volumineux (max 20 Mo)");
-        await chat.uploadFile(conv.id, pendingFile, body);
+        setUploadProgress(0);
+        await chat.uploadFile(conv.id, pendingFile, body, (p) => setUploadProgress(p));
+        setUploadProgress(1);
         setPendingFile(null);
       } else {
         await chat.send(conv.id, body);
@@ -291,6 +295,7 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
     } catch (e: any) { toast.error(e?.message ?? "Erreur d'envoi"); }
     finally {
       setSending(false);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -431,6 +436,11 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
           <div className="flex-1 min-w-0">
             <div className="text-xs font-medium truncate">{pendingFile.name}</div>
             <div className="text-[10px] text-muted-foreground">{(pendingFile.size / 1024).toFixed(1)} Ko</div>
+            {uploadProgress !== null && (
+              <div className="w-full mt-1 bg-background rounded h-2 overflow-hidden">
+                <div className="h-2 bg-primary" style={{ width: `${Math.round(uploadProgress * 100)}%` }} />
+              </div>
+            )}
           </div>
           <button type="button" onClick={() => setPendingFile(null)} className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-background">
             <X className="h-3.5 w-3.5" />
@@ -451,7 +461,7 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+            accept={attachmentAcceptAttribute()}
             onChange={(e) => onPickFile(e.target.files)}
           />
           <Button type="button" variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()} disabled={sending} title="Joindre un fichier">

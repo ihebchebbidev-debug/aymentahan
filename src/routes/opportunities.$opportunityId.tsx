@@ -58,7 +58,8 @@ function OpportunityDetailPage() {
   const [opp, setOpp] = useState<Opportunity | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState("");
+  const [draftNote, setDraftNote] = useState("");
+  const [assignedToQuery, setAssignedToQuery] = useState("");
   const [busy, setBusy] = useState(false);
 
   const reload = async () => {
@@ -66,7 +67,6 @@ function OpportunityDetailPage() {
     try {
       const r = await api<{ opportunity: Opportunity }>(`/opportunities.php?id=${encodeURIComponent(opportunityId)}`);
       setOpp(r.opportunity ?? null);
-      setNotes(r.opportunity?.notes ?? "");
     } catch { setOpp(null); }
     finally { setLoading(false); }
   };
@@ -83,6 +83,49 @@ function OpportunityDetailPage() {
   }, [opportunityId]);
 
   const agent = useMemo(() => users.find((u) => u.username === opp?.assignedTo), [users, opp]);
+  const assignedUsers = useMemo(() => {
+    const query = assignedToQuery.trim().toLowerCase();
+    return users
+      .filter((u) => u.role && ['Agent','Manager','AgentSuivi','AgentActivation','AgentVente','Administrateur'].includes(u.role))
+      .filter((u) => {
+        if (!query) return true;
+        return u.username.toLowerCase().includes(query) || (u.fullName ?? '').toLowerCase().includes(query);
+      });
+  }, [users, assignedToQuery]);
+
+  const noteHistory = useMemo(() => {
+    const notesText = opp?.notes ?? '';
+    const trimmed = notesText.trim();
+    if (!trimmed) return [] as Array<{ id: string; author: string | null; date: string | null; body: string }>;
+    return trimmed.split(/\n{2,}/).filter(Boolean).map((entry, index) => {
+      const lines = entry.split(/\n/);
+      const first = lines[0];
+      const rest = lines.slice(1).join('\n');
+      const match = first.match(/^\[([^\]]+)\]\s+([^:]+):\s*(.*)$/);
+      if (match) {
+        const [, date, author, firstBody] = match;
+        const body = [firstBody, rest].filter(Boolean).join('\n');
+        return { id: `note-${index}-${date}`, author, date, body };
+      }
+      return { id: `note-${index}`, author: null, date: null, body: entry };
+    });
+  }, [opp?.notes]);
+
+  const addComment = async () => {
+    const text = draftNote.trim();
+    if (!text) return;
+    setBusy(true);
+    try {
+      await api('/opportunities.php', { method: 'PATCH', body: { id: opp?.id, action: 'append_note', note: text } });
+      setDraftNote('');
+      await reload();
+      toast.success('Commentaire ajouté');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Échec de l’ajout du commentaire');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (loading) {
     return <AppLayout skeleton="detail"><div className="p-10 text-center text-muted-foreground">Chargement…</div></AppLayout>;
@@ -310,8 +353,23 @@ function OpportunityDetailPage() {
                         <Select value={opp.assignedTo ?? "__none__"} onValueChange={(v) => patch({ assignedTo: v === "__none__" ? null : v })} disabled={busy}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
+                            <div className="p-2">
+                              <Input
+                                placeholder="Rechercher un agent…"
+                                value={assignedToQuery}
+                                onChange={(e) => setAssignedToQuery(e.target.value)}
+                                className="w-full"
+                                disabled={busy}
+                              />
+                            </div>
                             <SelectItem value="__none__">Non attribué</SelectItem>
-                            {users.map((u) => <SelectItem key={u.username} value={u.username}>{u.fullName} (@{u.username})</SelectItem>)}
+                            {assignedUsers.length > 0 ? assignedUsers.map((u) => (
+                              <SelectItem key={u.username} value={u.username}>
+                                {u.fullName} (@{u.username})
+                              </SelectItem>
+                            )) : (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">Aucun agent correspondant</div>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -332,16 +390,48 @@ function OpportunityDetailPage() {
                     </div>
                   )}
 
-                  <div className="space-y-1.5 pt-3 border-t">
-                    <Label className="text-xs">Notes</Label>
-                    <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!canEdit} />
-                    {canEdit && (
-                      <div className="flex justify-end">
-                        <Button size="sm" disabled={busy || notes === (opp.notes ?? "")} onClick={() => patch({ notes })}>
-                          Enregistrer
-                        </Button>
+                  <div className="space-y-4 pt-3 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-xs">Historique des commentaires</Label>
+                        <p className="text-[11px] text-muted-foreground">Les nouveaux commentaires sont ajoutés à la suite du fil.</p>
                       </div>
-                    )}
+                      <span className="text-xs text-muted-foreground">{noteHistory.length} entrée{noteHistory.length > 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="space-y-3 rounded-lg border bg-background p-3">
+                      {noteHistory.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">Aucun commentaire. Ajoutez le premier message.</div>
+                      ) : (
+                        noteHistory.map((note) => (
+                          <div key={note.id} className="rounded-lg border border-border bg-muted p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                              <span>{note.author ?? 'Note'}</span>
+                              {note.date ? <span>{note.date}</span> : null}
+                            </div>
+                            <div className="whitespace-pre-wrap text-sm text-foreground mt-2">{note.body}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Textarea
+                        rows={3}
+                        value={draftNote}
+                        onChange={(e) => setDraftNote(e.target.value)}
+                        placeholder={canEdit ? 'Ajouter un commentaire…' : 'Vous ne pouvez pas ajouter de commentaire.'}
+                        disabled={!canEdit}
+                      />
+                      {canEdit && (
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" disabled={busy || !draftNote.trim()} onClick={() => setDraftNote('')}>
+                            Effacer
+                          </Button>
+                          <Button size="sm" disabled={busy || !draftNote.trim()} onClick={addComment}>
+                            Ajouter
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

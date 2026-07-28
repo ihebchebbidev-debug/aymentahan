@@ -56,6 +56,7 @@ function EditOpportunityPage() {
   const [saving, setSaving] = useState(false);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [types, setTypes] = useState<ProspectType[]>([]);
+  const [assignedToQuery, setAssignedToQuery] = useState("");
 
   // Form state
   const [civility, setCivility] = useState<"M" | "Mme">("M");
@@ -138,6 +139,12 @@ function EditOpportunityPage() {
     () => users.filter((u) => ["Agent","Manager","AgentSuivi","AgentActivation","AgentVente","Administrateur"].includes(u.role)),
     [users],
   );
+
+  const filteredAgents = useMemo(() => {
+    const query = assignedToQuery.trim().toLowerCase();
+    if (!query) return agents;
+    return agents.filter((u) => u.username.toLowerCase().includes(query) || (u.fullName ?? '').toLowerCase().includes(query));
+  }, [agents, assignedToQuery]);
 
   if (loading) {
     return <AppLayout skeleton="form"><div className="p-10 text-center text-muted-foreground">Chargement…</div></AppLayout>;
@@ -310,8 +317,22 @@ function EditOpportunityPage() {
                 <Select value={assignedTo} onValueChange={setAssignedTo}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <div className="p-2">
+                      <Input
+                        placeholder="Rechercher un agent…"
+                        value={assignedToQuery}
+                        onChange={(e) => setAssignedToQuery(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
                     <SelectItem value="__none__">— Non attribué —</SelectItem>
-                    {agents.map((u) => <SelectItem key={u.username} value={u.username}>{u.fullName} (@{u.username})</SelectItem>)}
+                    {filteredAgents.length > 0 ? filteredAgents.map((u) => (
+                      <SelectItem key={u.username} value={u.username}>
+                        {u.fullName} (@{u.username})
+                      </SelectItem>
+                    )) : (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">Aucun agent correspondant</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

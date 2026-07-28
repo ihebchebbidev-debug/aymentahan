@@ -142,8 +142,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     ingestMessage(id, r.message);
   }, [ingestMessage]);
 
-  const uploadFile = useCallback(async (id: string, file: File, caption = "") => {
-    const r = await chatApi.upload(id, file, caption);
+  const uploadFile = useCallback(async (id: string, file: File, caption = "", onProgress?: (p: number) => void) => {
+    const r = await chatApi.upload(id, file, caption, onProgress);
     ingestMessage(id, r.message);
   }, [ingestMessage]);
 
