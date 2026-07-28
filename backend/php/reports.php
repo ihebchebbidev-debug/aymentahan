@@ -149,7 +149,7 @@ if ($team !== '' && !$teamIsNone) $mp[':team'] = $team;
 $monthly->execute($mp);
 $months = array_map(fn($r)=>['month'=>$r['ym'],'contracts'=>(int)$r['cnt'],'revenue'=>(float)$r['rev']], $monthly->fetchAll());
 
-// Per source
+// Per prospect type (the values shown in the prospect-type filters, e.g. Client guichet, Swap gpon)
 if ($teamIsNone) {
     $srcJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
     $srcWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
@@ -162,20 +162,21 @@ if ($teamIsNone) {
 }
 
 $src = $db->prepare("
-  SELECT p.source, COUNT(*) total,
-    SUM(CASE WHEN p.outcome='won' THEN 1 ELSE 0 END) won
+  SELECT COALESCE(pt.name, pt.label, p.type_id, p.source, 'Sans type') AS type_label,
+         COUNT(*) total,
+         SUM(CASE WHEN p.outcome='won' THEN 1 ELSE 0 END) won
   FROM crminternet_prospects p
   $srcJoin
+  LEFT JOIN crminternet_prospect_types pt ON pt.id = p.type_id
   WHERE p.created_at BETWEEN :f AND :t
   $srcWhereTeam
-  GROUP BY p.source ORDER BY total DESC
-
+  GROUP BY type_label ORDER BY total DESC
 ");
 $sp = [':f'=>$from, ':t'=>$to];
 if ($team !== '' && !$teamIsNone) $sp[':team'] = $team;
 $src->execute($sp);
 $sources = array_map(fn($r)=>[
-    'source'=>$r['source'], 'total'=>(int)$r['total'], 'won'=>(int)$r['won'],
+    'source'=>$r['type_label'], 'total'=>(int)$r['total'], 'won'=>(int)$r['won'],
     'conversion'=> (int)$r['total']>0 ? round((int)$r['won']/(int)$r['total']*100,1) : 0.0,
 ], $src->fetchAll());
 
