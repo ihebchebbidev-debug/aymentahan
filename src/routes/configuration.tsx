@@ -28,6 +28,7 @@ import { ProspectTypesPanel } from "@/components/ProspectTypesPanel";
 import type { ProspectType } from "@/lib/types";
 import { IdleTimeoutsPanel } from "@/components/IdleTimeoutsPanel";
 import { ObjectivesPanel, EntitiesPanel } from "@/components/GuichetAdmin";
+import BackofficeObjectivesPanel from "@/components/BackofficeAdmin";
 import { TeamsPanel } from "@/components/TeamsPanel";
 import { LeadStagesPanel } from "@/components/LeadStagesPanel";
 import { Can } from "@/components/Can";
@@ -652,6 +653,9 @@ function ConfigPage() {
           <Can anyOf={["guichet.view_objectives", "guichet.manage_objectives"]}>
             <TabsTrigger value="guichet-objectives">Guichet · Objectifs</TabsTrigger>
           </Can>
+          <Can anyOf={["backoffice.view_objectives", "backoffice.manage_objectives"]}>
+            <TabsTrigger value="backoffice-objectives">Backoffice · Objectifs</TabsTrigger>
+          </Can>
           <Can perm="guichet.manage_entities">
             <TabsTrigger value="guichet-entities">Guichet · Entités</TabsTrigger>
           </Can>
@@ -669,6 +673,7 @@ function ConfigPage() {
         <TabsContent value="user" className="space-y-0 mt-4"><FieldList tab="user" /></TabsContent>
         <TabsContent value="teams" className="space-y-4 mt-4"><TeamsPanel /></TabsContent>
         <TabsContent value="guichet-objectives" className="space-y-4 mt-4"><ObjectivesPanel /></TabsContent>
+        <TabsContent value="backoffice-objectives" className="space-y-4 mt-4"><BackofficeObjectivesPanel /></TabsContent>
         <TabsContent value="guichet-entities" className="space-y-4 mt-4"><EntitiesPanel /></TabsContent>
       </Tabs>
     </AppLayout>

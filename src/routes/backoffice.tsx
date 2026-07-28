@@ -3,8 +3,41 @@ import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Wrench, Users, ShieldCheck, UsersRound, Building2, Briefcase, Heart, Package, Tag, ListChecks, Receipt, CheckCircle2, Stethoscope } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { getBackofficeDashboard } from "@/lib/backofficeApi";
 import { useErp } from "@/lib/erpStore";
 import { useMemo } from "react";
+
+function BackofficeTargets() {
+  const [data, setData] = useState<any>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const month = new Date().toISOString().slice(0,7);
+        const r = await getBackofficeDashboard({ month });
+        setData(r);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
+
+  if (!data) return <div className="text-sm text-muted-foreground mt-2">Chargement…</div>;
+  return (
+    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="p-2">
+        <div className="text-xs text-muted-foreground">Contrats</div>
+        <div className="font-medium">{data.contracts.month} / {data.targets.contractsMonthly ?? 0}</div>
+        <div className="text-xs text-muted-foreground">Progress: {data.progress.contractsMonthly ?? 0}%</div>
+      </div>
+      <div className="p-2">
+        <div className="text-xs text-muted-foreground">Migrations</div>
+        <div className="font-medium">{data.migrations.month} / {data.targets.migrationsMonthly ?? 0}</div>
+        <div className="text-xs text-muted-foreground">Progress: {data.progress.migrationsMonthly ?? 0}%</div>
+      </div>
+    </div>
+  );
+}
 
 export const Route = createFileRoute("/backoffice")({
   head: () => ({
@@ -49,6 +82,15 @@ function BackofficePage() {
         description="Configurez les données de référence de votre ERP"
         icon={<Wrench className="h-5 w-5" />}
       />
+
+      {/* Targets / progress */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+        <Card className="p-4">
+          <div className="text-sm font-medium">Objectifs Backoffice (mois en cours)</div>
+          <BackofficeTargets />
+        </Card>
+        <div />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {items.map((it) => {

@@ -17,7 +17,7 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   listEntities, createEntity, updateEntity, deleteEntity,
-  getDashboard, upsertObjective,
+  getDashboard, listObjectives, upsertObjective,
   type GuichetEntity, type GuichetDashboard,
 } from "@/lib/guichetApi";
 
@@ -133,12 +133,61 @@ function ObjectiveEditor({ month, entities, onSaved }: { month: string; entities
   const [tcd, setTcd] = useState(25); const [tcm, setTcm] = useState(650); const [wdays, setWdays] = useState(26);
   const [budgetM, setBudgetM] = useState<number | "">(900); const [budgetD, setBudgetD] = useState<number | "">(30);
   const [minAct, setMinAct] = useState<number>(25); const [bonus, setBonus] = useState<number | "">("");
-  
+
   // Get active agents
   const agents = useMemo(
     () => users.filter((u) => (u.role === "Agent" || u.role === "Manager" || u.role === "AgentSuivi" || u.role === "AgentActivation" || u.role === "AgentVente") && u.active !== false),
     [users],
   );
+
+  const resetObjectiveForm = () => {
+    setSim(900);
+    setPort(90);
+    setFancy(90);
+    setTcd(25);
+    setTcm(650);
+    setWdays(26);
+    setBudgetM(900);
+    setBudgetD(30);
+    setMinAct(25);
+    setBonus("");
+  };
+
+  const loadExistingObjective = async () => {
+    const query: Record<string, string | undefined> = { scope, month };
+    if (scope === "agent") query.agentId = agentId || undefined;
+    if (scope === "entity") query.entityId = entityId || undefined;
+
+    if ((scope === "agent" && !agentId) || (scope === "entity" && !entityId)) {
+      resetObjectiveForm();
+      return;
+    }
+
+    try {
+      const list = await listObjectives(query);
+      const obj = list[0];
+      if (!obj) {
+        resetObjectiveForm();
+        return;
+      }
+      setSim(obj.targetSim);
+      setPort(obj.targetPort);
+      setFancy(obj.targetFancy);
+      setTcd(obj.targetContractsDaily);
+      setTcm(obj.targetContractsMonthly);
+      setWdays(obj.workingDays);
+      setBudgetM(obj.budgetMonthlyDt ?? "");
+      setBudgetD(obj.budgetDailyDt ?? "");
+      setMinAct(obj.minActivationPct);
+      setBonus(obj.challengeBonusDt ?? "");
+    } catch {
+      resetObjectiveForm();
+    }
+  };
+
+  useEffect(() => {
+    loadExistingObjective();
+  }, [scope, agentId, entityId, month]);
 
   const save = async () => {
     if (scope === "agent" && !agentId.trim()) {
