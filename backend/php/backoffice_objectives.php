@@ -20,6 +20,7 @@ function row_to_obj_bo(array $r): array {
         'scope' => $r['scope'] ?? 'agent',
         'agentId' => $r['agent_id'] ?? null,
         'entityId' => $r['entity_id'] ?? null,
+        'roleName' => $r['role_name'] ?? null,
         'periodMonth' => $r['period_month'] ?? '',
         'targetContracts' => (int)($r['target_contracts'] ?? 0),
         'targetMigrations' => (int)($r['target_migrations'] ?? 0),
@@ -30,7 +31,7 @@ function row_to_obj_bo(array $r): array {
 
 if ($method === 'GET') {
     $where = []; $params = [];
-    foreach (['scope'=>'scope','agentId'=>'agent_id','entityId'=>'entity_id'] as $q=>$col) {
+    foreach (['scope'=>'scope','agentId'=>'agent_id','entityId'=>'entity_id','roleName'=>'role_name'] as $q=>$col) {
         if (!empty($_GET[$q])) { $where[] = "$col = :$q"; $params[":$q"] = $_GET[$q]; }
     }
     if (!empty($_GET['month']) && preg_match('/^\d{4}-\d{2}$/', $_GET['month'])) {
@@ -47,18 +48,20 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     require_permission($db, $me, 'backoffice.manage_objectives');
     $in = json_input();
-    $scope = in_array(($in['scope'] ?? 'agent'), ['agent','entity','global'], true) ? $in['scope'] : 'agent';
+    $scope = in_array(($in['scope'] ?? 'agent'), ['agent','entity','global','role'], true) ? $in['scope'] : 'agent';
     $period = (string)($in['periodMonth'] ?? '');
     if (!preg_match('/^\d{4}-\d{2}$/', $period)) fail('periodMonth (YYYY-MM) requis', 422);
     $agent  = $scope === 'agent'  ? (string)($in['agentId']  ?? '') : null;
     $entity = $scope === 'entity' ? (string)($in['entityId'] ?? '') : null;
+    $roleName = $scope === 'role' ? (string)($in['roleName'] ?? '') : null;
     if ($scope === 'agent'  && !$agent)  fail('agentId requis',  422);
     if ($scope === 'entity' && !$entity) fail('entityId requis', 422);
+    if ($scope === 'role'   && !$roleName) fail('roleName requis', 422);
 
     $find = $db->prepare("SELECT id FROM crminternet_backoffice_objectives
         WHERE scope=:s AND period_month=:p
-        AND (agent_id <=> :a) AND (entity_id <=> :e) LIMIT 1");
-    $find->execute([':s'=>$scope, ':p'=>$period, ':a'=>$agent, ':e'=>$entity]);
+        AND (agent_id <=> :a) AND (entity_id <=> :e) AND (role_name <=> :r) LIMIT 1");
+    $find->execute([':s'=>$scope, ':p'=>$period, ':a'=>$agent, ':e'=>$entity, ':r'=>$roleName]);
     $existing = $find->fetchColumn();
 
     $tc = max(0, (int)($in['targetContracts'] ?? 0));
@@ -68,18 +71,18 @@ if ($method === 'POST') {
 
     if ($existing) {
         $db->prepare("UPDATE crminternet_backoffice_objectives
-            SET target_contracts=:tc, target_migrations=:tm, working_days=:wd, notes=:n
+            SET target_contracts=:tc, target_migrations=:tm, working_days=:wd, notes=:n, role_name=:r
             WHERE id=:id")
-           ->execute([':tc'=>$tc, ':tm'=>$tm, ':wd'=>$wdays, ':n'=>$notes, ':id'=>$existing]);
+           ->execute([':tc'=>$tc, ':tm'=>$tm, ':wd'=>$wdays, ':n'=>$notes, ':r'=>$roleName, ':id'=>$existing]);
         audit_log($db, $me, 'backoffice_objective.update', 'backoffice_objective', $existing);
         ok(['id'=>$existing, 'updated'=>1]);
     }
     $id = 'BO-' . substr(bin2hex(random_bytes(6)), 0, 10);
     $db->prepare("INSERT INTO crminternet_backoffice_objectives
-        (id, scope, agent_id, entity_id, period_month, target_contracts, target_migrations, working_days, notes)
-        VALUES (:id,:s,:a,:e,:p,:tc,:tm,:wd,:n)")
+        (id, scope, agent_id, entity_id, role_name, period_month, target_contracts, target_migrations, working_days, notes)
+        VALUES (:id,:s,:a,:e,:r,:p,:tc,:tm,:wd,:n)")
        ->execute([
-           ':id'=>$id, ':s'=>$scope, ':a'=>$agent, ':e'=>$entity, ':p'=>$period,
+           ':id'=>$id, ':s'=>$scope, ':a'=>$agent, ':e'=>$entity, ':r'=>$roleName, ':p'=>$period,
            ':tc'=>$tc, ':tm'=>$tm, ':wd'=>$wdays, ':n'=>$notes,
        ]);
     audit_log($db, $me, 'backoffice_objective.create', 'backoffice_objective', $id);

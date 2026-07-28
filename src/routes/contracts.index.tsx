@@ -61,7 +61,7 @@ function buildImportFields(currencySymbol: string): ImportField[] {
     { key: "signatureDate", label: "Date signature (AAAA-MM-JJ)", sample: "2026-04-28" },
     { key: "effectiveDate", label: "Date d'effet", sample: "2026-05-01" },
     { key: "validationDate", label: "Date validation" },
-    { key: "source", label: "Source", sample: "Web" },
+    { key: "source", label: "Type source", sample: "Web" },
     { key: "assignedTo", label: "Assigné à (username)", sample: "REDISSI.SONIA" },
   ];
 }
@@ -219,7 +219,7 @@ function ContractsPage() {
     { key: "effectiveDate",  label: CONTRACT_LABELS.effectiveDate ?? "Date d'effet" },
     { key: "validationDate", label: CONTRACT_LABELS.validationDate ?? "Date validation" },
     { key: "billingStatus",  label: CONTRACT_LABELS.billingStatus ?? "Statut facturation" },
-    { key: "source",         label: CONTRACT_LABELS.source ?? "Source" },
+    { key: "source",         label: CONTRACT_LABELS.source ?? "Type source" },
     { key: "assignedTo",     label: CONTRACT_LABELS.assignedTo ?? "Assigné à" },
     { key: "comment1",       label: "Observation 1" },
     { key: "comment2",       label: "Observation 2" },
@@ -686,7 +686,7 @@ function ContractsPage() {
                 cell: (c) => <Badge variant="outline" className={billingColor[c.billingStatus] ?? ""}>{c.billingStatus}</Badge>,
                 editor: ({ value, setValue }) => <CellSelect value={value} setValue={setValue} options={BILLING.map((s: string) => ({ value: s, label: s }))} />,
               },
-              { key: "source", header: "Source", accessor: (c) => c.source ?? "", hideBelow: "lg",
+              { key: "source", header: "Type source", accessor: (c) => c.source ?? "", hideBelow: "lg",
                 cell: (c) => <span className="text-muted-foreground">{c.source || "—"}</span> },
               { key: "assignedTo", header: "Assigné À", accessor: (c) => c.assignedTo, hideBelow: "md",
                 cell: (c) => <span className="text-muted-foreground">{c.assignedTo}</span> },

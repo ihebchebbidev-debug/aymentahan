@@ -158,7 +158,7 @@ function OpportunitiesPage() {
     { key: "address",     label: "Adresse" },
     { key: "codePostal",  label: "Code postal" },
     { key: "localisationXy", label: "Localisation (lat,lng)" },
-    { key: "source",      label: "Source" },
+    { key: "source",      label: "Type source" },
     { key: "title",       label: "Titre" },
     { key: "stage",       label: "Statut" },
     { key: "amount",      label: "Montant" },
@@ -417,7 +417,7 @@ function OpportunitiesPage() {
     { key: "codePostal", header: "CP", accessor: (o) => o.codePostal ?? "", hideBelow: "xl" },
     { key: "localisationXy", header: "GPS", accessor: (o) => o.localisationXy ?? "", hideBelow: "xl",
       cell: (o) => <span className="text-muted-foreground truncate">{o.localisationXy || "—"}</span> },
-    { key: "source", header: "Source", accessor: (o) => o.source ?? "", hideBelow: "lg",
+    { key: "source", header: "Type source", accessor: (o) => o.source ?? "", hideBelow: "lg",
       cell: (o) => <span className="text-muted-foreground">{o.source || "—"}</span>,
       editor: ({ value, setValue }) => (
         <CellInput value={value ?? ""} setValue={setValue} />

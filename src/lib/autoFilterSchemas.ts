@@ -96,7 +96,7 @@ export function autoFilterSchema(
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, tél, email, CIN)", type: "text" },
         realField("Statut d'appel", "statut", rows, "status", input.prospectStatuses ?? [], true),
-        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Type source", "source", rows, "source", standardSources, true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
         realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
         { key: "outcome", label: "Issue", type: "select", options: [
@@ -152,7 +152,7 @@ export function autoFilterSchema(
         { key: "search", label: "Recherche (nom, ville, titre)", type: "text" },
         realField("Étape", "stage", rows, "stage", input.opportunityStages ?? [], true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
-        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Type source", "source", rows, "source", standardSources, true),
         realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
         gouvernoratField(rows),
         realField("Délégation", "delegation", rows, "delegation"),
@@ -217,7 +217,7 @@ export function autoFilterSchema(
       return withCf([
         { key: "search", label: "Recherche (nom, prénom, ville)", type: "text" },
         realField("Statut Facturation", "statut", rows, "billingStatus", input.contractBilling ?? ["Brouillon", "Actif", "Résilié", "Suspendu"], true),
-        realField("Source", "source", rows, "source", standardSources, true),
+        realField("Type source", "source", rows, "source", standardSources, true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
         realField("Civilité", "civility", rows, "civility", ["M", "Mme"], true),
         gouvernoratField(rows),

@@ -2,9 +2,10 @@ import { api } from "./api";
 
 export type BackofficeObjective = {
   id: string;
-  scope: "agent" | "entity" | "global";
+  scope: "agent" | "entity" | "global" | "role";
   agentId: string | null;
   entityId: string | null;
+  roleName: string | null;
   periodMonth: string;
   targetContracts: number;
   targetMigrations: number;
@@ -23,5 +24,5 @@ export const upsertBackofficeObjective = (body: Partial<BackofficeObjective>) =>
 export const deleteBackofficeObjective = (id: string) =>
   api("/backoffice_objectives.php", { method: "DELETE", query: { id } });
 
-export const getBackofficeDashboard = (query: { month: string; entityId?: string; agentId?: string }) =>
+export const getBackofficeDashboard = (query: { month: string; entityId?: string; agentId?: string; roleName?: string }) =>
   api<{ month: string; targets: any; progress: any; contracts: any; migrations: any }>("/backoffice_dashboard.php", { query });

@@ -14,6 +14,7 @@ $month = (string)($_GET['month'] ?? date('Y-m'));
 if (!preg_match('/^\d{4}-\d{2}$/', $month)) fail('month (YYYY-MM) requis', 422);
 $entityId = !empty($_GET['entityId']) ? (string)$_GET['entityId'] : null;
 $agentId  = !empty($_GET['agentId'])  ? (string)$_GET['agentId']  : null;
+$roleName = !empty($_GET['roleName']) ? (string)$_GET['roleName'] : ((string)($me['role'] ?? '') ?: null);
 
 // Basic permission: any authenticated user can read; non-admins see their own scope.
 $role = $me['role'] ?? '';
@@ -29,12 +30,12 @@ $targetContracts = 0;
 $targetMigrations = 0;
 $workingDays = 26;
 $notes = null;
-$lookup = function(string $scope, ?string $a, ?string $e) use ($db, $month, &$targetContracts, &$targetMigrations, &$workingDays, &$notes) {
+$lookup = function(string $scope, ?string $a, ?string $e, ?string $r = null) use ($db, $month, &$targetContracts, &$targetMigrations, &$workingDays, &$notes) {
     if ($targetContracts || $targetMigrations) return;
     $st = $db->prepare("SELECT * FROM crminternet_backoffice_objectives
         WHERE scope=:s AND period_month=:p
-        AND (agent_id <=> :a) AND (entity_id <=> :e) LIMIT 1");
-    $st->execute([':s'=>$scope, ':p'=>$month, ':a'=>$a, ':e'=>$e]);
+        AND (agent_id <=> :a) AND (entity_id <=> :e) AND (role_name <=> :r) LIMIT 1");
+    $st->execute([':s'=>$scope, ':p'=>$month, ':a'=>$a, ':e'=>$e, ':r'=>$r]);
     $row = $st->fetch();
     if ($row) {
         $targetContracts = (int)($row['target_contracts'] ?? 0);
@@ -43,9 +44,10 @@ $lookup = function(string $scope, ?string $a, ?string $e) use ($db, $month, &$ta
         $notes = $row['notes'] ?? null;
     }
 };
-if ($agentId)  $lookup('agent',  $agentId,  null);
-if ($entityId) $lookup('entity', null,      $entityId);
-$lookup('global', null, null);
+if ($roleName) $lookup('role', null, null, $roleName);
+if ($agentId)  $lookup('agent',  $agentId,  null, null);
+if ($entityId) $lookup('entity', null,      $entityId, null);
+$lookup('global', null, null, null);
 
 $monthStart = $month . '-01';
 $today = date('Y-m-d');
@@ -80,7 +82,7 @@ $pct = function(float $n, float $t): int { return $t > 0 ? (int)min(100, round($
 
 ok([
     'month' => $month,
-    'scope' => ['agentId' => $agentId, 'entityId' => $entityId],
+    'scope' => ['agentId' => $agentId, 'entityId' => $entityId, 'roleName' => $roleName],
     'targets' => [
         'contractsMonthly' => $targetContracts,
         'migrationsMonthly' => $targetMigrations,

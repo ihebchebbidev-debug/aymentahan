@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { useErp } from "@/lib/erpStore";
+import { useAuth } from "@/lib/auth";
 import { listEntities } from "@/lib/guichetApi";
 import { listBackofficeObjectives, upsertBackofficeObjective, type BackofficeObjective } from "@/lib/backofficeApi";
 
@@ -26,20 +27,30 @@ export function BackofficeObjectivesPanel() {
 
 function ObjectiveEditor({ month, entities }: { month: string; entities: { id: string; name: string }[] }) {
   const { users } = useErp();
-  const [scope, setScope] = useState<"agent"|"entity"|"global">("global");
+  const { user } = useAuth();
+  const [scope, setScope] = useState<"agent"|"entity"|"global"|"role">("global");
   const [agentId, setAgentId] = useState("");
   const [entityId, setEntityId] = useState("");
+  const [roleName, setRoleName] = useState("");
   const [contracts, setContracts] = useState(0);
   const [migrations, setMigrations] = useState(0);
   const [workingDays, setWorkingDays] = useState(26);
 
   const agents = useMemo(() => users.filter((u) => u.active !== false), [users]);
+  const roleOptions = useMemo(() => Array.from(new Set(users.map((u) => u.role).filter(Boolean))) as string[], [users]);
+
+  useEffect(() => {
+    if (user?.role && !roleName) {
+      setRoleName(user.role);
+    }
+  }, [user?.role, roleName]);
 
   const load = async () => {
     const q: Record<string,string|undefined> = { scope, month };
     if (scope === 'agent') q.agentId = agentId || undefined;
     if (scope === 'entity') q.entityId = entityId || undefined;
-    if ((scope === 'agent' && !agentId) || (scope === 'entity' && !entityId)) {
+    if (scope === 'role') q.roleName = roleName || undefined;
+    if ((scope === 'agent' && !agentId) || (scope === 'entity' && !entityId) || (scope === 'role' && !roleName)) {
       setContracts(0); setMigrations(0); setWorkingDays(26); return;
     }
     try {
@@ -54,13 +65,14 @@ function ObjectiveEditor({ month, entities }: { month: string; entities: { id: s
     }
   };
 
-  useEffect(() => { void load(); }, [scope, agentId, entityId, month]);
+  useEffect(() => { void load(); }, [scope, agentId, entityId, roleName, month]);
 
   const save = async () => {
     if (scope === 'agent' && !agentId) { toast.error('Sélectionner un agent'); return; }
     if (scope === 'entity' && !entityId) { toast.error('Sélectionner une entité'); return; }
+    if (scope === 'role' && !roleName) { toast.error('Sélectionner un rôle'); return; }
     try {
-      await upsertBackofficeObjective({ scope, agentId: scope==='agent' ? agentId : undefined, entityId: scope==='entity' ? entityId : undefined, periodMonth: month, targetContracts: contracts, targetMigrations: migrations, workingDays });
+      await upsertBackofficeObjective({ scope, agentId: scope==='agent' ? agentId : undefined, entityId: scope==='entity' ? entityId : undefined, roleName: scope==='role' ? roleName : undefined, periodMonth: month, targetContracts: contracts, targetMigrations: migrations, workingDays });
       toast.success('Objectif backoffice enregistré');
     } catch (e: any) { toast.error(e?.message ?? 'Erreur'); }
   };
@@ -71,9 +83,13 @@ function ObjectiveEditor({ month, entities }: { month: string; entities: { id: s
       <CardContent className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
         <div className="space-y-1.5"><Label>Portée</Label>
           <Select value={scope} onValueChange={(v) => setScope(v as any)}><SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="global">Global</SelectItem><SelectItem value="entity">Par entité</SelectItem><SelectItem value="agent">Par agent</SelectItem></SelectContent>
+            <SelectContent><SelectItem value="global">Global</SelectItem><SelectItem value="role">Par rôle</SelectItem><SelectItem value="entity">Par entité</SelectItem><SelectItem value="agent">Par agent</SelectItem></SelectContent>
           </Select>
         </div>
+        {scope === 'role' && <div className="space-y-1.5"><Label>Rôle</Label>
+          <Select value={roleName} onValueChange={setRoleName}><SelectTrigger><SelectValue placeholder="Choisir un rôle" /></SelectTrigger>
+            <SelectContent>{roleOptions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+          </Select></div>}
         {scope === 'entity' && <div className="space-y-1.5"><Label>Entité</Label>
           <Select value={entityId} onValueChange={setEntityId}><SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
             <SelectContent>{entities.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}</SelectContent>

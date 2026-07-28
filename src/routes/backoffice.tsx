@@ -6,21 +6,23 @@ import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { getBackofficeDashboard } from "@/lib/backofficeApi";
 import { useErp } from "@/lib/erpStore";
+import { useAuth } from "@/lib/auth";
 import { useMemo } from "react";
 
 function BackofficeTargets() {
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   useEffect(() => {
     (async () => {
       try {
         const month = new Date().toISOString().slice(0,7);
-        const r = await getBackofficeDashboard({ month });
+        const r = await getBackofficeDashboard({ month, roleName: user?.role ?? undefined });
         setData(r);
       } catch (e) {
         // ignore
       }
     })();
-  }, []);
+  }, [user?.role]);
 
   if (!data) return <div className="text-sm text-muted-foreground mt-2">Chargement…</div>;
   return (

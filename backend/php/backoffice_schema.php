@@ -23,6 +23,7 @@ function ensure_backoffice_objectives_schema(PDO $db): void
             scope VARCHAR(16) NOT NULL DEFAULT 'agent',
             agent_id VARCHAR(40) NULL,
             entity_id VARCHAR(40) NULL,
+            role_name VARCHAR(80) NULL,
             period_month CHAR(7) NOT NULL,
             target_contracts INT NOT NULL DEFAULT 0,
             target_migrations INT NOT NULL DEFAULT 0,
@@ -44,6 +45,7 @@ function ensure_backoffice_objectives_schema(PDO $db): void
     $adds = [
         'scope' => "VARCHAR(16) NOT NULL DEFAULT 'agent'",
         'agent_id' => 'VARCHAR(40) NULL',
+        'role_name' => 'VARCHAR(80) NULL',
         'target_contracts' => 'INT NOT NULL DEFAULT 0',
         'target_migrations' => 'INT NOT NULL DEFAULT 0',
         'working_days' => 'INT NOT NULL DEFAULT 26',
@@ -53,5 +55,11 @@ function ensure_backoffice_objectives_schema(PDO $db): void
         if (!isset($cols[$field])) {
             crm_try_alter($db, "ALTER TABLE crminternet_backoffice_objectives ADD COLUMN {$field} {$def}");
         }
+    }
+
+    try {
+        $db->query("SHOW INDEX FROM crminternet_backoffice_objectives WHERE Key_name='uniq_scope_role_period'");
+    } catch (Throwable $e) {
+        crm_try_alter($db, "ALTER TABLE crminternet_backoffice_objectives ADD UNIQUE KEY uniq_scope_role_period (scope, role_name, period_month)");
     }
 }
