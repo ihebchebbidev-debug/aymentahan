@@ -35,7 +35,7 @@ type Report = {
   teams?: { team: string; agents: number; handled: number; won: number; lost: number; contracts: number; revenue: number; conversion: number }[];
   funnel: { pending: number; won: number; lost: number; total: number };
   monthly: { month: string; contracts: number; revenue: number }[];
-
+  sources: { source: string; total: number; won: number; conversion: number }[];
 };
 
 const fmtDate = (d: Date) => d.toISOString().slice(0, 10);
@@ -319,6 +319,33 @@ function ReportsPage() {
           </Card>
 
           <div className="grid grid-cols-1 gap-4 mt-6">
+            <Card className="shadow-elegant">
+              <div className="px-4 py-3 border-b font-semibold text-sm">Rapport par type source</div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type source</TableHead>
+                    <TableHead className="text-right">Leads</TableHead>
+                    <TableHead className="text-right">Gagnés</TableHead>
+                    <TableHead className="text-right">Conv. %</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.sources.map((s) => (
+                    <TableRow key={s.source || "__empty__"}>
+                      <TableCell>{s.source || "—"}</TableCell>
+                      <TableCell className="text-right">{s.total}</TableCell>
+                      <TableCell className="text-right text-success">{s.won}</TableCell>
+                      <TableCell className="text-right">{s.conversion}%</TableCell>
+                    </TableRow>
+                  ))}
+                  {data.sources.length === 0 && (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Aucune donnée</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+
             <Card className="shadow-elegant">
               <div className="px-4 py-3 border-b font-semibold text-sm">Revenus mensuels (12 mois)</div>
               <Table>
