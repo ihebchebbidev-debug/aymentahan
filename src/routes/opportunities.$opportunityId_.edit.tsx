@@ -12,6 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import { useErp } from "@/lib/erpStore";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { api } from "@/lib/api";
@@ -64,6 +65,7 @@ function EditOpportunityPage() {
   const [firstName, setFirstName] = useState("");
   const [phone, setPhone] = useState("");
   const [phone2, setPhone2] = useState("");
+  const [ancienLigne, setAncienLigne] = useState("");
   const [cin, setCin] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [email, setEmail] = useState("");
@@ -101,6 +103,7 @@ function EditOpportunityPage() {
           setFirstName(o.firstName ?? "");
           setPhone(o.phone ?? "");
           setPhone2(o.phone2 ?? "");
+          setAncienLigne(o.ancienLigne ?? "");
           setCin(o.cin ?? "");
           setBirthDate(o.birthDate ?? "");
           setEmail(o.email ?? "");
@@ -180,6 +183,7 @@ function EditOpportunityPage() {
         address: address.trim(),
         localisationXy: normalizeLocalisationXy(localisationXy) || null,
         codePostal: normalizeCodePostal(codePostal) || null,
+        ancienLigne: ancienLigne.trim() || null,
         source,
         typeId: typeId || null,
         comment1: comment1.trim() || null,
@@ -279,7 +283,8 @@ function EditOpportunityPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Gsm 1</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Gsm 2</Label><Input value={phone2} onChange={(e) => setPhone2(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Gouvernorat</Label><Input value={gouvernorat} onChange={(e) => setGouvernorat(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Ancienne ligne</Label><Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Gouvernorat</Label><GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} /></div>
               <div className="space-y-1.5"><Label>Délégation</Label><Input value={delegation} onChange={(e) => setDelegation(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Ville</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Code postal</Label>

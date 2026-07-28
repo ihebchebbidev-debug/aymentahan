@@ -15,6 +15,7 @@ import {
 import { useErp } from "@/lib/erpStore";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import type { Migration, PipelineStage, ProspectType } from "@/lib/types";
+import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
@@ -272,7 +273,7 @@ function EditMigrationPage() {
               <div className="space-y-1.5"><Label>Gsm 2</Label><Input value={phone2} onChange={(e) => setPhone2(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Animateur</Label><Input value={animateur} onChange={(e) => setAnimateur(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Ancienne ligne</Label><Input value={ancienLigne} onChange={(e) => setAncienLigne(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Gouvernorat</Label><Input value={gouvernorat} onChange={(e) => setGouvernorat(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Gouvernorat</Label><GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} /></div>
               <div className="space-y-1.5"><Label>Délégation</Label><Input value={delegation} onChange={(e) => setDelegation(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Ville</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Zone</Label><Input value={zone} onChange={(e) => setZone(e.target.value)} /></div>

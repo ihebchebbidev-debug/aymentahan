@@ -490,6 +490,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         'email' => 'email', 'city' => 'city',
         'gouvernorat' => 'gouvernorat', 'delegation' => 'delegation', 'address' => 'address',
         'localisationXy' => 'localisation_xy', 'codePostal' => 'code_postal',
+        'ancienLigne' => 'ancien_ligne',
         'comment1' => 'comment1', 'comment2' => 'comment2',
         'source' => 'source',
         'typeId' => 'type_id',

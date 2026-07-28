@@ -16,6 +16,7 @@ import { useErp } from "@/lib/erpStore";
 import { api } from "@/lib/api";
 import type { Contract, PipelineStage, ProspectType } from "@/lib/types";
 import { useContractStages } from "@/hooks/use-contract-stages";
+import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import { ensureDefaultProspectTypes } from "@/lib/prospectTypes";
 import { toast } from "sonner";
 import {
@@ -241,7 +242,7 @@ function EditContractPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>Gsm 1</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Gsm 2</Label><Input value={phone2} onChange={(e) => setPhone2(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>Gouvernorat</Label><Input value={gouvernorat} onChange={(e) => setGouvernorat(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Gouvernorat</Label><GouvernoratSelect value={gouvernorat} onChange={setGouvernorat} /></div>
               <div className="space-y-1.5"><Label>Délégation</Label><Input value={delegation} onChange={(e) => setDelegation(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Ville</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>Code postal</Label>
