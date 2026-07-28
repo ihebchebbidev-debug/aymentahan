@@ -162,7 +162,11 @@ if ($teamIsNone) {
 }
 
 $src = $db->prepare("
-  SELECT COALESCE(pt.name, pt.label, p.type_id, p.source, 'Sans type') AS type_label,
+  SELECT CASE
+           WHEN COALESCE(NULLIF(pt.name, ''), NULLIF(pt.label, '')) IS NOT NULL THEN COALESCE(NULLIF(pt.name, ''), NULLIF(pt.label, ''))
+           WHEN p.type_id IS NOT NULL AND p.type_id <> '' AND p.type_id NOT LIKE 'PT-%' THEN p.type_id
+           ELSE 'Type non défini'
+         END AS type_label,
          COUNT(*) total,
          SUM(CASE WHEN p.outcome='won' THEN 1 ELSE 0 END) won
   FROM crminternet_prospects p
