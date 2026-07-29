@@ -114,9 +114,17 @@ function crm_apply_production_seed(PDO $db): array
             }
         }
         $existingOpportunityPerms = [];
+        $existingContractAssignPerms = [];
+        $existingContractTypePerms = [];
         foreach ($perms as $row) {
             if (($row[1] ?? '') === 'opportunity.assign_prospect') {
                 $existingOpportunityPerms[(string)($row[0] ?? '')] = true;
+            }
+            if (($row[1] ?? '') === 'contract.assign') {
+                $existingContractAssignPerms[(string)($row[0] ?? '')] = true;
+            }
+            if (($row[1] ?? '') === 'contract.type') {
+                $existingContractTypePerms[(string)($row[0] ?? '')] = true;
             }
         }
         foreach ($perms as $row) {
@@ -131,6 +139,24 @@ function crm_apply_production_seed(PDO $db): array
                 if ($role !== '' && !isset($existingOpportunityPerms[$role])) {
                     $perms[] = [$role, 'opportunity.assign_prospect', 1];
                     $perms[] = [$role, 'opportunity.change_prospect_type', 1];
+                }
+            }
+            if (($row[1] ?? '') === 'contract.edit' && ($row[2] ?? 0) === 1) {
+                $role = (string)($row[0] ?? '');
+                if ($role !== '' && !isset($existingContractAssignPerms[$role])) {
+                    $perms[] = [$role, 'contract.assign', 1];
+                }
+                if ($role !== '' && !isset($existingContractTypePerms[$role])) {
+                    $perms[] = [$role, 'contract.type', 1];
+                }
+            }
+            if (($row[1] ?? '') === 'migration.edit' && ($row[2] ?? 0) === 1) {
+                $role = (string)($row[0] ?? '');
+                if ($role !== '' && !isset($existingContractAssignPerms[$role])) {
+                    $perms[] = [$role, 'migration.assign', 1];
+                }
+                if ($role !== '' && !isset($existingContractTypePerms[$role])) {
+                    $perms[] = [$role, 'migration.type', 1];
                 }
             }
         }

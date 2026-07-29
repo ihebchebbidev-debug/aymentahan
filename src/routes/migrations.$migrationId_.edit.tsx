@@ -12,6 +12,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth";
 import { useErp } from "@/lib/erpStore";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import type { Migration, PipelineStage, ProspectType } from "@/lib/types";
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/migrations/$migrationId_/edit")({
 
 function GuardedEditMigrationPage() {
   return (
-    <RequirePerm perm="migration.edit" backTo="/migrations" backLabel="Retour aux migrations">
+    <RequirePerm anyOf={["migration.edit", "migration.assign", "migration.type"]} backTo="/migrations" backLabel="Retour aux migrations">
       <EditMigrationPage />
     </RequirePerm>
   );
@@ -50,6 +51,7 @@ const MIGRATION_TYPES = ["Portabilité", "Nouvelle ligne", "Changement offre", "
 function EditMigrationPage() {
   const { migrationId } = Route.useParams();
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const { users } = useErp();
   const { sync } = useCrmListSync();
   const stages: PipelineStage[] = useMigrationStages();
@@ -82,6 +84,9 @@ function EditMigrationPage() {
   const [source, setSource] = useState(SOURCES[0]);
   const [typeId, setTypeId] = useState("");
   const [oldOperator, setOldOperator] = useState("");
+  const canEditMigration = hasPermission("migration.edit");
+  const canAssignMigration = canEditMigration || hasPermission("migration.assign");
+  const canChangeMigrationType = canEditMigration || hasPermission("migration.type");
   const [newOperator, setNewOperator] = useState("");
   const [portingNumber, setPortingNumber] = useState("");
   const [migrationType, setMigrationType] = useState(MIGRATION_TYPES[0]);
@@ -169,40 +174,49 @@ function EditMigrationPage() {
     }
     setSaving(true);
     try {
-      await updateMigration(migration.id, {
-        civility,
-        lastName: lastName.trim(),
-        firstName: firstName.trim(),
-        phone: phone.trim(),
-        phone2: phone2.trim(),
-        animateur: animateur.trim() || null,
-        ancienLigne: ancienLigne.trim() || null,
-        cin: cin.trim(),
-        birthDate: birthDate || null,
-        email: email.trim(),
-        gouvernorat: gouvernorat.trim().toUpperCase(),
-        delegation: delegation.trim(),
-        city: city.trim(),
-        zone: zone.trim() || null,
-        address: address.trim(),
-        localisationXy: normalizeLocalisationXy(localisationXy) || null,
-        codePostal: normalizeCodePostal(codePostal) || null,
-        comment1: comment1.trim() || null,
-        comment2: comment2.trim() || null,
-        source,
-        typeId: typeId || null,
-        oldOperator: oldOperator.trim(),
-        newOperator: newOperator.trim(),
-        portingNumber: portingNumber.trim(),
-        migrationType,
-        requestedDate: requestedDate || null,
-        completedDate: completedDate || null,
-        technicalStatus: technicalStatus.trim(),
-        externalRef: externalRef.trim(),
-        workflowStatus: workflowStatus || migration.workflowStatus,
-        notes: notes.trim() || null,
-        assignedTo: assignedTo === "__none__" ? "" : assignedTo,
-      });
+      const payload: Record<string, unknown> = { id: migration.id };
+      if (canEditMigration) {
+        Object.assign(payload, {
+          civility,
+          lastName: lastName.trim(),
+          firstName: firstName.trim(),
+          phone: phone.trim(),
+          phone2: phone2.trim(),
+          animateur: animateur.trim() || null,
+          ancienLigne: ancienLigne.trim() || null,
+          cin: cin.trim(),
+          birthDate: birthDate || null,
+          email: email.trim(),
+          gouvernorat: gouvernorat.trim().toUpperCase(),
+          delegation: delegation.trim(),
+          city: city.trim(),
+          zone: zone.trim() || null,
+          address: address.trim(),
+          localisationXy: normalizeLocalisationXy(localisationXy) || null,
+          codePostal: normalizeCodePostal(codePostal) || null,
+          comment1: comment1.trim() || null,
+          comment2: comment2.trim() || null,
+          source,
+          typeId: typeId || null,
+          oldOperator: oldOperator.trim(),
+          newOperator: newOperator.trim(),
+          portingNumber: portingNumber.trim(),
+          migrationType,
+          requestedDate: requestedDate || null,
+          completedDate: completedDate || null,
+          technicalStatus: technicalStatus.trim(),
+          externalRef: externalRef.trim(),
+          workflowStatus: workflowStatus || migration.workflowStatus,
+          notes: notes.trim() || null,
+        });
+      }
+      if (canAssignMigration) {
+        payload.assignedTo = assignedTo === "__none__" ? "" : assignedTo;
+      }
+      if (canChangeMigrationType) {
+        payload.typeId = typeId || null;
+      }
+      await updateMigration(migration.id, payload);
       await sync(["migrations"]);
       toast.success("Migration mise à jour");
       navigate({ to: "/migrations/$migrationId", params: { migrationId: migration.id } });
@@ -236,11 +250,11 @@ function EditMigrationPage() {
               {types.length > 0 && (
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Type</Label>
-                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)}>
+                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)} disabled={!canChangeMigrationType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">— Aucun —</SelectItem>
-                      {types.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      {types.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>) }
                     </SelectContent>
                   </Select>
                 </div>
@@ -330,7 +344,7 @@ function EditMigrationPage() {
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Assigné à</Label>
-                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <Select value={assignedTo} onValueChange={setAssignedTo} disabled={!canAssignMigration}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">— Non attribué —</SelectItem>

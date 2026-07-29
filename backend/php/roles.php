@@ -48,7 +48,7 @@ function ensure_mvp_roles(PDO $db): void {
                 'page.dashboard','page.prospects','page.opportunities','page.contracts',
                 'page.calendar','page.tasks','page.notifications','page.profile',
                 'prospect.view','prospect.add','prospect.edit','prospect.type','prospect.status',
-                'opportunity.view','opportunity.edit','opportunity.assign_prospect','opportunity.change_prospect_type','contract.view','contract.edit',
+                'opportunity.view','opportunity.edit','opportunity.assign_prospect','opportunity.change_prospect_type','contract.view','contract.edit','contract.assign','contract.type',
                 'task.add','task.edit','task.complete','calendar.event.add',
             ],
             'AgentActivation' => [

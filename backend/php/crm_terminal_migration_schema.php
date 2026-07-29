@@ -12,6 +12,8 @@ function crm_migration_permission_keys(): array
         'migration.view',
         'migration.add',
         'migration.edit',
+        'migration.assign',
+        'migration.type',
         'migration.delete',
         'migration.export',
         'migration.import',
@@ -76,7 +78,8 @@ function crm_seed_migration_role_permissions(PDO $db): void
         ['Manager', 'AgentSuivi', 'AgentActivation', 'Agent', 'AgentVente', 'Backoffice'],
         [
             'page.migrations', 'migration.view', 'migration.add', 'migration.edit',
-            'migration.export', 'migration.validate', 'opportunity.convert_migration',
+            'migration.assign', 'migration.type', 'migration.export', 'migration.validate',
+            'opportunity.convert_migration',
         ],
         1
     );
@@ -89,7 +92,7 @@ function crm_seed_migration_role_permissions(PDO $db): void
              WHERE permission IN ('page.contracts', 'contract.view') AND enabled = 1"
         )->fetchAll(PDO::FETCH_COLUMN);
         $mirror = [
-            'page.migrations', 'migration.view', 'migration.edit', 'migration.export',
+            'page.migrations', 'migration.view', 'migration.edit', 'migration.assign', 'migration.type', 'migration.export',
         ];
         foreach ($contractRoles as $role) {
             if ($role === 'Administrateur' || $role === '' || $role === null) {

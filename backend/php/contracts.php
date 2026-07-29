@@ -201,6 +201,30 @@ if ($method === 'PATCH' || $method === 'PUT') {
         fail('Accès refusé', 403);
     }
 
+    $canEditContract = user_has_permission($db, $me, 'contract.edit');
+    $canAssignContract = $canEditContract || user_has_permission($db, $me, 'contract.assign');
+    $canChangeContractType = $canEditContract || user_has_permission($db, $me, 'contract.type');
+
+    $allowedLimitedFields = ['id', 'assignedTo', 'typeId'];
+    $disallowedFields = [];
+    foreach (array_keys($in) as $k) {
+        if ($k === 'id') {
+            continue;
+        }
+        if (!$canEditContract && !in_array($k, $allowedLimitedFields, true)) {
+            $disallowedFields[] = $k;
+        }
+    }
+    if (!$canEditContract && $disallowedFields !== []) {
+        fail('Accès refusé (permission requise : contract.edit pour modifier ces champs)', 403);
+    }
+    if (array_key_exists('assignedTo', $in) && !$canAssignContract) {
+        fail('Accès refusé (permission requise : contract.assign)', 403);
+    }
+    if (array_key_exists('typeId', $in) && !$canChangeContractType) {
+        fail('Accès refusé (permission requise : contract.type)', 403);
+    }
+
     $sets   = [];
     $params = [':id' => $cid];
 

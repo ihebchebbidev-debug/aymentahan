@@ -441,11 +441,11 @@ if ($method === 'POST') {
 
 // ---------------------------------------------------- PATCH/PUT (update)
 if ($method === 'PATCH' || $method === 'PUT') {
-    require_permission($db, $me, 'opportunity.edit');
     $in = json_input();
     $action = $in['action'] ?? $action ?? '';
 
     if ($action === 'append_note') {
+        require_permission($db, $me, 'opportunity.edit');
         $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
         if ($oid === '') fail('id requis', 422);
 
@@ -475,6 +475,10 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $canEditProspect = user_has_permission($db, $me, 'prospect.edit');
     $canAssignProspect = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.assign_prospect') || user_has_permission($db, $me, 'prospect.assign');
     $canChangeProspectType = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.change_prospect_type') || user_has_permission($db, $me, 'prospect.type');
+
+    if (!$canEditOpportunity && !$canEditProspect && !$canAssignProspect && !$canChangeProspectType) {
+        fail('Accès refusé', 403);
+    }
 
     $allowedLimitedFields = ['id', 'assignedTo', 'typeId', 'action'];
     $disallowedFields = [];

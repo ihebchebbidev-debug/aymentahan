@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useErp } from "@/lib/erpStore";
+import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { Contract, PipelineStage, ProspectType } from "@/lib/types";
 import { useContractStages } from "@/hooks/use-contract-stages";
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/contracts/$contractId_/edit")({
 
 function GuardedEditContractPage() {
   return (
-    <RequirePerm perm="contract.edit" backTo="/contracts" backLabel="Retour aux contrats">
+    <RequirePerm anyOf={["contract.edit", "contract.assign", "contract.type"]} backTo="/contracts" backLabel="Retour aux contrats">
       <EditContractPage />
     </RequirePerm>
   );
@@ -51,6 +52,7 @@ function EditContractPage() {
   const { contractId } = Route.useParams();
   const navigate = useNavigate();
   const { contracts, updateContract, users } = useErp();
+  const { hasPermission } = useAuth();
   const stages: PipelineStage[] = useContractStages();
   const [types, setTypes] = useState<ProspectType[]>([]);
   const contract = useMemo(() => contracts.find((c) => c.id === contractId), [contracts, contractId]);
@@ -87,6 +89,9 @@ function EditContractPage() {
   const [debit, setDebit] = useState<number | null>(null);
   const [billingStatus, setBillingStatus] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
+  const canEditContract = hasPermission("contract.edit");
+  const canAssignContract = canEditContract || hasPermission("contract.assign");
+  const canChangeContractType = canEditContract || hasPermission("contract.type");
 
   useEffect(() => {
     if (!contract || hydrated) return;
@@ -146,35 +151,43 @@ function EditContractPage() {
     }
     setSaving(true);
     try {
-      await updateContract(contract.id, {
-        civility,
-        lastName: lastName.trim(),
-        firstName: firstName.trim(),
-        phone: phone.trim(),
-        phone2: phone2.trim(),
-        cin: cin.trim(),
-        birthDate: birthDate || null,
-        email: email.trim(),
-        gouvernorat: gouvernorat.trim().toUpperCase(),
-        delegation: delegation.trim(),
-        city: city.trim(),
-        address: address.trim(),
-        localisationXy: normalizeLocalisationXy(localisationXy) || null,
-        codePostal: normalizeCodePostal(codePostal) || null,
-        comment1: comment1.trim() || null,
-        comment2: comment2.trim() || null,
-        source,
-        typeId: typeId || null,
-        partner: null,
-        cabinet: null,
-        signatureDate: signatureDate || undefined,
-        effectiveDate: effectiveDate || undefined,
-        validationDate: validationDate || null,
-        premium: Number(premium) || 0,
-        debit,
-        billingStatus: billingStatus || contract.billingStatus,
-        assignedTo: assignedTo === "__none__" ? "" : assignedTo,
-      } as any);
+      const payload: Record<string, unknown> = { id: contract.id };
+      if (canEditContract) {
+        Object.assign(payload, {
+          civility,
+          lastName: lastName.trim(),
+          firstName: firstName.trim(),
+          phone: phone.trim(),
+          phone2: phone2.trim(),
+          cin: cin.trim(),
+          birthDate: birthDate || null,
+          email: email.trim(),
+          gouvernorat: gouvernorat.trim().toUpperCase(),
+          delegation: delegation.trim(),
+          city: city.trim(),
+          address: address.trim(),
+          localisationXy: normalizeLocalisationXy(localisationXy) || null,
+          codePostal: normalizeCodePostal(codePostal) || null,
+          comment1: comment1.trim() || null,
+          comment2: comment2.trim() || null,
+          source,
+          partner: null,
+          cabinet: null,
+          signatureDate: signatureDate || undefined,
+          effectiveDate: effectiveDate || undefined,
+          validationDate: validationDate || null,
+          premium: Number(premium) || 0,
+          debit,
+          billingStatus: billingStatus || contract.billingStatus,
+        });
+      }
+      if (canAssignContract) {
+        payload['assignedTo'] = assignedTo === "__none__" ? "" : assignedTo;
+      }
+      if (canChangeContractType) {
+        payload['typeId'] = typeId || null;
+      }
+      await updateContract(contract.id, payload as any);
       toast.success("Contrat mis à jour");
       navigate({ to: "/contracts/$contractId", params: { contractId: contract.id } });
     } catch (e: any) {
@@ -206,7 +219,7 @@ function EditContractPage() {
               {types.length > 0 && (
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Type</Label>
-                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)}>
+                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)} disabled={!canChangeContractType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">— Aucun —</SelectItem>
@@ -278,7 +291,7 @@ function EditContractPage() {
               {/* Source retirée de l'UI — déduite du type de prospect. Valeur existante préservée au save. */}
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Assigné à</Label>
-                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <Select value={assignedTo} onValueChange={setAssignedTo} disabled={!canAssignContract}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">— Non attribué —</SelectItem>
