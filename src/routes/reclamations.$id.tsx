@@ -71,6 +71,62 @@ function ReclamationDetailPage() {
 
   const numericId = useMemo(() => Number(id), [id]);
   const validId = Number.isFinite(numericId) && numericId > 0;
+  const [draftDescriptionComment, setDraftDescriptionComment] = useState("");
+  const [addingDescriptionComment, setAddingDescriptionComment] = useState(false);
+
+  const descriptionHistory = useMemo(() => {
+    const text = row?.description ?? "";
+    const trimmed = text.trim();
+    if (!trimmed) return [] as Array<{ id: string; author: string | null; date: string | null; body: string }>;
+
+    return trimmed.split(/\n{2,}/).filter(Boolean).map((entry, index) => {
+      const lines = entry.split(/\n/);
+      const first = lines[0];
+      const rest = lines.slice(1).join("\n");
+      const match = first.match(/^\[([^\]]+)\]\s+([^:]+):\s*(.*)$/);
+      if (match) {
+        const [, date, author, firstBody] = match;
+        const body = [firstBody, rest].filter(Boolean).join("\n");
+        return { id: `description-${index}-${date}`, author, date, body };
+      }
+      return { id: `description-${index}`, author: null, date: null, body: entry };
+    });
+  }, [row?.description]);
+
+  const buildDescriptionText = (existing: string | null, comment: string): string => {
+    const base = existing?.trim();
+    const now = new Date();
+    const timestamp = now.toLocaleString("fr-FR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const author = user?.fullName || user?.username || "Commentaire";
+    const entry = `[${timestamp}] ${author}: ${comment}`;
+    return base ? `${base}\n\n${entry}` : entry;
+  };
+
+  const addDescriptionComment = async () => {
+    if (!row) return;
+    const text = draftDescriptionComment.trim();
+    if (!text) return;
+
+    setAddingDescriptionComment(true);
+    try {
+      const nextDescription = buildDescriptionText(row.description, text);
+      await api(`/reclamations.php?id=${row.id}`, { method: "PATCH", body: { description: nextDescription } });
+      update({ description: nextDescription });
+      setDraftDescriptionComment("");
+      toast.success("Commentaire ajouté");
+    } catch (e: any) {
+      toast.error("Échec de l'ajout du commentaire", { description: e?.message });
+    } finally {
+      setAddingDescriptionComment(false);
+    }
+  };
+
   const assignedUserOptions = useMemo(
     () => (users ?? [])
       .filter((u: any) => ["Agent","Manager","AgentSuivi","AgentActivation","AgentVente","Administrateur"].includes(u.role))
@@ -228,8 +284,52 @@ function ReclamationDetailPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Description" className="md:col-span-2"><Textarea rows={3} value={row.description ?? ""} disabled={!canEdit} onChange={(e) => update({ description: e.target.value })} /></Field>
+                <Field label="Description" className="md:col-span-2">
+                  <Textarea rows={3} value={row.description ?? ""} disabled={!canEdit} onChange={(e) => update({ description: e.target.value })} />
+                </Field>
                 <Field label="Remarques" className="md:col-span-2"><Textarea rows={2} value={row.remarques ?? ""} disabled={!canEdit} onChange={(e) => update({ remarques: e.target.value })} /></Field>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <Label className="text-sm">Historique de la description</Label>
+                  <p className="text-xs text-muted-foreground">Les commentaires sont conservés et affichés comme un fil.</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{descriptionHistory.length} entrée{descriptionHistory.length > 1 ? 's' : ''}</span>
+              </div>
+              <div className="space-y-3 rounded-lg border bg-background p-3">
+                {descriptionHistory.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">Aucun commentaire dans la description.</div>
+                ) : (
+                  descriptionHistory.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-border bg-muted p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>{item.author ?? 'Commentaire'}</span>
+                        {item.date ? <span>{item.date}</span> : null}
+                      </div>
+                      <div className="whitespace-pre-wrap text-sm text-foreground mt-2">{item.body}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="space-y-2 mt-4">
+                <Textarea
+                  rows={3}
+                  value={draftDescriptionComment}
+                  onChange={(e) => setDraftDescriptionComment(e.target.value)}
+                  placeholder={canEdit ? 'Ajouter un commentaire à la description…' : 'Vous ne pouvez pas ajouter de commentaire.'}
+                  disabled={!canEdit}
+                />
+                {canEdit && (
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" disabled={addingDescriptionComment || !draftDescriptionComment.trim()} onClick={() => setDraftDescriptionComment("")}>Effacer</Button>
+                    <Button size="sm" disabled={addingDescriptionComment || !draftDescriptionComment.trim()} onClick={addDescriptionComment}>
+                      Ajouter
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
 
