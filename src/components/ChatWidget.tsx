@@ -328,6 +328,8 @@ function ChatWindow({ conv }: { conv: Conversation }) {
   const meRole = conv.members.find((m) => m.username === user?.username)?.role;
   const isGroupAdmin = meRole === "admin" || user?.role === "Administrateur";
   const canManageGroup = hasPermission("chat.group.manage");
+  const isAppAdmin = user?.role === "Administrateur";
+  const canDelete = hasPermission("chat.group.delete") && (isAppAdmin || isGroupAdmin);
   const canPost = conv.type === "dm" || conv.postPolicy === "all" || isGroupAdmin;
   const subtitle = conv.type === "dm"
     ? "Message direct"
@@ -902,7 +904,7 @@ export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean;
 
         <div className="flex items-center justify-between gap-2 mt-4">
           <div>
-            {hasPermission("chat.group.delete") && (
+            {canDelete && (
               <Button variant="ghost" className="text-destructive" onClick={async () => {
                 if (!(await confirmDialog({ title: "Supprimer le groupe", description: "Voulez-vous vraiment supprimer ce groupe ? Cette action est irréversible.", tone: "destructive", confirmText: "Supprimer" }))) return;
                 try {
