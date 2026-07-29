@@ -52,7 +52,6 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       "/contracts",
       "/migrations",
       "/reclamations",
-      "/reconciliation",
       "/calendar",
       "/dispatch",
       "/tasks",

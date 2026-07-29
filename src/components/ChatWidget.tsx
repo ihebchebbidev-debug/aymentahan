@@ -271,7 +271,7 @@ function ConversationListItem({ conv, meUsername, onClick, active }: { conv: Con
 
 function ChatWindow({ conv }: { conv: Conversation }) {
   const chat = useChat();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const minimized = !!chat.minimized[conv.id];
   const messages = chat.messagesByConv[conv.id] ?? [];
   const hasMore = chat.hasMore[conv.id] !== false;
@@ -327,6 +327,7 @@ function ChatWindow({ conv }: { conv: Conversation }) {
   const title = convTitle(conv, user?.username);
   const meRole = conv.members.find((m) => m.username === user?.username)?.role;
   const isGroupAdmin = meRole === "admin" || user?.role === "Administrateur";
+  const canManageGroup = hasPermission("chat.group.manage") || isGroupAdmin;
   const canPost = conv.type === "dm" || conv.postPolicy === "all" || isGroupAdmin;
   const subtitle = conv.type === "dm"
     ? "Message direct"
@@ -373,7 +374,7 @@ function ChatWindow({ conv }: { conv: Conversation }) {
               <DropdownMenuItem onClick={() => chat.setMute(conv.id, !conv.muted)}>
                 {conv.muted ? <><Bell className="h-4 w-4 mr-2" /> Réactiver les notifications</> : <><BellOff className="h-4 w-4 mr-2" /> Mettre en sourdine</>}
               </DropdownMenuItem>
-              {conv.type !== "dm" && isGroupAdmin && (
+              {conv.type !== "dm" && canManageGroup && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setAddOpen(true)}><UserPlus className="h-4 w-4 mr-2" /> Ajouter des membres</DropdownMenuItem>

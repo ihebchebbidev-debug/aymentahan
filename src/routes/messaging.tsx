@@ -240,7 +240,7 @@ function MessagingPage() {
 }
 
 function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => void }) {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const chat = useChat();
   const messages = chat.messagesByConv[conv.id] ?? [];
   const hasMore = chat.hasMore[conv.id] !== false;
@@ -303,6 +303,7 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
   const title = convTitle(conv, user?.username);
   const meRole = conv.members.find((m) => m.username === user?.username)?.role;
   const isGroupAdmin = meRole === "admin" || user?.role === "Administrateur";
+  const canManageGroup = hasPermission("chat.group.manage") || isGroupAdmin;
   const canPost = conv.type === "dm" || conv.postPolicy === "all" || isGroupAdmin;
 
   const subtitle = conv.type === "dm"
@@ -317,8 +318,8 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
           <ChevronLeft className="h-4 w-4" />
         </button>
         <button
-          onClick={() => conv.type !== "dm" && isGroupAdmin && setManageOpen(true)}
-          className={`flex items-center gap-2 flex-1 min-w-0 text-left ${conv.type !== "dm" && isGroupAdmin ? "hover:bg-muted/40 -mx-1 px-1 rounded-md" : ""}`}
+          onClick={() => conv.type !== "dm" && canManageGroup && setManageOpen(true)}
+          className={`flex items-center gap-2 flex-1 min-w-0 text-left ${conv.type !== "dm" && canManageGroup ? "hover:bg-muted/40 -mx-1 px-1 rounded-md" : ""}`}
         >
           <ConvAvatar conv={conv} meUsername={user?.username} size={38} />
           <div className="flex-1 min-w-0">
@@ -350,7 +351,7 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
               {conv.muted ? <><Bell className="h-4 w-4 mr-2" /> Réactiver les notifications</>
                 : <><BellOff className="h-4 w-4 mr-2" /> Mettre en sourdine</>}
             </DropdownMenuItem>
-            {conv.type !== "dm" && isGroupAdmin && (
+            {conv.type !== "dm" && canManageGroup && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setAddOpen(true)}>

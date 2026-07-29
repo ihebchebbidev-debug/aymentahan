@@ -45,7 +45,6 @@ const ROUTE_LABELS: Record<string, string> = {
   "/reports": "Rapports",
   "/objectives": "Objectifs",
   "/dispatch": "Dispatch",
-  "/reconciliation": "Réconciliation",
   "/users": "Utilisateurs",
   "/roles": "Rôles & Permissions",
   "/audit": "Journal d'audit",

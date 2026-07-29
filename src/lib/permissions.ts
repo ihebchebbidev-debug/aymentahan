@@ -23,10 +23,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "page.notifications", label: "Page : Notifications" },
       { key: "page.dispatch", label: "Page : Dispatch" },
       { key: "page.backoffice", label: "Page : Backoffice" },
-      { key: "page.pipelines", label: "Page : Pipelines" },
       { key: "page.stages", label: "Page : Stages" },
       { key: "page.reports", label: "Page : Rapports" },
-      { key: "page.reconciliation", label: "Page : Réconciliation" },
       { key: "page.objectives", label: "Page : Objectifs" },
       { key: "page.profile", label: "Page : Profil" },
       { key: "page.documentation", label: "Page : Documentation" },
@@ -124,7 +122,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
     ],
   },
   {
-    title: "Tâches & Calendrier",
+    title: "Tâches, Calendrier & Messagerie",
     perms: [
       { key: "task.add", label: "Créer tâche" },
       { key: "task.edit", label: "Éditer tâche" },
@@ -291,7 +289,6 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/dispatch": "page.dispatch",
   "/backoffice": "page.backoffice",
   "/reports": "page.reports",
-  "/reconciliation": "page.reconciliation",
   "/objectives": "page.objectives",
   "/profile": "page.profile",
   "/documentation": "page.documentation",

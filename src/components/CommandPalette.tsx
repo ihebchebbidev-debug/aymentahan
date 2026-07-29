@@ -52,7 +52,6 @@ export function CommandPalette() {
   const canViewCalendar = can("page.calendar");
   const canViewTasks = can("page.tasks");
   const canViewReports = can("page.reports");
-  const canViewReconciliation = can("page.reconciliation");
   const canViewDispatch = can("page.dispatch");
   const canViewRoles = can("page.roles");
   const canViewConfiguration = can("page.configuration");

@@ -564,7 +564,7 @@ if ($method === 'POST') {
     }
 
     if ($action === 'create_group') {
-        if (!in_array($me['role'] ?? '', ['Administrateur','Manager'], true)) fail('Forbidden', 403);
+        require_permission($db, $me, 'chat.group.create');
         $name    = trim((string)($in['name'] ?? ''));
         $members = $in['members'] ?? [];
         if ($name === '') fail('name requis', 422);
@@ -588,6 +588,7 @@ if ($method === 'POST') {
         $convId  = $in['conversation_id'] ?? '';
         $members = $in['members'] ?? [];
         if (!$convId || !is_array($members)) fail('Paramètres invalides', 422);
+        require_permission($db, $me, 'chat.group.manage');
         if (!user_can_admin_conv($db, $convId, $me)) fail('Forbidden', 403);
         $ins = $db->prepare("INSERT IGNORE INTO crminternet_chat_members (conversation_id,user_username,role) VALUES (:c,:u,'member')");
         $added = 0;
@@ -603,6 +604,7 @@ if ($method === 'POST') {
         $convId = $in['conversation_id'] ?? '';
         $user   = $in['user'] ?? '';
         if (!$convId || !$user) fail('Paramètres invalides', 422);
+        require_permission($db, $me, 'chat.group.manage');
         if (!user_can_admin_conv($db, $convId, $me) && $user !== $me['username']) fail('Forbidden', 403);
         $db->prepare('DELETE FROM crminternet_chat_members WHERE conversation_id=:c AND user_username=:u')
            ->execute([':c'=>$convId, ':u'=>$user]);
@@ -614,6 +616,7 @@ if ($method === 'POST') {
         $convId = $in['conversation_id'] ?? '';
         $name   = trim((string)($in['name'] ?? ''));
         if (!$convId || $name === '') fail('Paramètres invalides', 422);
+        require_permission($db, $me, 'chat.group.manage');
         if (!user_can_admin_conv($db, $convId, $me)) fail('Forbidden', 403);
         $db->prepare('UPDATE crminternet_chat_conversations SET name=:n WHERE id=:id')
            ->execute([':n'=>$name, ':id'=>$convId]);
@@ -655,6 +658,7 @@ if ($method === 'POST') {
         $user   = trim((string)($in['user'] ?? ''));
         $role   = $in['role'] ?? '';
         if (!$convId || !$user || !in_array($role, ['admin','member'], true)) fail('Paramètres invalides', 422);
+        require_permission($db, $me, 'chat.group.manage');
         if (!user_can_admin_conv($db, $convId, $me)) fail('Forbidden', 403);
         $type = $db->prepare('SELECT type FROM crminternet_chat_conversations WHERE id=:id');
         $type->execute([':id'=>$convId]);
@@ -671,6 +675,7 @@ if ($method === 'POST') {
         $convId = $in['conversation_id'] ?? '';
         $policy = $in['policy'] ?? '';
         if (!$convId || !in_array($policy, ['all','admins'], true)) fail('Paramètres invalides', 422);
+        require_permission($db, $me, 'chat.group.manage');
         if (!user_can_admin_conv($db, $convId, $me)) fail('Forbidden', 403);
         $type = $db->prepare('SELECT type FROM crminternet_chat_conversations WHERE id=:id');
         $type->execute([':id'=>$convId]);
@@ -684,10 +689,10 @@ if ($method === 'POST') {
     }
 
     if ($action === 'broadcast') {
-        // Admin-only: send a message to many users at once.
+        // Send a message to many users at once when the role has the matching permission.
         // target: 'all' | 'role' (value=role) | 'team' (value=team) | 'users' (value=array of usernames)
         // mode: 'individual' (one DM per user) | 'group' (one new group with all)
-        if (($me['role'] ?? '') !== 'Administrateur') fail('Forbidden', 403);
+        require_permission($db, $me, 'chat.broadcast');
         $body  = trim((string)($in['body'] ?? ''));
         $target= $in['target'] ?? 'all';
         $value = $in['value'] ?? null;
