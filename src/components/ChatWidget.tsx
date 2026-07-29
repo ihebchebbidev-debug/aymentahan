@@ -327,7 +327,7 @@ function ChatWindow({ conv }: { conv: Conversation }) {
   const title = convTitle(conv, user?.username);
   const meRole = conv.members.find((m) => m.username === user?.username)?.role;
   const isGroupAdmin = meRole === "admin" || user?.role === "Administrateur";
-  const canManageGroup = hasPermission("chat.group.manage") || isGroupAdmin;
+  const canManageGroup = hasPermission("chat.group.manage");
   const canPost = conv.type === "dm" || conv.postPolicy === "all" || isGroupAdmin;
   const subtitle = conv.type === "dm"
     ? "Message direct"
