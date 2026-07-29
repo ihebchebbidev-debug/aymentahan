@@ -138,6 +138,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "calendar.event.delete", label: "Supprimer évènement" },
       { key: "chat.group.create", label: "Créer des groupes de discussion" },
       { key: "chat.group.manage", label: "Gérer les groupes (admin)" },
+      { key: "chat.group.delete", label: "Supprimer un groupe de discussion" },
       { key: "chat.broadcast", label: "Faire des annonces globales" },
     ],
   },

@@ -624,6 +624,24 @@ if ($method === 'POST') {
         ok(['updated' => true]);
     }
 
+    if ($action === 'delete') {
+        $convId = $in['conversation_id'] ?? '';
+        if (!$convId) fail('conversation_id requis', 422);
+        // Require explicit delete permission
+        require_permission($db, $me, 'chat.group.delete');
+        // Only applicable to non-DM conversations
+        $type = $db->prepare('SELECT type FROM crminternet_chat_conversations WHERE id=:id');
+        $type->execute([':id'=>$convId]);
+        $t = $type->fetchColumn();
+        if (!$t) fail('Conversation introuvable', 404);
+        if ($t === 'dm') fail('Impossible de supprimer une conversation privée', 422);
+        // Ensure caller is admin of the group (or app admin)
+        if (!user_is_app_admin($me) && !user_can_admin_conv($db, $convId, $me)) fail('Forbidden', 403);
+        // Delete conversation — messages and members cascade via FK
+        $db->prepare('DELETE FROM crminternet_chat_conversations WHERE id = :id')->execute([':id'=>$convId]);
+        ok(['deleted' => true]);
+    }
+
     if ($action === 'mark_read') {
         $convId = $in['conversation_id'] ?? '';
         if (!$convId) fail('conversation_id requis', 422);

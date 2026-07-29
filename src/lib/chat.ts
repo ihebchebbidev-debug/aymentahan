@@ -126,4 +126,6 @@ export const chatApi = {
     value?: string | string[];
     mode?: "individual" | "group";
   }) => api(PATH, { method: "POST", body: { action: "broadcast", ...input } }),
+  deleteGroup: (conversationId: string) =>
+    api<{ deleted: boolean }>(PATH, { method: "POST", body: { action: "delete", conversation_id: conversationId } }),
 };

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MessageCircle, X, Minus, Search, Plus, Megaphone, BellOff, Bell, Users, Send,
   MoreVertical, LogOut, UserPlus, Paperclip, FileText, Image as ImageIcon,
-  File as FileIcon, Loader2, Shield, ShieldOff, Lock, Unlock, Settings, Inbox,
+  File as FileIcon, Loader2, Shield, ShieldOff, Lock, Unlock, Settings, Inbox, Trash,
   Maximize2, ExternalLink, CheckCheck, Search as SearchIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -528,6 +528,7 @@ export function NewDmDialog({ open, onOpenChange }: { open: boolean; onOpenChang
   const filtered = users.filter((u) => u.username !== user?.username && (
     u.fullName.toLowerCase().includes(q.toLowerCase()) || u.username.toLowerCase().includes(q.toLowerCase())
   ));
+  const [creatingUser, setCreatingUser] = useState<string | null>(null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -537,17 +538,21 @@ export function NewDmDialog({ open, onOpenChange }: { open: boolean; onOpenChang
           {loading ? <div className="p-6 text-center text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin inline mr-1" /> Chargement…</div>
             : filtered.length === 0 ? <div className="p-6 text-center text-xs text-muted-foreground">Aucun utilisateur trouvé.</div>
             : filtered.map((u) => (
-            <button
+              <button
               key={u.username}
               onClick={async () => {
+                if (creatingUser) return;
+                setCreatingUser(u.username);
                 try {
                   const r = await chatApi.createDm(u.username);
                   await chat.refreshConversations();
                   chat.openConversation(r.id);
                   onOpenChange(false);
                 } catch (e: any) { toast.error(e?.message); }
+                finally { setCreatingUser(null); }
               }}
               className="w-full p-2.5 flex items-center gap-3 hover:bg-muted/60 border-b border-border/50 last:border-0 text-left"
+              disabled={creatingUser === u.username}
             >
               <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white bg-gradient-to-br from-primary/80 to-primary">{initials(u.fullName)}</div>
               <div className="flex-1 min-w-0">
@@ -574,14 +579,17 @@ export function NewGroupDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     u.fullName.toLowerCase().includes(q.toLowerCase()) || u.username.toLowerCase().includes(q.toLowerCase())
   ));
   const submit = async () => {
-    if (!name.trim() || selected.size === 0) return;
+    if (!name.trim() || selected.size === 0 || submitting) return;
+    setSubmitting(true);
     try {
       const r = await chatApi.createGroup(name.trim(), Array.from(selected));
       await chat.refreshConversations();
       chat.openConversation(r.id);
       onOpenChange(false);
     } catch (e: any) { toast.error(e?.message); }
+    finally { setSubmitting(false); }
   };
+  const [submitting, setSubmitting] = useState(false);
   const selectedUsers = users.filter((u) => selected.has(u.username));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -621,7 +629,7 @@ export function NewGroupDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={submit} disabled={!name.trim() || selected.size === 0}>Créer le groupe</Button>
+          <Button onClick={submit} disabled={!name.trim() || selected.size === 0 || submitting}>Créer le groupe</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -892,9 +900,27 @@ export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean;
           })}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
-        </DialogFooter>
+        <div className="flex items-center justify-between gap-2 mt-4">
+          <div>
+            {hasPermission("chat.group.delete") && (
+              <Button variant="ghost" className="text-destructive" onClick={async () => {
+                if (!(await confirmDialog({ title: "Supprimer le groupe", description: "Voulez-vous vraiment supprimer ce groupe ? Cette action est irréversible.", tone: "destructive", confirmText: "Supprimer" }))) return;
+                try {
+                  await chatApi.deleteGroup(conv.id);
+                  chat.closeConversation(conv.id);
+                  await chat.refreshConversations();
+                  onOpenChange(false);
+                  toast.success("Groupe supprimé");
+                } catch (e: any) { toast.error(e?.message ?? "Erreur lors de la suppression"); }
+              }}>
+                <Trash className="h-4 w-4 mr-2" /> Supprimer le groupe
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
