@@ -81,6 +81,8 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "opportunity.view", label: "Voir opportunités" },
       { key: "opportunity.view_all", label: "Voir toutes les opportunités" },
       { key: "opportunity.edit", label: "Éditer opportunité" },
+      { key: "opportunity.assign_prospect", label: "Réassigner le prospect depuis l'opportunité" },
+      { key: "opportunity.change_prospect_type", label: "Modifier le type du prospect depuis l'opportunité" },
       { key: "opportunity.delete", label: "Supprimer opportunité" },
       { key: "opportunity.convert", label: "Convertir → Contrat" },
       { key: "opportunity.convert_migration", label: "Convertir → Migration" },

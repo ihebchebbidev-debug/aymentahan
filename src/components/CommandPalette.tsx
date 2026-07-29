@@ -55,6 +55,7 @@ export function CommandPalette() {
   const canViewDispatch = can("page.dispatch");
   const canViewRoles = can("page.roles");
   const canViewConfiguration = can("page.configuration");
+  const canViewReconciliation = can("page.backoffice") || can("page.reports");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

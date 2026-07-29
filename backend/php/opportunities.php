@@ -471,6 +471,28 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
     if ($oid === '') fail('id requis', 422);
 
+    $canEditOpportunity = user_has_permission($db, $me, 'opportunity.edit');
+    $canEditProspect = user_has_permission($db, $me, 'prospect.edit');
+    $canAssignProspect = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.assign_prospect') || user_has_permission($db, $me, 'prospect.assign');
+    $canChangeProspectType = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.change_prospect_type') || user_has_permission($db, $me, 'prospect.type');
+
+    $allowedLimitedFields = ['id', 'assignedTo', 'typeId', 'action'];
+    $disallowedFields = [];
+    foreach (array_keys($in) as $k) {
+        if (in_array($k, $allowedLimitedFields, true) || $k === 'op') continue;
+        $disallowedFields[] = $k;
+    }
+    if (!$canEditOpportunity && !$canEditProspect && $disallowedFields !== []) {
+        fail('Accès refusé (permission requise : opportunity.edit ou prospect.edit pour modifier les autres champs)', 403);
+    }
+
+    if (array_key_exists('assignedTo', $in) && !$canAssignProspect) {
+        fail('Accès refusé (permission requise : prospect.assign)', 403);
+    }
+    if (array_key_exists('typeId', $in) && !$canChangeProspectType) {
+        fail('Accès refusé (permission requise : prospect.type)', 403);
+    }
+
     $cur = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
     $cur->execute([':id' => $oid]);
     $before = $cur->fetch();

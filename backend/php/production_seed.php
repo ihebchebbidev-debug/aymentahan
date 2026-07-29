@@ -113,11 +113,24 @@ function crm_apply_production_seed(PDO $db): array
                 $existingTypePerms[(string)($row[0] ?? '')] = true;
             }
         }
+        $existingOpportunityPerms = [];
+        foreach ($perms as $row) {
+            if (($row[1] ?? '') === 'opportunity.assign_prospect') {
+                $existingOpportunityPerms[(string)($row[0] ?? '')] = true;
+            }
+        }
         foreach ($perms as $row) {
             if (($row[1] ?? '') === 'prospect.edit' && ($row[2] ?? 0) === 1) {
                 $role = (string)($row[0] ?? '');
                 if ($role !== '' && !isset($existingTypePerms[$role])) {
                     $perms[] = [$role, 'prospect.type', 1];
+                }
+            }
+            if (($row[1] ?? '') === 'opportunity.edit' && ($row[2] ?? 0) === 1) {
+                $role = (string)($row[0] ?? '');
+                if ($role !== '' && !isset($existingOpportunityPerms[$role])) {
+                    $perms[] = [$role, 'opportunity.assign_prospect', 1];
+                    $perms[] = [$role, 'opportunity.change_prospect_type', 1];
                 }
             }
         }

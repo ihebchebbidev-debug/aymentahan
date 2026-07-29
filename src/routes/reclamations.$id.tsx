@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { ArrowLeft, MessageSquareWarning, Save, Trash2 } from "lucide-react";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { useErp } from "@/lib/erpStore";
 
 const SERVICES = ["Technique", "Facturation", "Commercial", "Autre"] as const;
 type Service = (typeof SERVICES)[number];
@@ -60,6 +61,7 @@ function ReclamationDetailPage() {
   const { id } = useParams({ from: "/reclamations/$id" });
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
+  const { users } = useErp();
   const canEdit = hasPermission("reclamation.edit");
   const canDelete = hasPermission("reclamation.delete");
 
@@ -69,6 +71,15 @@ function ReclamationDetailPage() {
 
   const numericId = useMemo(() => Number(id), [id]);
   const validId = Number.isFinite(numericId) && numericId > 0;
+  const assignedUserOptions = useMemo(
+    () => (users ?? [])
+      .filter((u: any) => ["Agent","Manager","AgentSuivi","AgentActivation","AgentVente","Administrateur"].includes(u.role))
+      .map((u: any) => ({
+        username: u.username,
+        label: [u.fullName, u.username].filter(Boolean).join(" — "),
+      })),
+    [users],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +217,17 @@ function ReclamationDetailPage() {
                     onChange={(e) => update({ date_resolution: e.target.value || null })} />
                 </Field>
 
-                <Field label="Assigné à (username)" className="md:col-span-2"><Input value={row.assigned_to ?? ""} disabled={!canEdit} onChange={(e) => update({ assigned_to: e.target.value })} /></Field>
+                <Field label="Assigné à" className="md:col-span-2">
+                  <Select value={row.assigned_to ?? "__none__"} onValueChange={(v) => update({ assigned_to: v === "__none__" ? null : v })} disabled={!canEdit}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner un utilisateur" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Aucun</SelectItem>
+                      {assignedUserOptions.map((u) => (
+                        <SelectItem key={u.username} value={u.username}>{u.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <Field label="Description" className="md:col-span-2"><Textarea rows={3} value={row.description ?? ""} disabled={!canEdit} onChange={(e) => update({ description: e.target.value })} /></Field>
                 <Field label="Remarques" className="md:col-span-2"><Textarea rows={2} value={row.remarques ?? ""} disabled={!canEdit} onChange={(e) => update({ remarques: e.target.value })} /></Field>
               </div>

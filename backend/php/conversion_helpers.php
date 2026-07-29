@@ -111,7 +111,7 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
         ':c1'    => $p['comment'] ?? null,
         ':c2'    => $p['comment2'] ?? null,
         ':src'   => $p['source'] ?? '',
-        ':tid'   => $p['type_id'] ?? null,
+        ':tid'   => null,
         ':lst'   => $p['status'] ?? null,
         ':lr'    => $p['lost_reason'] ?? null,
         ':title' => $title,

@@ -116,11 +116,18 @@ function ReclamationsPage() {
   const canExport = hasPermission("reclamation.export");
 
   const { users } = useErp();
-  const agentOptions = useMemo(
+  const assignedUserOptions = useMemo(
     () => (users ?? [])
       .filter((u: any) => ["Agent","Manager","AgentSuivi","AgentActivation","AgentVente","Administrateur"].includes(u.role))
-      .map((u: any) => u.username),
+      .map((u: any) => ({
+        username: u.username,
+        label: [u.fullName, u.username].filter(Boolean).join(" — "),
+      })),
     [users],
+  );
+  const agentOptions = useMemo(
+    () => assignedUserOptions.map((u) => u.username),
+    [assignedUserOptions],
   );
 
   const [rows, setRows] = useState<Reclamation[]>([]);
@@ -614,7 +621,17 @@ function ReclamationsPage() {
                        value={editing.date_resolution ? String(editing.date_resolution).slice(0, 16).replace(" ", "T") : ""}
                        onChange={(e) => setEditing({ ...editing, date_resolution: e.target.value || null })} />
               </Field>
-              <Field label="Assigné à (username)" className="col-span-2"><Input value={editing.assigned_to ?? ""} onChange={(e) => setEditing({ ...editing, assigned_to: e.target.value })} /></Field>
+              <Field label="Assigné à" className="col-span-2">
+                <Select value={editing.assigned_to ?? "__none__"} onValueChange={(v) => setEditing({ ...editing, assigned_to: v === "__none__" ? null : v })}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un utilisateur" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Aucun</SelectItem>
+                    {assignedUserOptions.map((u) => (
+                      <SelectItem key={u.username} value={u.username}>{u.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="Description" className="col-span-2"><Textarea rows={3} value={editing.description ?? ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} /></Field>
               <Field label="Remarques" className="col-span-2"><Textarea rows={2} value={editing.remarques ?? ""} onChange={(e) => setEditing({ ...editing, remarques: e.target.value })} /></Field>
 

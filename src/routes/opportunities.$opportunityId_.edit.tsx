@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { GouvernoratSelect } from "@/components/GouvernoratSelect";
 import { useErp } from "@/lib/erpStore";
+import { useAuth } from "@/lib/auth";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
 import { api } from "@/lib/api";
 import type { Opportunity, PipelineStage, ProspectType } from "@/lib/types";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/opportunities/$opportunityId_/edit")({
 
 function GuardedEditOpportunityPage() {
   return (
-    <RequirePerm perm="opportunity.edit" backTo="/opportunities" backLabel="Retour aux opportunités">
+    <RequirePerm anyOf={["opportunity.edit", "opportunity.assign_prospect", "opportunity.change_prospect_type", "prospect.edit", "prospect.assign", "prospect.type"]} backTo="/opportunities" backLabel="Retour aux opportunités">
       <EditOpportunityPage />
     </RequirePerm>
   );
@@ -50,6 +51,7 @@ function EditOpportunityPage() {
   const { opportunityId } = Route.useParams();
   const navigate = useNavigate();
   const { users } = useErp();
+  const { hasPermission } = useAuth();
   const { afterOpportunityAuto, sync } = useCrmListSync();
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
@@ -87,6 +89,11 @@ function EditOpportunityPage() {
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>("__none__");
   const [notes, setNotes] = useState("");
+
+  const canEditProspect = hasPermission("prospect.edit");
+  const canEditOpportunity = hasPermission("opportunity.edit");
+  const canAssignProspect = canEditOpportunity || canEditProspect || hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
+  const canChangeProspectType = canEditOpportunity || canEditProspect || hasPermission("opportunity.change_prospect_type") || hasPermission("prospect.type");
 
   useEffect(() => {
     let cancel = false;
@@ -171,31 +178,37 @@ function EditOpportunityPage() {
     }
     setSaving(true);
     try {
-      const body: Record<string, any> = {
-        id: opp.id,
-        civility, lastName: lastName.trim(), firstName: firstName.trim(),
-        phone: phone.trim(), phone2: phone2.trim(),
-        cin: cin.trim(), birthDate: birthDate || null,
-        email: email.trim(),
-        gouvernorat: gouvernorat.trim().toUpperCase(),
-        delegation: delegation.trim(),
-        city: city.trim(),
-        address: address.trim(),
-        localisationXy: normalizeLocalisationXy(localisationXy) || null,
-        codePostal: normalizeCodePostal(codePostal) || null,
-        ancienLigne: ancienLigne.trim() || null,
-        source,
-        typeId: typeId || null,
-        comment1: comment1.trim() || null,
-        comment2: comment2.trim() || null,
-        title: title.trim(),
-        stage,
-        amount: Number(amount) || 0,
-        probability: Number(probability) || 0,
-        expectedCloseDate: expectedCloseDate || null,
-        assignedTo: assignedTo === "__none__" ? null : assignedTo,
-        notes,
-      };
+      const body: Record<string, any> = { id: opp.id };
+      if (canEditOpportunity || canEditProspect) {
+        Object.assign(body, {
+          civility, lastName: lastName.trim(), firstName: firstName.trim(),
+          phone: phone.trim(), phone2: phone2.trim(),
+          cin: cin.trim(), birthDate: birthDate || null,
+          email: email.trim(),
+          gouvernorat: gouvernorat.trim().toUpperCase(),
+          delegation: delegation.trim(),
+          city: city.trim(),
+          address: address.trim(),
+          localisationXy: normalizeLocalisationXy(localisationXy) || null,
+          codePostal: normalizeCodePostal(codePostal) || null,
+          ancienLigne: ancienLigne.trim() || null,
+          source,
+          comment1: comment1.trim() || null,
+          comment2: comment2.trim() || null,
+          title: title.trim(),
+          stage,
+          amount: Number(amount) || 0,
+          probability: Number(probability) || 0,
+          expectedCloseDate: expectedCloseDate || null,
+          notes,
+        });
+      }
+      if (canAssignProspect) {
+        body.assignedTo = assignedTo === "__none__" ? null : assignedTo;
+      }
+      if (canChangeProspectType) {
+        body.typeId = typeId || null;
+      }
       const r = await api<{ auto?: { executed?: boolean; contractId?: string; migrationId?: string; error?: string; created?: boolean } }>(
         "/opportunities.php",
         { method: "PATCH", body },
@@ -241,7 +254,7 @@ function EditOpportunityPage() {
               {types.length > 0 && (
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label>Type</Label>
-                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)}>
+                  <Select value={typeId || "__none__"} onValueChange={(v) => setTypeId(v === "__none__" ? "" : v)} disabled={!canChangeProspectType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">— Aucun —</SelectItem>
@@ -319,7 +332,7 @@ function EditOpportunityPage() {
               <div className="space-y-1.5"><Label>Clôture prévue</Label><DatePicker value={expectedCloseDate} onChange={setExpectedCloseDate} /></div>
               <div className="space-y-1.5">
                 <Label>Assigné à</Label>
-                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                <Select value={assignedTo} onValueChange={setAssignedTo} disabled={!canAssignProspect}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <div className="p-2">
