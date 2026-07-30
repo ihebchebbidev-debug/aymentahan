@@ -73,6 +73,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "RH & Paie",
     items: [
+      { title: "Tableau Pointage", url: "/hr/attendance/dashboard", icon: BarChart3 },
       { title: "Pointage", url: "/hr/attendance", icon: Clock },
       { title: "Paie", url: "/hr/payroll", icon: Wallet },
       { title: "Commissions", url: "/hr/commissions", icon: TrendingUp },

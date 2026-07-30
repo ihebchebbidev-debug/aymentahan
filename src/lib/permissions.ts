@@ -49,6 +49,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
   {
     title: "Pages — Ressources Humaines",
     perms: [
+      { key: "page.hr.attendance_dashboard", label: "Page : Pointage — Dashboard" },
       { key: "page.hr.attendance", label: "Page : Pointage" },
       { key: "page.hr.payroll", label: "Page : Paie" },
       { key: "page.hr.commissions", label: "Page : Commissions" },
@@ -306,6 +307,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/audit": "page.audit",
   "/security": "page.security",
   "/hr/attendance": "page.hr.attendance",
+  "/hr/attendance/dashboard": "page.hr.attendance_dashboard",
   "/hr/payroll": "page.hr.payroll",
   "/hr/commissions": "page.hr.commissions",
   "/hr/external-agents": "page.hr.external-agents",
