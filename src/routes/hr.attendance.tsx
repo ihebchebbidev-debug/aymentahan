@@ -11,7 +11,7 @@ import { Clock, RefreshCw, LogOut as LogOutIcon, LogIn as LogInIcon, X } from "l
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import type { AttendanceEntry, AttendanceAggregate } from "@/lib/types";
+import type { AttendanceEntry } from "@/lib/types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/hr/attendance")({
@@ -59,7 +59,7 @@ function AttendancePage() {
   const [username, setUsername] = useState("");
   const [rows, setRows] = useState<AttendanceEntry[]>([]);
   const [summary, setSummary] = useState<Summary[]>([]);
-  const [aggregates, setAggregates] = useState<AttendanceAggregate[]>([]);
+  const [aggregates, setAggregates] = useState<any[]>([]);
   const [aggLoading, setAggLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -154,33 +154,7 @@ function AttendancePage() {
 
   const clearRange = () => { setFrom(""); setTo(""); };
 
-  const fetchAggregates = async () => {
-    setAggLoading(true);
-    try {
-      // derive start/end from range or month
-      let start: string | null = null;
-      let end: string | null = null;
-      if (rangeActive) {
-        start = from;
-        end = to;
-      } else {
-        // month is YYYY-MM
-        const [y, m] = month.split("-");
-        const mm = Number(m) - 1;
-        const last = new Date(Number(y), mm + 1, 0).getDate();
-        start = `${y}-${String(Number(m)).padStart(2, "0")}-01`;
-        end = `${y}-${String(Number(m)).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
-      }
-      const q: any = { action: "aggregates", start, end };
-      if (username && isPriv) q.username = username;
-      const r = await api<{ aggregates: AttendanceAggregate[] }>('/attendance.php', { query: q });
-      setAggregates(r.aggregates ?? []);
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Erreur de synthèse');
-    } finally {
-      setAggLoading(false);
-    }
-  };
+  // Advanced aggregates moved to dedicated dashboard
 
   return (
     <AppLayout skeleton="table">
@@ -241,9 +215,9 @@ function AttendancePage() {
         {isPriv && (
           <Button size="sm" onClick={() => void load()}>Filtrer</Button>
         )}
-        {isPriv && (
-          <Button size="sm" variant="outline" onClick={() => void fetchAggregates()} disabled={aggLoading}>
-            {aggLoading ? 'Génération…' : 'Synthèse avancée'}
+            {isPriv && (
+          <Button size="sm" variant="outline" asChild>
+            <a href="/hr/attendance/dashboard">Ouvrir le tableau Pointage</a>
           </Button>
         )}
       </div>
@@ -323,96 +297,18 @@ function AttendancePage() {
         </div>
       </Card>
 
-      {/* Advanced aggregates (per-day) */}
-      {aggregates.length > 0 && (
-        <Card className="p-4 mt-6">
-          <h3 className="font-semibold text-sm mb-2">Synthèse avancée {rangeActive ? `${from} → ${to}` : month}</h3>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Période</TableHead>
-                  <TableHead>Durée</TableHead>
-                  <TableHead>Sessions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {aggregates.map((a) => (
-                  <TableRow key={a.period}>
-                    <TableCell className="font-medium">{a.period}</TableCell>
-                    <TableCell>{fmtMin(a.minutes)}</TableCell>
-                    <TableCell>{a.sessions}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      )}
+      {/* Advanced aggregates moved to the dashboard page. */}
 
-      <div className="grid lg:grid-cols-3 gap-4 mt-6">
-        <Card className="p-4 lg:col-span-1">
-          <h3 className="font-semibold mb-3 text-sm">Synthèse {periodLabel}</h3>
-          <div className="space-y-2">
-            {summary.length === 0 && <div className="text-sm text-muted-foreground">Aucune donnée</div>}
-            {summary.map((s) => (
-              <div key={s.username} className="flex items-center justify-between text-sm border-b border-border/60 pb-2 last:border-0">
-                <div>
-                  <div className="font-medium">{s.username}</div>
-                  <div className="text-xs text-muted-foreground">{s.sessions} session(s)</div>
-                </div>
-                <Badge variant="secondary">{s.totalHours} h</Badge>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className="p-0 lg:col-span-2 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Utilisateur</TableHead>
-                <TableHead>Entrée</TableHead>
-                <TableHead>Sortie</TableHead>
-                <TableHead>Durée</TableHead>
-                <TableHead>IP</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Chargement…</TableCell></TableRow>}
-              {!loading && visibleRows.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Aucune session</TableCell></TableRow>
-              )}
-              {visibleRows.map((r) => {
-                const inDt = splitDateTime(r.loginAt);
-                const outDt = r.logoutAt ? splitDateTime(r.logoutAt) : null;
-                return (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.username}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">{inDt.time}</div>
-                      <div className="text-xs text-muted-foreground">{inDt.date}</div>
-                    </TableCell>
-                    <TableCell>
-                      {outDt ? (
-                        <>
-                          <div className="text-sm">{outDt.time}</div>
-                          <div className="text-xs text-muted-foreground">{outDt.date}</div>
-                        </>
-                      ) : (
-                        <Badge variant="outline">en cours</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{r.totalMinutes ? fmtMin(r.totalMinutes) : "—"}</TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground max-w-[180px] truncate" title={r.ip ?? ""}>
-                      {r.ip ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Card>
+      <div className="mt-6">
+        {isPriv ? (
+          <Card className="p-4">
+            <h3 className="font-semibold mb-2">Vue complète</h3>
+            <p className="text-sm text-muted-foreground mb-3">Les synthèses et rapports avancés ont été déplacés vers le Tableau Pointage.</p>
+            <Button asChild>
+              <a href="/hr/attendance/dashboard">Ouvrir le tableau Pointage</a>
+            </Button>
+          </Card>
+        ) : null}
       </div>
     </AppLayout>
   );

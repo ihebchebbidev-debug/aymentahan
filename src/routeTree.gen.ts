@@ -53,6 +53,7 @@ import { Route as CalendarDateRouteImport } from './routes/calendar.$date'
 import { Route as ProspectsProspectIdEditRouteImport } from './routes/prospects.$prospectId_.edit'
 import { Route as OpportunitiesOpportunityIdEditRouteImport } from './routes/opportunities.$opportunityId_.edit'
 import { Route as MigrationsMigrationIdEditRouteImport } from './routes/migrations.$migrationId_.edit'
+import { Route as HrAttendanceDashboardRouteImport } from './routes/hr.attendance.dashboard'
 import { Route as ContractsContractIdEditRouteImport } from './routes/contracts.$contractId_.edit'
 
 const UsersRoute = UsersRouteImport.update({
@@ -278,6 +279,11 @@ const MigrationsMigrationIdEditRoute =
     path: '/migrations/$migrationId/edit',
     getParentRoute: () => rootRouteImport,
   } as any)
+const HrAttendanceDashboardRoute = HrAttendanceDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => HrAttendanceRoute,
+} as any)
 const ContractsContractIdEditRoute = ContractsContractIdEditRouteImport.update({
   id: '/contracts/$contractId_/edit',
   path: '/contracts/$contractId/edit',
@@ -309,7 +315,7 @@ export interface FileRoutesByFullPath {
   '/calendar/$date': typeof CalendarDateRoute
   '/contracts/$contractId': typeof ContractsContractIdRoute
   '/guichet/analytics': typeof GuichetAnalyticsRoute
-  '/hr/attendance': typeof HrAttendanceRoute
+  '/hr/attendance': typeof HrAttendanceRouteWithChildren
   '/hr/commissions': typeof HrCommissionsRoute
   '/hr/external-agents': typeof HrExternalAgentsRoute
   '/hr/payroll': typeof HrPayrollRoute
@@ -327,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/prospects/': typeof ProspectsIndexRoute
   '/reclamations/': typeof ReclamationsIndexRoute
   '/contracts/$contractId/edit': typeof ContractsContractIdEditRoute
+  '/hr/attendance/dashboard': typeof HrAttendanceDashboardRoute
   '/migrations/$migrationId/edit': typeof MigrationsMigrationIdEditRoute
   '/opportunities/$opportunityId/edit': typeof OpportunitiesOpportunityIdEditRoute
   '/prospects/$prospectId/edit': typeof ProspectsProspectIdEditRoute
@@ -356,7 +363,7 @@ export interface FileRoutesByTo {
   '/calendar/$date': typeof CalendarDateRoute
   '/contracts/$contractId': typeof ContractsContractIdRoute
   '/guichet/analytics': typeof GuichetAnalyticsRoute
-  '/hr/attendance': typeof HrAttendanceRoute
+  '/hr/attendance': typeof HrAttendanceRouteWithChildren
   '/hr/commissions': typeof HrCommissionsRoute
   '/hr/external-agents': typeof HrExternalAgentsRoute
   '/hr/payroll': typeof HrPayrollRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/prospects': typeof ProspectsIndexRoute
   '/reclamations': typeof ReclamationsIndexRoute
   '/contracts/$contractId/edit': typeof ContractsContractIdEditRoute
+  '/hr/attendance/dashboard': typeof HrAttendanceDashboardRoute
   '/migrations/$migrationId/edit': typeof MigrationsMigrationIdEditRoute
   '/opportunities/$opportunityId/edit': typeof OpportunitiesOpportunityIdEditRoute
   '/prospects/$prospectId/edit': typeof ProspectsProspectIdEditRoute
@@ -404,7 +412,7 @@ export interface FileRoutesById {
   '/calendar/$date': typeof CalendarDateRoute
   '/contracts/$contractId': typeof ContractsContractIdRoute
   '/guichet_/analytics': typeof GuichetAnalyticsRoute
-  '/hr/attendance': typeof HrAttendanceRoute
+  '/hr/attendance': typeof HrAttendanceRouteWithChildren
   '/hr/commissions': typeof HrCommissionsRoute
   '/hr/external-agents': typeof HrExternalAgentsRoute
   '/hr/payroll': typeof HrPayrollRoute
@@ -422,6 +430,7 @@ export interface FileRoutesById {
   '/prospects/': typeof ProspectsIndexRoute
   '/reclamations/': typeof ReclamationsIndexRoute
   '/contracts/$contractId_/edit': typeof ContractsContractIdEditRoute
+  '/hr/attendance/dashboard': typeof HrAttendanceDashboardRoute
   '/migrations/$migrationId_/edit': typeof MigrationsMigrationIdEditRoute
   '/opportunities/$opportunityId_/edit': typeof OpportunitiesOpportunityIdEditRoute
   '/prospects/$prospectId_/edit': typeof ProspectsProspectIdEditRoute
@@ -471,6 +480,7 @@ export interface FileRouteTypes {
     | '/prospects/'
     | '/reclamations/'
     | '/contracts/$contractId/edit'
+    | '/hr/attendance/dashboard'
     | '/migrations/$migrationId/edit'
     | '/opportunities/$opportunityId/edit'
     | '/prospects/$prospectId/edit'
@@ -518,6 +528,7 @@ export interface FileRouteTypes {
     | '/prospects'
     | '/reclamations'
     | '/contracts/$contractId/edit'
+    | '/hr/attendance/dashboard'
     | '/migrations/$migrationId/edit'
     | '/opportunities/$opportunityId/edit'
     | '/prospects/$prospectId/edit'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/prospects/'
     | '/reclamations/'
     | '/contracts/$contractId_/edit'
+    | '/hr/attendance/dashboard'
     | '/migrations/$migrationId_/edit'
     | '/opportunities/$opportunityId_/edit'
     | '/prospects/$prospectId_/edit'
@@ -595,7 +607,7 @@ export interface RootRouteChildren {
   CalendarDateRoute: typeof CalendarDateRoute
   ContractsContractIdRoute: typeof ContractsContractIdRoute
   GuichetAnalyticsRoute: typeof GuichetAnalyticsRoute
-  HrAttendanceRoute: typeof HrAttendanceRoute
+  HrAttendanceRoute: typeof HrAttendanceRouteWithChildren
   HrCommissionsRoute: typeof HrCommissionsRoute
   HrExternalAgentsRoute: typeof HrExternalAgentsRoute
   HrPayrollRoute: typeof HrPayrollRoute
@@ -927,6 +939,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MigrationsMigrationIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hr/attendance/dashboard': {
+      id: '/hr/attendance/dashboard'
+      path: '/dashboard'
+      fullPath: '/hr/attendance/dashboard'
+      preLoaderRoute: typeof HrAttendanceDashboardRouteImport
+      parentRoute: typeof HrAttendanceRoute
+    }
     '/contracts/$contractId_/edit': {
       id: '/contracts/$contractId_/edit'
       path: '/contracts/$contractId/edit'
@@ -946,6 +965,18 @@ const UsersRouteChildren: UsersRouteChildren = {
 }
 
 const UsersRouteWithChildren = UsersRoute._addFileChildren(UsersRouteChildren)
+
+interface HrAttendanceRouteChildren {
+  HrAttendanceDashboardRoute: typeof HrAttendanceDashboardRoute
+}
+
+const HrAttendanceRouteChildren: HrAttendanceRouteChildren = {
+  HrAttendanceDashboardRoute: HrAttendanceDashboardRoute,
+}
+
+const HrAttendanceRouteWithChildren = HrAttendanceRoute._addFileChildren(
+  HrAttendanceRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -972,7 +1003,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarDateRoute: CalendarDateRoute,
   ContractsContractIdRoute: ContractsContractIdRoute,
   GuichetAnalyticsRoute: GuichetAnalyticsRoute,
-  HrAttendanceRoute: HrAttendanceRoute,
+  HrAttendanceRoute: HrAttendanceRouteWithChildren,
   HrCommissionsRoute: HrCommissionsRoute,
   HrExternalAgentsRoute: HrExternalAgentsRoute,
   HrPayrollRoute: HrPayrollRoute,

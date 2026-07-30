@@ -66,6 +66,11 @@ function AttendanceDashboard() {
   const totalMinutes = useMemo(() => aggregates.reduce((s, a) => s + (a.minutes || 0), 0), [aggregates]);
   const totalSessions = useMemo(() => aggregates.reduce((s, a) => s + (a.sessions || 0), 0), [aggregates]);
   const avgPerDay = aggregates.length ? Math.round((totalMinutes / aggregates.length) * 10) / 10 : 0;
+  const avgSessionMinutes = totalSessions ? Math.round((totalMinutes / totalSessions) * 10) / 10 : 0;
+  const sessionsPerDay = aggregates.length ? Math.round((totalSessions / aggregates.length) * 10) / 10 : 0;
+  const maxDaily = aggregates.length ? Math.max(...aggregates.map((a) => a.minutes || 0)) : 0;
+  const minDaily = aggregates.length ? Math.min(...aggregates.map((a) => a.minutes || 0)) : 0;
+  const busiest = aggregates.length ? aggregates.reduce((best, a) => (a.minutes || 0) > (best.minutes || 0) ? a : best, aggregates[0]) : null;
 
   if (!canView) return (
     <AppLayout>
@@ -81,7 +86,7 @@ function AttendanceDashboard() {
         </>
       )} />
 
-      <div className="grid lg:grid-cols-4 gap-4 mt-6">
+      <div className="grid lg:grid-cols-6 gap-4 mt-6">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Période</div>
           <div className="mt-2 flex gap-2 items-center">
@@ -101,12 +106,29 @@ function AttendanceDashboard() {
           <div className="text-sm text-muted-foreground">Moyenne / jour</div>
           <div className="text-2xl font-semibold mt-2">{fmtMin(Math.round(avgPerDay))}</div>
         </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Durée moyenne / session</div>
+          <div className="text-2xl font-semibold mt-2">{avgSessionMinutes} min</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Sessions / jour</div>
+          <div className="text-2xl font-semibold mt-2">{sessionsPerDay}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Max par jour</div>
+          <div className="text-2xl font-semibold mt-2">{fmtMin(maxDaily)}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Min par jour</div>
+          <div className="text-2xl font-semibold mt-2">{fmtMin(minDaily)}</div>
+        </Card>
       </div>
 
       <div className="mt-6">
         <Card className="p-4">
           <h3 className="font-semibold mb-3">Tendance quotidienne</h3>
           {loading ? <div>Chargement…</div> : aggregates.length === 0 ? <div className="text-muted-foreground">Aucune donnée</div> : <BarChart data={aggregates} />}
+          {busiest ? <div className="text-xs text-muted-foreground mt-3">Jour le plus chargé : {busiest.period} — {fmtMin(busiest.minutes)}</div> : null}
         </Card>
       </div>
 
