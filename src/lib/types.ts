@@ -213,6 +213,13 @@ export type AttendanceEntry = {
   ip?: string | null;
 };
 
+export type AttendanceAggregate = {
+  period: string; // YYYY-MM-DD (day) or YYYY-MM (month) depending on query
+  seconds: number;
+  minutes: number;
+  sessions: number;
+};
+
 export type PayrollEntry = {
   id: string;
   userId: string;

@@ -10,6 +10,49 @@ $db = (new Database())->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
+// --- GET aggregates (per-day / range summary) -----------------------
+if ($method === 'GET' && $action === 'aggregates') {
+    $start = $_GET['start'] ?? null;
+    $end = $_GET['end'] ?? null;
+    $username = $_GET['username'] ?? null;
+
+    // If not provided, derive start/end from ?month=YYYY-MM
+    if (!$start || !$end) {
+        $month = $_GET['month'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) fail('month invalide', 422);
+        $start = $month . '-01';
+        $end = date('Y-m-t', strtotime($start));
+    }
+
+    // Restrict to non-privileged users
+    $isPriv = in_array($me['role'], ['Administrateur','Manager'], true);
+    if (!$isPriv) $username = $me['username'];
+
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+        fail('dates invalides', 422);
+    }
+
+    $params = [':start' => $start . ' 00:00:00', ':end' => $end . ' 23:59:59'];
+    $sql = "SELECT DATE(login_at) as period, SUM(TIMESTAMPDIFF(SECOND, login_at, COALESCE(logout_at, NOW()))) as seconds, COUNT(*) as sessions
+            FROM crminternet_attendance WHERE login_at BETWEEN :start AND :end";
+    if ($username) { $sql .= " AND username = :u"; $params[':u'] = $username; }
+    $sql .= " GROUP BY DATE(login_at) ORDER BY DATE(login_at) ASC";
+
+    $st = $db->prepare($sql);
+    $st->execute($params);
+    $rows = $st->fetchAll();
+
+    $out = array_map(function($r){
+        return [
+            'period' => $r['period'],
+            'seconds' => (int)$r['seconds'],
+            'minutes' => (int)round(((int)$r['seconds'])/60),
+            'sessions' => (int)$r['sessions'],
+        ];
+    }, $rows);
+
+    ok(['aggregates' => $out, 'start' => $start, 'end' => $end]);
+}
 function ensure_attendance(PDO $db): void {
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS crminternet_attendance (

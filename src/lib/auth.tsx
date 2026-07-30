@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { api, API_ENABLED, getToken, setToken } from "./api";
+import { api, API_ENABLED, getToken, setToken, authenticatedApiUrl } from "./api";
 
 export type AuthUser = {
   id: string;
@@ -241,6 +241,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
   }, [applyPermsForUser]);
 
+  // Best-effort: on tab close / refresh, try to send a beacon to close attendance.
+  useEffect(() => {
+    if (!API_ENABLED || !user) return;
+    const onBeforeUnload = () => {
+      try {
+        if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+          const attUrl = authenticatedApiUrl("/attendance.php", { action: "clock_out" });
+          navigator.sendBeacon(attUrl, "");
+        }
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [user]);
+
   // Keep permissions fresh in the background: when the tab regains focus or
   // becomes visible again, re-fetch /roles.php so an admin's change (revoke
   // or grant) reaches the user without requiring a logout/login cycle.
@@ -417,14 +432,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     if (API_ENABLED) {
-      // CRITICAL: await clock_out BEFORE navigating away. Without await + keepalive,
-      // window.location.href below cancels the in-flight fetch and the attendance
-      // session stays open forever (logout_at NULL, total_minutes 0), then every
-      // subsequent login reuses that stale row.
-      await Promise.allSettled([
-        api("/attendance.php?action=clock_out", { method: "POST", body: {}, keepalive: true }),
-        api("/auth_logout.php", { method: "POST", keepalive: true }),
-      ]);
+      // Prefer navigator.sendBeacon for reliable delivery during unload/redirect.
+      // sendBeacon doesn't allow headers so we use authenticated URL with token in query.
+      try {
+        const beaconSupported = typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function";
+        if (beaconSupported) {
+          try {
+            const attUrl = authenticatedApiUrl("/attendance.php", { action: "clock_out" });
+            const authUrl = authenticatedApiUrl("/auth_logout.php");
+            // send empty body; backend treats POST without body as valid for these endpoints
+            navigator.sendBeacon(attUrl, "");
+            navigator.sendBeacon(authUrl, "");
+          } catch (e) {
+            // fall back to fetch below
+            await Promise.allSettled([
+              api("/attendance.php?action=clock_out", { method: "POST", body: {}, keepalive: true }),
+              api("/auth_logout.php", { method: "POST", keepalive: true }),
+            ]);
+          }
+        } else {
+          // No sendBeacon support — keep existing fetch+keepalive method.
+          await Promise.allSettled([
+            api("/attendance.php?action=clock_out", { method: "POST", body: {}, keepalive: true }),
+            api("/auth_logout.php", { method: "POST", keepalive: true }),
+          ]);
+        }
+      } catch (e) {
+        // Ensure logout proceeds even if the network calls fail.
+        try {
+          await Promise.allSettled([
+            api("/attendance.php?action=clock_out", { method: "POST", body: {}, keepalive: true }),
+            api("/auth_logout.php", { method: "POST", keepalive: true }),
+          ]);
+        } catch { /* ignore */ }
+      }
     }
     // Wipe the per-user permissions cache so the next user on this machine
     // doesn't inherit a stale snapshot.
