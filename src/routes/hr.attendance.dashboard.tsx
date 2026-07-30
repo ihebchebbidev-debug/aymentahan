@@ -44,7 +44,7 @@ function BarChart({ data }: { data: AttendanceAggregate[] }) {
 }
 
 function AttendanceDashboard() {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const canView = hasPermission("page.hr.attendance_dashboard") || hasPermission("page.hr.attendance");
   const [start, setStart] = useState<string>(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10));
   const [end, setEnd] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -65,12 +65,13 @@ function AttendanceDashboard() {
 
   const totalMinutes = useMemo(() => aggregates.reduce((s, a) => s + (a.minutes || 0), 0), [aggregates]);
   const totalSessions = useMemo(() => aggregates.reduce((s, a) => s + (a.sessions || 0), 0), [aggregates]);
-  const avgPerDay = aggregates.length ? Math.round((totalMinutes / aggregates.length) * 10) / 10 : 0;
+  const daysCount = aggregates.length;
+  const avgPerDay = daysCount ? Math.round((totalMinutes / daysCount) * 10) / 10 : 0;
   const avgSessionMinutes = totalSessions ? Math.round((totalMinutes / totalSessions) * 10) / 10 : 0;
-  const sessionsPerDay = aggregates.length ? Math.round((totalSessions / aggregates.length) * 10) / 10 : 0;
-  const maxDaily = aggregates.length ? Math.max(...aggregates.map((a) => a.minutes || 0)) : 0;
-  const minDaily = aggregates.length ? Math.min(...aggregates.map((a) => a.minutes || 0)) : 0;
-  const busiest = aggregates.length ? aggregates.reduce((best, a) => (a.minutes || 0) > (best.minutes || 0) ? a : best, aggregates[0]) : null;
+  const sessionsPerDay = daysCount ? Math.round((totalSessions / daysCount) * 10) / 10 : 0;
+  const maxDaily = daysCount ? Math.max(...aggregates.map((a) => a.minutes || 0)) : 0;
+  const minDaily = daysCount ? Math.min(...aggregates.map((a) => a.minutes || 0)) : 0;
+  const busiest = daysCount ? aggregates.reduce((best, a) => (a.minutes || 0) > (best.minutes || 0) ? a : best, aggregates[0]) : null;
 
   if (!canView) return (
     <AppLayout>
@@ -86,41 +87,37 @@ function AttendanceDashboard() {
         </>
       )} />
 
-      <div className="grid lg:grid-cols-6 gap-4 mt-6">
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Période</div>
-          <div className="mt-2 flex gap-2 items-center">
-            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="border rounded px-2 py-1" />
-            <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="border rounded px-2 py-1" />
-          </div>
-        </Card>
+      <div className="grid gap-4 mt-6 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Heures totales</div>
-          <div className="text-2xl font-semibold mt-2">{fmtMin(totalMinutes)}</div>
+          <div className="text-3xl font-semibold mt-3">{fmtMin(totalMinutes)}</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Sessions</div>
-          <div className="text-2xl font-semibold mt-2">{totalSessions}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Moyenne / jour</div>
-          <div className="text-2xl font-semibold mt-2">{fmtMin(Math.round(avgPerDay))}</div>
+          <div className="text-3xl font-semibold mt-3">{totalSessions}</div>
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Durée moyenne / session</div>
-          <div className="text-2xl font-semibold mt-2">{avgSessionMinutes} min</div>
+          <div className="text-3xl font-semibold mt-3">{avgSessionMinutes} min</div>
         </Card>
+        <Card className="p-4">
+          <div className="text-sm text-muted-foreground">Jours couverts</div>
+          <div className="text-3xl font-semibold mt-3">{daysCount}</div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 mt-4 sm:grid-cols-3">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Sessions / jour</div>
-          <div className="text-2xl font-semibold mt-2">{sessionsPerDay}</div>
+          <div className="text-xl font-semibold mt-2">{sessionsPerDay}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Max par jour</div>
-          <div className="text-2xl font-semibold mt-2">{fmtMin(maxDaily)}</div>
+          <div className="text-sm text-muted-foreground">Max / jour</div>
+          <div className="text-xl font-semibold mt-2">{fmtMin(maxDaily)}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Min par jour</div>
-          <div className="text-2xl font-semibold mt-2">{fmtMin(minDaily)}</div>
+          <div className="text-sm text-muted-foreground">Min / jour</div>
+          <div className="text-xl font-semibold mt-2">{fmtMin(minDaily)}</div>
         </Card>
       </div>
 

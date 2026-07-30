@@ -19,8 +19,6 @@ export const Route = createFileRoute("/hr/attendance")({
   component: AttendancePage,
 });
 
-type Summary = { username: string; totalMinutes: number; totalHours: number; sessions: number };
-
 function fmtMin(m: number) {
   const h = Math.floor(m / 60);
   const mm = m % 60;
@@ -58,9 +56,6 @@ function AttendancePage() {
   const [to, setTo] = useState<string>("");
   const [username, setUsername] = useState("");
   const [rows, setRows] = useState<AttendanceEntry[]>([]);
-  const [summary, setSummary] = useState<Summary[]>([]);
-  const [aggregates, setAggregates] = useState<any[]>([]);
-  const [aggLoading, setAggLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const rangeActive = Boolean(from && to);
@@ -79,29 +74,18 @@ function AttendancePage() {
         }
         const results = await Promise.all(
           months.map((m) =>
-            api<{ attendance: AttendanceEntry[]; summary: Summary[] }>("/attendance.php", {
+            api<{ attendance: AttendanceEntry[] }>("/attendance.php", {
               query: { month: m, ...(username ? { username } : {}) },
             }),
           ),
         );
         const all = results.flatMap((r) => r.attendance);
         setRows(all);
-        // Recompute summary across all months for consistency.
-        const agg = new Map<string, Summary>();
-        for (const r of all) {
-          const cur = agg.get(r.username) ?? { username: r.username, totalMinutes: 0, totalHours: 0, sessions: 0 };
-          cur.totalMinutes += r.totalMinutes ?? 0;
-          cur.sessions += 1;
-          agg.set(r.username, cur);
-        }
-        for (const s of agg.values()) s.totalHours = Math.round((s.totalMinutes / 60) * 10) / 10;
-        setSummary([...agg.values()]);
       } else {
-        const r = await api<{ attendance: AttendanceEntry[]; summary: Summary[] }>("/attendance.php", {
+        const r = await api<{ attendance: AttendanceEntry[] }>("/attendance.php", {
           query: { month, ...(username ? { username } : {}) },
         });
         setRows(r.attendance);
-        setSummary(r.summary);
       }
     } catch (e: any) {
       toast.error(e?.message ?? "Erreur de chargement");
@@ -144,11 +128,6 @@ function AttendancePage() {
     }
     return r;
   }, [rows, rangeActive, from, to, username, isPriv]);
-
-  const myRows = useMemo(
-    () => visibleRows.filter((r) => r.username === user?.username).slice(0, 10),
-    [visibleRows, user?.username],
-  );
 
   const periodLabel = rangeActive ? `${from} → ${to}` : month;
 
@@ -215,24 +194,34 @@ function AttendancePage() {
         {isPriv && (
           <Button size="sm" onClick={() => void load()}>Filtrer</Button>
         )}
-            {isPriv && (
+        {isPriv && (
           <Button size="sm" variant="outline" asChild>
             <a href="/hr/attendance/dashboard">Ouvrir le tableau Pointage</a>
           </Button>
         )}
       </div>
 
-      {/* Personal history — confirms each clock-in / clock-out for the current user */}
+      <div className="mt-6">
+        {isPriv ? (
+          <Card className="p-4">
+            <h3 className="font-semibold text-sm">Pointage</h3>
+            <p className="text-sm text-muted-foreground">
+              Cette page affiche toutes les sessions de pointage pour les utilisateurs. Pour les KPI et graphiques, utilisez le Tableau Pointage.
+            </p>
+          </Card>
+        ) : null}
+      </div>
+
       <Card className="p-4 mt-6">
         <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
           <div>
-            <h3 className="font-semibold text-sm">Mes derniers pointages</h3>
+            <h3 className="font-semibold text-sm">Historique des pointages</h3>
             <p className="text-xs text-muted-foreground">
-              Historique des entrées / sorties enregistrées pour {user?.username} — période {periodLabel}.
+              Liste des entrées / sorties pour tous les utilisateurs sur la période sélectionnée.
             </p>
           </div>
           {(() => {
-            const open = visibleRows.find((r) => r.username === user?.username && !r.logoutAt);
+            const open = visibleRows.find((r) => !r.logoutAt);
             return open ? (
               <Badge className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30">
                 Session ouverte
@@ -246,6 +235,7 @@ function AttendancePage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Utilisateur</TableHead>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Entrée</TableHead>
                 <TableHead>Sortie</TableHead>
@@ -255,14 +245,15 @@ function AttendancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {myRows.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">Aucun pointage sur cette période</TableCell></TableRow>
+              {visibleRows.length === 0 && (
+                <TableRow><TableCell colSpan={7} className="text-center py-6 text-muted-foreground text-sm">Aucun pointage sur cette période</TableCell></TableRow>
               )}
-              {myRows.map((r, i) => {
+              {visibleRows.map((r, i) => {
                 const inDt = splitDateTime(r.loginAt);
                 const outDt = r.logoutAt ? splitDateTime(r.logoutAt) : null;
                 return (
                   <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.username}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
                       <div className="text-sm font-medium">{inDt.time}</div>
@@ -297,7 +288,17 @@ function AttendancePage() {
         </div>
       </Card>
 
-      {/* Advanced aggregates moved to the dashboard page. */}
+      <div className="mt-6">
+        {isPriv ? (
+          <Card className="p-4">
+            <h3 className="font-semibold mb-2">Vue complète</h3>
+            <p className="text-sm text-muted-foreground mb-3">Les synthèses et rapports avancés ont été déplacés vers le Tableau Pointage.</p>
+            <Button asChild>
+              <a href="/hr/attendance/dashboard">Ouvrir le tableau Pointage</a>
+            </Button>
+          </Card>
+        ) : null}
+      </div>
 
       <div className="mt-6">
         {isPriv ? (

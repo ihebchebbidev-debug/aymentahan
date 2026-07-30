@@ -115,7 +115,7 @@ export function useNavVisibility() {
 export function AppSidebar() {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const isActive = (path: string) =>
-    path === "/" ? currentPath === "/" : currentPath.startsWith(path);
+    path === "/" ? currentPath === "/" : currentPath === path;
   const { user, hasPermission } = useAuth();
   const displayName = user?.fullName ?? user?.username ?? "Utilisateur";
   const displayRole = roleLabel(user?.role);
