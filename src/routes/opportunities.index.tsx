@@ -143,7 +143,7 @@ function OpportunitiesPage() {
     ],
   });
   const BASE_COLS_META: { key: string; label: string }[] = [
-    { key: "typeId",      label: "Type" },
+    { key: "typeId",      label: "Type de prospect" },
     { key: "civility",    label: "Civilité" },
     { key: "lastName",    label: "Nom" },
     { key: "firstName",   label: "Prénom" },
@@ -380,7 +380,7 @@ function OpportunitiesPage() {
 
   const baseColumns: DataGridColumn<Opportunity>[] = [
     {
-      key: "typeId", header: "Type", accessor: (o) => o.typeId ?? "", hideBelow: "lg",
+      key: "typeId", header: "Type de prospect", accessor: (o) => o.typeId ?? "", hideBelow: "lg",
       cell: (o) => o.typeId
         ? <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-normal text-[11px]">{typeNameById.get(o.typeId) ?? "—"}</Badge>
         : <span className="text-muted-foreground">—</span>,
