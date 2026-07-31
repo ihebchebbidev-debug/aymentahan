@@ -269,11 +269,12 @@ function conversion_insert_migration_from_opportunity(PDO $db, string $mid, arra
          :rd, :cd, :tstat, :eref,
          :sid, :ws, :at, :vat, :vby, :notes,
          :cb, :ca, :ua)";
+    $tid = $extra['type_id'] ?? $o['type_id'] ?? $o['typeId'] ?? null;
     $db->prepare($sql)->execute([
         ':id' => $mid,
         ':oid' => $o['id'] ?? '',
         ':pid' => $o['prospect_id'] ?? null,
-        ':tid' => $o['type_id'] ?? null,
+        ':tid' => $tid,
         ':civ' => $o['civility'] ?? 'M',
         ':ln' => $o['last_name'] ?? '',
         ':fn' => $o['first_name'] ?? '',
