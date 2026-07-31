@@ -300,9 +300,6 @@ function OpportunityDetailPage() {
               <TabsTrigger value="attachments" className="gap-1.5"><Paperclip className="h-3.5 w-3.5" />Pièces jointes</TabsTrigger>
               <TabsTrigger value="custom" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Champs perso</TabsTrigger>
               <TabsTrigger value="contract-info" className="gap-1.5"><Network className="h-3.5 w-3.5" />Information contrat</TabsTrigger>
-              {canViewJourney && (
-                <TabsTrigger value="journey" className="gap-1.5"><History className="h-3.5 w-3.5" />Parcours complet</TabsTrigger>
-              )}
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 mt-0">
@@ -468,7 +465,7 @@ function OpportunityDetailPage() {
 
 
             {canViewJourney && (
-              <TabsContent value="journey" className="mt-0">
+              <TabsContent value="history" className="mt-0">
                 <JourneyTimeline
                   prospectId={opp.prospectId ?? opp.id}
                   opportunityId={opp.id}

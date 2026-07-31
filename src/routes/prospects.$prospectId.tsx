@@ -74,6 +74,7 @@ function ProspectDetailPage() {
   const [comment2, setComment2] = useState(prospect?.comment2 ?? "");
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [restoredMeta, setRestoredMeta] = useState<{ prospectId: string; opportunityId?: string | null; restoredAt?: string } | null>(null);
+  const [linkedOpportunityMeta, setLinkedOpportunityMeta] = useState<{ contractId: string | null; migrationId: string | null } | null>(null);
 
   const linkedOpportunityId = prospect?.opportunityId ?? restoredMeta?.opportunityId ?? null;
   const attachmentExtras = useMemo(
@@ -105,6 +106,28 @@ function ProspectDetailPage() {
       .then((r) => setTypes((r.types ?? []).slice().sort((a, b) => a.position - b.position)))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!linkedOpportunityId || !API_ENABLED) {
+      setLinkedOpportunityMeta(null);
+      return;
+    }
+    let cancelled = false;
+    api<{ opportunity?: { contractId?: string | null; migrationId?: string | null } }>(`/opportunities.php?id=${encodeURIComponent(linkedOpportunityId)}`)
+      .then((r) => {
+        if (cancelled) return;
+        const opp = r.opportunity ?? null;
+        setLinkedOpportunityMeta({
+          contractId: opp?.contractId ?? null,
+          migrationId: opp?.migrationId ?? null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedOpportunityMeta(null);
+      });
+    return () => { cancelled = true; };
+  }, [linkedOpportunityId]);
+
   const STATUS_OPTIONS = useMemo(() => {
     const set = new Set<string>(catalogStatusNames.length ? catalogStatusNames : STATUS_FALLBACK);
     if (prospect?.status) set.add(prospect.status);
@@ -275,10 +298,7 @@ function ProspectDetailPage() {
               <TabsTrigger value="custom" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Champs perso</TabsTrigger>
               <TabsTrigger value="contract-info" className="gap-1.5"><Network className="h-3.5 w-3.5" />Information contrat</TabsTrigger>
               {canViewHistory && (
-                <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" />Historique</TabsTrigger>
-              )}
-              {canViewHistory && (
-                <TabsTrigger value="journey" className="gap-1.5"><History className="h-3.5 w-3.5" />Parcours complet</TabsTrigger>
+                <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" />Historique du dossier</TabsTrigger>
               )}
             </TabsList>
 
@@ -377,14 +397,11 @@ function ProspectDetailPage() {
 
             {canViewHistory && (
               <TabsContent value="history" className="mt-0">
-                <LeadHistoryCard prospectId={prospect.id} />
-              </TabsContent>
-            )}
-            {canViewHistory && (
-              <TabsContent value="journey" className="mt-0">
                 <JourneyTimeline
                   prospectId={prospect.id}
                   opportunityId={prospect.opportunityId ?? restoredMeta?.opportunityId ?? null}
+                  contractId={linkedOpportunityMeta?.contractId ?? null}
+                  migrationId={linkedOpportunityMeta?.migrationId ?? null}
                 />
               </TabsContent>
             )}

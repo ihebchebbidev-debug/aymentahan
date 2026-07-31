@@ -324,11 +324,10 @@ export function JourneyTimeline({ prospectId, opportunityId, contractId, migrati
     <Card className="shadow-elegant">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <History className="h-4 w-4" />Parcours complet du client
+          <History className="h-4 w-4" />Historique complet du dossier
         </CardTitle>
         <CardDescription>
-          Toutes les étapes — création, prises en charge, changements de statut,
-          conversions, modifications de contrat, perte — avec auteur et horodatage.
+          Suivi complet du lead jusqu'à l'opportunité, au contrat ou à la migration, avec auteur et horodatage.
         </CardDescription>
       </CardHeader>
       <CardContent>{body}</CardContent>

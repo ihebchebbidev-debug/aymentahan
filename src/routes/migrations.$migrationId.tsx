@@ -367,7 +367,7 @@ function MigrationDetailsView({
               )}
               <TabsTrigger value="activity" className="gap-1.5"><Activity className="h-3.5 w-3.5" />Activité</TabsTrigger>
               {canViewJourney && (
-                <TabsTrigger value="journey" className="gap-1.5"><History className="h-3.5 w-3.5" />Parcours complet</TabsTrigger>
+                <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" />Historique du dossier</TabsTrigger>
               )}
               <TabsTrigger value="attachments" className="gap-1.5"><Paperclip className="h-3.5 w-3.5" />Pièces jointes</TabsTrigger>
               <TabsTrigger value="custom" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Champs perso</TabsTrigger>
@@ -480,7 +480,7 @@ function MigrationDetailsView({
             </TabsContent>
 
             {canViewJourney && (
-              <TabsContent value="journey" className="mt-0">
+              <TabsContent value="history" className="mt-0">
                 <JourneyTimeline
                   prospectId={m.prospectId ?? m.opportunityId ?? m.id}
                   opportunityId={m.opportunityId ?? null}
