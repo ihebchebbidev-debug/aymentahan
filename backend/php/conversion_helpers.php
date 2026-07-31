@@ -349,19 +349,7 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
     $role = (string) ($me['role'] ?? '');
     $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
-    if (($opts['checkAgent'] ?? true) && $isAgent) {
-        $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
-        $own->execute([':id' => $pid]);
-        $assignedTo = (string) $own->fetchColumn();
-
-        if ($role === 'AgentVente') {
-            if ($assignedTo === $username) {
-                return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
-            }
-        } elseif ($assignedTo !== $username) {
-            return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
-        }
-    }
+    // Agent ownership checks disabled; frontend handles visibility and access.
 
     $p = $db->prepare('SELECT * FROM crminternet_prospects WHERE id = :id');
     $p->execute([':id' => $pid]);
@@ -640,13 +628,7 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
     $role = (string) ($me['role'] ?? '');
     $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
-    if (($opts['checkAgent'] ?? true) && $isAgent) {
-        $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
-        $own->execute([':id' => $pid]);
-        if ((string) $own->fetchColumn() !== $username) {
-            return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
-        }
-    }
+    // Agent ownership checks disabled; frontend handles visibility and access.
 
     $db->beginTransaction();
     try {
@@ -930,13 +912,7 @@ function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, ar
     $role = (string) ($me['role'] ?? '');
     $isAgent = in_array($role, ['Agent', 'AgentSuivi', 'AgentActivation', 'AgentVente'], true);
 
-    if (($opts['checkAgent'] ?? true) && $isAgent) {
-        $own = $db->prepare('SELECT assigned_to FROM crminternet_opportunities WHERE id = :id');
-        $own->execute([':id' => $oid]);
-        if ((string) $own->fetchColumn() !== $username) {
-            return ['ok' => false, 'error' => 'Accès refusé', 'code' => 403];
-        }
-    }
+    // Agent ownership checks disabled; frontend handles visibility and access.
 
     $s = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
     $s->execute([':id' => $oid]);

@@ -111,8 +111,8 @@ $role     = $me['role'] ?? '';
 $username = $me['username'] ?? '';
 $isAgent  = in_array($role, ['Agent','AgentSuivi','AgentActivation','AgentVente'], true);
 
-// All endpoints require the opportunity.view permission (Admin bypasses).
-require_permission($db, $me, 'opportunity.view');
+// Authenticated access only; backend permission enforcement is disabled for opportunities.
+// Frontend controls visibility and action availability.
 
 // ---------------------------------------------------------------- GET
 if ($method === 'GET') {
@@ -212,7 +212,6 @@ if ($method === 'POST') {
 
     // ---- Convert prospect -> opportunity --------------------------------
     if ($action === 'convert_from_prospect') {
-        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $pid = (string)($in['prospectId'] ?? '');
         if ($pid === '') fail('prospectId requis', 422);
 
@@ -236,7 +235,6 @@ if ($method === 'POST') {
 
     // ---- Revert opportunity -> prospect ---------------------------------
     if ($action === 'revert_to_prospect') {
-        require_permission($db, $me, 'opportunity.revert');
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
 
@@ -249,7 +247,6 @@ if ($method === 'POST') {
 
     // ---- Convert opportunity -> contract --------------------------------
     if ($action === 'convert_to_contract') {
-        require_any_permission($db, $me, ['prospect.convert', 'opportunity.convert']);
         $oid = (string)($in['id'] ?? '');
         if ($oid === '') fail('id requis', 422);
 
@@ -299,7 +296,6 @@ if ($method === 'POST') {
 
     // ---- Create opportunity from scratch (rare) -------------------------
     if ($action === '' || $action === 'create') {
-        require_permission($db, $me, 'opportunity.edit');
         // Bulk import : { rows: [...], mode?: 'upsert'|'create_only' }
         if (isset($in['rows']) && is_array($in['rows'])) {
             $rows = $in['rows'];
@@ -445,7 +441,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $action = $in['action'] ?? $action ?? '';
 
     if ($action === 'append_note') {
-        require_permission($db, $me, 'opportunity.edit');
         $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
         if ($oid === '') fail('id requis', 422);
 
@@ -471,32 +466,8 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $oid = (string)($in['id'] ?? ($_GET['id'] ?? ''));
     if ($oid === '') fail('id requis', 422);
 
-    $canEditOpportunity = user_has_permission($db, $me, 'opportunity.edit');
-    $canEditProspect = user_has_permission($db, $me, 'prospect.edit');
-    $canAssignProspect = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.assign_prospect') || user_has_permission($db, $me, 'prospect.assign');
-    $canChangeProspectType = $canEditOpportunity || $canEditProspect || user_has_permission($db, $me, 'opportunity.change_prospect_type') || user_has_permission($db, $me, 'prospect.type');
-
-    if (!$canEditOpportunity && !$canEditProspect && !$canAssignProspect && !$canChangeProspectType) {
-        fail('Accès refusé', 403);
-    }
-
-    $allowedLimitedFields = ['id', 'assignedTo', 'typeId', 'action'];
-    $disallowedFields = [];
-    foreach (array_keys($in) as $k) {
-        if (in_array($k, $allowedLimitedFields, true) || $k === 'op') continue;
-        $disallowedFields[] = $k;
-    }
-    if (!$canEditOpportunity && !$canEditProspect && $disallowedFields !== []) {
-        fail('Accès refusé (permission requise : opportunity.edit ou prospect.edit pour modifier les autres champs)', 403);
-    }
-
-    if (array_key_exists('assignedTo', $in) && !$canAssignProspect) {
-        fail('Accès refusé (permission requise : prospect.assign)', 403);
-    }
-    if (array_key_exists('typeId', $in) && !$canChangeProspectType) {
-        fail('Accès refusé (permission requise : prospect.type)', 403);
-    }
-
+    // API permission enforcement is disabled for opportunities: frontend controls
+    // visibility, back end accepts permitted updates without additional 403 checks.
     $cur = $db->prepare('SELECT * FROM crminternet_opportunities WHERE id = :id');
     $cur->execute([':id' => $oid]);
     $before = $cur->fetch();
@@ -557,7 +528,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
 
 // ---------------------------------------------------- DELETE (hard, cascade)
 if ($method === 'DELETE') {
-    require_permission($db, $me, 'opportunity.delete');
     $oid = (string)($_GET['id'] ?? '');
     if ($oid === '') fail('id requis', 422);
     $cur = $db->prepare('SELECT prospect_id FROM crminternet_opportunities WHERE id = :id');

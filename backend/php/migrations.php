@@ -177,7 +177,6 @@ if ($method === 'POST') {
     $action = (string)($in['action'] ?? '');
 
     if ($action === 'revert_to_opportunity') {
-        require_permission($db, $me, 'migration.revert');
         $mid = (string)($in['id'] ?? '');
         if ($mid === '') {
             fail('id requis', 422);
@@ -237,29 +236,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         fail('id requis', 422);
     }
 
-    $canEditMigration = user_has_permission($db, $me, 'migration.edit');
-    $canAssignMigration = $canEditMigration || user_has_permission($db, $me, 'migration.assign');
-    $canChangeMigrationType = $canEditMigration || user_has_permission($db, $me, 'migration.type');
-
-    $allowedLimitedFields = ['id', 'assignedTo', 'typeId'];
-    $disallowedFields = [];
-    foreach (array_keys($in) as $k) {
-        if ($k === 'id') {
-            continue;
-        }
-        if (!$canEditMigration && !in_array($k, $allowedLimitedFields, true)) {
-            $disallowedFields[] = $k;
-        }
-    }
-    if (!$canEditMigration && $disallowedFields !== []) {
-        fail('Accès refusé (permission requise : migration.edit pour modifier ces champs)', 403);
-    }
-    if (array_key_exists('assignedTo', $in) && !$canAssignMigration) {
-        fail('Accès refusé (permission requise : migration.assign)', 403);
-    }
-    if (array_key_exists('typeId', $in) && !$canChangeMigrationType) {
-        fail('Accès refusé (permission requise : migration.type)', 403);
-    }
+    // API permission enforcement disabled; frontend controls visibility.
 
     $cur = $db->prepare('SELECT * FROM crminternet_migrations WHERE id = :id AND deleted_at IS NULL');
     $cur->execute([':id' => $mid]);

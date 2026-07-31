@@ -50,9 +50,9 @@ function user_can_convert_opportunity_to_migration(PDO $db, array $me): bool
 
 function require_convert_opportunity_to_migration(PDO $db, array $me): void
 {
-    if (!user_can_convert_opportunity_to_migration($db, $me)) {
-        fail('Forbidden', 403);
-    }
+    // API permission enforcement disabled for opportunity -> migration conversions.
+    // Frontend controls visibility, but backend should not reject the request.
+    return;
 }
 
 function crm_seed_migration_role_permissions(PDO $db): void

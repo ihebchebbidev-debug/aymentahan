@@ -296,12 +296,6 @@ if ($method === 'POST') {
         $pid    = $in['id'] ?? '';
         $reason = trim($in['reason'] ?? 'Non précisé');
         if (!$pid) fail('id requis', 422);
-        if ($isAgent) {
-            $own = $db->prepare('SELECT assigned_to FROM crminternet_prospects WHERE id = :id');
-            $own->execute([':id' => $pid]);
-            $owner = $own->fetchColumn();
-            if ($owner !== $me['username']) fail('Accès refusé', 403);
-        }
         $cur = $db->prepare('SELECT outcome, status, lost_reason FROM crminternet_prospects WHERE id = :id');
         $cur->execute([':id' => $pid]);
         $bef = $cur->fetch() ?: [];
@@ -638,17 +632,6 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $cur->execute([':id' => $id]);
     $curRow = $cur->fetch();
     if (!$curRow) fail('Prospect introuvable', 404);
-    if ($isAgent) {
-        // Politique : les agents peuvent éditer n'importe quel prospect, mais
-        // ne peuvent pas le réassigner à un autre utilisateur (auto-assignation
-        // ou désattribution uniquement).
-        if (array_key_exists('assignedTo', $in)) {
-            $target = $in['assignedTo'];
-            if ($target !== null && $target !== '' && $target !== $me['username']) {
-                fail('Accès refusé', 403);
-            }
-        }
-    }
 
     $map = [
         'civility'    => 'civility',

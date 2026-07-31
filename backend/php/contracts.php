@@ -199,29 +199,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
 
     // agent-assignment check removed: API no longer enforces per-agent assignment
 
-    $canEditContract = user_has_permission($db, $me, 'contract.edit');
-    $canAssignContract = $canEditContract || user_has_permission($db, $me, 'contract.assign');
-    $canChangeContractType = $canEditContract || user_has_permission($db, $me, 'contract.type');
-
-    $allowedLimitedFields = ['id', 'assignedTo', 'typeId'];
-    $disallowedFields = [];
-    foreach (array_keys($in) as $k) {
-        if ($k === 'id') {
-            continue;
-        }
-        if (!$canEditContract && !in_array($k, $allowedLimitedFields, true)) {
-            $disallowedFields[] = $k;
-        }
-    }
-    if (!$canEditContract && $disallowedFields !== []) {
-        fail('Accès refusé (permission requise : contract.edit pour modifier ces champs)', 403);
-    }
-    if (array_key_exists('assignedTo', $in) && !$canAssignContract) {
-        fail('Accès refusé (permission requise : contract.assign)', 403);
-    }
-    if (array_key_exists('typeId', $in) && !$canChangeContractType) {
-        fail('Accès refusé (permission requise : contract.type)', 403);
-    }
+    // API permission enforcement disabled; frontend controls visibility.
 
     $sets   = [];
     $params = [':id' => $cid];
@@ -410,7 +388,6 @@ if ($method === 'POST') {
 
     /* ---- revert contract -> prospect (lead) -------------------------- */
     if ($action === 'revert_to_prospect') {
-        require_permission($db, $me, 'contract.revert');
         $cid = (string)($in['id'] ?? '');
         if ($cid === '') fail('id requis', 422);
 
@@ -428,7 +405,6 @@ if ($method === 'POST') {
 
     /* ---- revert contract -> opportunity ------------------------------ */
     if ($action === 'revert_to_opportunity') {
-        require_permission($db, $me, 'contract.revert');
         $cid = (string)($in['id'] ?? '');
         if ($cid === '') fail('id requis', 422);
 
