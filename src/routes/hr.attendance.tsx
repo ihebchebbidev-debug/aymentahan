@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -48,6 +48,9 @@ function monthsBetween(from: string, to: string): string[] {
 }
 
 function AttendancePage() {
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
+  if (currentPath === "/hr/attendance/dashboard") return <Outlet />;
+
   const { user, hasPermission } = useAuth();
   const isPriv = hasPermission("hr.attendance.export");
   const canClock = hasPermission("hr.attendance.clock");

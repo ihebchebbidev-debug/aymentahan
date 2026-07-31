@@ -289,8 +289,6 @@ function ProspectDetailPage() {
                 showAnimateur={isStreetType || !!prospect.animateur}
               />
 
-              <CinDuplicatesCard cin={prospect.cin} currentId={prospect.id} />
-
               {/* Suivi commercial — historique des actions horodatées */}
               <LeadActionsTimeline prospectId={prospect.id} />
 
@@ -411,6 +409,8 @@ function ProspectDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <CinDuplicatesCard cin={prospect.cin} currentId={prospect.id} />
 
           {/* Planifier une relance — crée une tâche liée au lead. */}
           <Card className="shadow-elegant">

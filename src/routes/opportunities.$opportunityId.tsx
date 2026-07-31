@@ -48,7 +48,9 @@ function OpportunityDetailPage() {
   const { users, refresh } = useErp();
   const { toContract, toMigration, revertOpportunity, afterOpportunityAuto } = useCrmListSync();
   const { user, hasPermission } = useAuth();
-  const canEdit = hasPermission("opportunity.edit");
+  const canEditOpportunity = hasPermission("opportunity.edit");
+  const canAssignOpportunity = canEditOpportunity || hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
+  const canEdit = canEditOpportunity || canAssignOpportunity;
   const canConvert = hasAnyPermission(hasPermission, ["prospect.convert", "opportunity.convert"]);
   const canConvertMigration = canConvertOpportunityToMigration(hasPermission);
   const canRevert = hasPermission("opportunity.revert");
@@ -335,58 +337,64 @@ function OpportunityDetailPage() {
                   <LastModifiedInfo kind="opportunity" id={opp.id} createdAt={opp.createdAt} createdBy={opp.createdBy} />
 
 
-                  {canEdit && (
+                  {(canEditOpportunity || canAssignOpportunity) && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Statut</Label>
-                        <Select value={opp.stage} onValueChange={(v) => patch({ stage: v })} disabled={busy}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {stages.length > 0 ? stages.map((s) => (
-                              <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-                            )) : <SelectItem value={opp.stage}>{opp.stage}</SelectItem>}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Assigné à</Label>
-                        <Select value={opp.assignedTo ?? "__none__"} onValueChange={(v) => patch({ assignedTo: v === "__none__" ? null : v })} disabled={busy}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <div className="p-2">
-                              <Input
-                                placeholder="Rechercher un agent…"
-                                value={assignedToQuery}
-                                onChange={(e) => setAssignedToQuery(e.target.value)}
-                                className="w-full"
-                                disabled={busy}
-                              />
-                            </div>
-                            <SelectItem value="__none__">Non attribué</SelectItem>
-                            {assignedUsers.length > 0 ? assignedUsers.map((u) => (
-                              <SelectItem key={u.username} value={u.username}>
-                                {u.fullName} (@{u.username})
-                              </SelectItem>
-                            )) : (
-                              <div className="px-3 py-2 text-sm text-muted-foreground">Aucun agent correspondant</div>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Montant (TND)</Label>
-                        <Input type="number" defaultValue={opp.amount} onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (!Number.isNaN(v) && v !== opp.amount) patch({ amount: v });
-                        }} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Probabilité (%)</Label>
-                        <Input type="number" min={0} max={100} defaultValue={opp.probability} onBlur={(e) => {
-                          const v = Number(e.target.value);
-                          if (!Number.isNaN(v) && v !== opp.probability) patch({ probability: v });
-                        }} />
-                      </div>
+                      {canEditOpportunity && (
+                        <>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Statut</Label>
+                            <Select value={opp.stage} onValueChange={(v) => patch({ stage: v })} disabled={busy}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {stages.length > 0 ? stages.map((s) => (
+                                  <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                                )) : <SelectItem value={opp.stage}>{opp.stage}</SelectItem>}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Montant (TND)</Label>
+                            <Input type="number" defaultValue={opp.amount} onBlur={(e) => {
+                              const v = Number(e.target.value);
+                              if (!Number.isNaN(v) && v !== opp.amount) patch({ amount: v });
+                            }} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Probabilité (%)</Label>
+                            <Input type="number" min={0} max={100} defaultValue={opp.probability} onBlur={(e) => {
+                              const v = Number(e.target.value);
+                              if (!Number.isNaN(v) && v !== opp.probability) patch({ probability: v });
+                            }} />
+                          </div>
+                        </>
+                      )}
+                      {canAssignOpportunity && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">Assigné à</Label>
+                          <Select value={opp.assignedTo ?? "__none__"} onValueChange={(v) => patch({ assignedTo: v === "__none__" ? null : v })} disabled={busy}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <div className="p-2">
+                                <Input
+                                  placeholder="Rechercher un agent…"
+                                  value={assignedToQuery}
+                                  onChange={(e) => setAssignedToQuery(e.target.value)}
+                                  className="w-full"
+                                  disabled={busy}
+                                />
+                              </div>
+                              <SelectItem value="__none__">Non attribué</SelectItem>
+                              {assignedUsers.length > 0 ? assignedUsers.map((u) => (
+                                <SelectItem key={u.username} value={u.username}>
+                                  {u.fullName} (@{u.username})
+                                </SelectItem>
+                              )) : (
+                                <div className="px-3 py-2 text-sm text-muted-foreground">Aucun agent correspondant</div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
                   )}
 

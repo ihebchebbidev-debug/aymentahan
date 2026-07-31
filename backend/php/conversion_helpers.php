@@ -111,7 +111,7 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
         ':c1'    => $p['comment'] ?? null,
         ':c2'    => $p['comment2'] ?? null,
         ':src'   => $p['source'] ?? '',
-        ':tid'   => null,
+        ':tid'   => $extra['type_id'] ?? ($p['type_id'] ?? $p['typeId'] ?? null),
         ':lst'   => $p['status'] ?? null,
         ':lr'    => $p['lost_reason'] ?? null,
         ':title' => $title,
@@ -453,6 +453,7 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
             'assigned_to' => $row['assigned_to'] ?: $username,
             'created_by'  => $username,
             'notes'       => (string) ($opts['notes'] ?? ''),
+            'type_id'     => $row['type_id'] ?? $row['typeId'] ?? null,
         ]);
         $db->prepare(
             'UPDATE crminternet_prospects SET converted = 1, converted_at = NOW(), opportunity_id = :oid WHERE id = :id'
@@ -578,6 +579,7 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             'premium'        => $premium,
             'billing_status' => (string) ($opts['billing_status'] ?? 'Pré-validé'),
             'assigned_to'    => (string) ($opts['assigned_to'] ?? ''),
+            'type_id'        => $o['type_id'] ?? $o['typeId'] ?? null,
         ]);
         $db->prepare(
             'UPDATE crminternet_opportunities SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW() WHERE id = :id'
@@ -695,6 +697,7 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
             'premium'        => $premium,
             'billing_status' => (string) ($opts['billing_status'] ?? 'Pré-validé'),
             'assigned_to'    => $p['assigned_to'] ?? '—',
+            'type_id'        => $p['type_id'] ?? $p['typeId'] ?? null,
         ]);
 
         conv_tx_commit($db);
@@ -988,6 +991,7 @@ function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, ar
             'workflow_status'  => (string) ($opts['workflow_status'] ?? 'Pré-validé'),
             'assigned_to'      => (string) ($opts['assigned_to'] ?? ($o['assigned_to'] ?? '')),
             'created_by'       => $username,
+            'type_id'          => $o['type_id'] ?? $o['typeId'] ?? null,
         ]);
         $db->prepare(
             'UPDATE crminternet_opportunities

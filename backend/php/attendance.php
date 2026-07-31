@@ -53,6 +53,87 @@ if ($method === 'GET' && $action === 'aggregates') {
 
     ok(['aggregates' => $out, 'start' => $start, 'end' => $end]);
 }
+
+// --- GET summary by user / role / team -------------------------------
+if ($method === 'GET' && $action === 'summary') {
+    $start = $_GET['start'] ?? null;
+    $end = $_GET['end'] ?? null;
+    $username = $_GET['username'] ?? null;
+
+    if (!$start || !$end) {
+        $month = $_GET['month'] ?? date('Y-m');
+        if (!preg_match('/^\d{4}-\d{2}$/', $month)) fail('month invalide', 422);
+        $start = $month . '-01';
+        $end = date('Y-m-t', strtotime($start));
+    }
+
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $end)) {
+        fail('dates invalides', 422);
+    }
+
+    $isPriv = in_array($me['role'], ['Administrateur','Manager'], true);
+    if (!$isPriv) $username = $me['username'];
+
+    $where = 'a.login_at BETWEEN :start AND :end';
+    $params = [':start' => $start . ' 00:00:00', ':end' => $end . ' 23:59:59'];
+    if ($username) { $where .= ' AND a.username = :u'; $params[':u'] = $username; }
+
+    $userSql = "SELECT a.user_id, a.username, COALESCE(u.role, '') AS role, COALESCE(u.team, '') AS team,\n"
+             . "       SUM(TIMESTAMPDIFF(SECOND, a.login_at, COALESCE(a.logout_at, NOW()))) AS seconds,\n"
+             . "       COUNT(*) AS sessions\n"
+             . "FROM crminternet_attendance a\n"
+             . "LEFT JOIN crminternet_users u ON u.id = a.user_id\n"
+             . "WHERE $where\n"
+             . "GROUP BY a.user_id, a.username, role, team\n"
+             . "ORDER BY a.username ASC";
+
+    $st = $db->prepare($userSql);
+    $st->execute($params);
+    $users = array_map(function($r){
+        $seconds = (int)$r['seconds'];
+        $sessions = (int)$r['sessions'];
+        return [
+            'userId' => $r['user_id'],
+            'username' => $r['username'],
+            'role' => $r['role'],
+            'team' => $r['team'],
+            'seconds' => $seconds,
+            'minutes' => (int)round($seconds / 60),
+            'sessions' => $sessions,
+            'avgMinutes' => $sessions ? round($seconds / 60 / $sessions, 1) : 0,
+        ];
+    }, $st->fetchAll());
+
+    $groupSql = function(string $field, string $label) use ($where, $params, $db) {
+        $sql = "SELECT COALESCE(u.$field, '') AS group_label, "
+             . "       SUM(TIMESTAMPDIFF(SECOND, a.login_at, COALESCE(a.logout_at, NOW()))) AS seconds, "
+             . "       COUNT(*) AS sessions "
+             . "FROM crminternet_attendance a "
+             . "LEFT JOIN crminternet_users u ON u.id = a.user_id "
+             . "WHERE $where "
+             . "GROUP BY group_label "
+             . "ORDER BY group_label ASC";
+        $st = $db->prepare($sql);
+        $st->execute($params);
+        return array_map(function($r) {
+            $seconds = (int)$r['seconds'];
+            $sessions = (int)$r['sessions'];
+            return [
+                'group' => $r['group_label'] ?: 'N/A',
+                'seconds' => $seconds,
+                'minutes' => (int)round($seconds / 60),
+                'sessions' => $sessions,
+                'avgMinutes' => $sessions ? round($seconds / 60 / $sessions, 1) : 0,
+            ];
+        }, $st->fetchAll());
+    };
+
+    $roles = $groupSql('role', 'role');
+    $teams = $groupSql('team', 'team');
+
+    ok(['users' => $users, 'roles' => $roles, 'teams' => $teams, 'start' => $start, 'end' => $end]);
+}
+
 function ensure_attendance(PDO $db): void {
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS crminternet_attendance (

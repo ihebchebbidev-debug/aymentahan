@@ -212,6 +212,7 @@ function NewProspectPage() {
 
   const submit = async () => {
     if (!lastName.trim()) { toast.error("Nom obligatoire"); return; }
+    if (!typeId.trim()) { toast.error("Type de prospect obligatoire"); return; }
     if (!isValidLocalisationXy(localisationXy)) {
       toast.error("Localisation XY invalide", { description: "Format attendu : lat,lng (ex: 36.123456,10.123698)" });
       return;
@@ -285,7 +286,7 @@ function NewProspectPage() {
     <AppLayout skeleton="form">
       <PageHeader
         title="Nouveau prospect"
-        description="Renseignez la fiche du lead — tous les champs sauf Nom sont optionnels."
+        description="Renseignez la fiche du lead — tous les champs sauf Nom et Type de prospect sont optionnels."
         icon={<UserPlus className="h-5 w-5" />}
         actions={
           <Button variant="outline" size="sm" asChild>
@@ -308,7 +309,7 @@ function NewProspectPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {types.length > 0 && (
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>Type de prospect</Label>
+                  <Label>Type de prospect *</Label>
                   <Select value={typeId} onValueChange={setTypeId}>
                     <SelectTrigger><SelectValue placeholder="Choisir un type…" /></SelectTrigger>
                     <SelectContent>

@@ -591,9 +591,35 @@ function role_has_any_permission(PDO $db, string $role): bool {
     }
 }
 
+function ensure_opportunity_field_permissions(PDO $db): void {
+    $requiredByRole = [
+        'Agent' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+        'AgentSuivi' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+        'AgentActivation' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+        'AgentVente' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+        'Manager' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+        'Administrateur' => ['opportunity.assign_prospect', 'opportunity.change_prospect_type'],
+    ];
+    foreach ($requiredByRole as $role => $perms) {
+        foreach ($perms as $perm) {
+            try {
+                $s = $db->prepare('SELECT 1 FROM crminternet_role_permissions WHERE role = :r AND permission = :p LIMIT 1');
+                $s->execute([':r' => $role, ':p' => $perm]);
+                if (!$s->fetchColumn()) {
+                    $ins = $db->prepare('INSERT INTO crminternet_role_permissions (role, permission, enabled) VALUES (:r, :p, 1)');
+                    $ins->execute([':r' => $role, ':p' => $perm]);
+                }
+            } catch (Throwable $e) {
+                // Ignore database-version drift; permissions still evaluate locally
+            }
+        }
+    }
+}
+
 function user_has_permission(PDO $db, array $me, string $permission): bool {
     $permission = trim($permission);
     if ($permission === '') return false;
+    ensure_opportunity_field_permissions($db);
     if (($me['role'] ?? '') === 'Administrateur') return true;
     $username = (string)($me['username'] ?? '');
     $role     = trim((string)($me['role'] ?? ''));

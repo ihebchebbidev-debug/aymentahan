@@ -220,6 +220,25 @@ export type AttendanceAggregate = {
   sessions: number;
 };
 
+export type AttendanceUserSummary = {
+  userId: string;
+  username: string;
+  role: string;
+  team: string;
+  seconds: number;
+  minutes: number;
+  sessions: number;
+  avgMinutes: number;
+};
+
+export type AttendanceGroupSummary = {
+  group: string;
+  seconds: number;
+  minutes: number;
+  sessions: number;
+  avgMinutes: number;
+};
+
 export type PayrollEntry = {
   id: string;
   userId: string;
