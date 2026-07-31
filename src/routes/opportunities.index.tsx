@@ -355,7 +355,7 @@ function OpportunitiesPage() {
   }, [items, debouncedSearch, haystackById, stageF, filterStage, assigne, source, dateCree, dateFrom, dateTo, customFilters, customValuesById, presetExtra]);
 
   const presetChips = useMemo(() => {
-    const schema = autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs });
+    const schema = autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs, types });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
     return Object.entries(presetExtra)
       .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
@@ -558,7 +558,7 @@ function OpportunitiesPage() {
 
             <DynamicFilterBar
               scope="opportunities"
-              schema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs })}
+              schema={autoFilterSchema("opportunities", { opportunityStages: stages.map((s) => s.name), rows: items as any, customFields: customDefs, types })}
               values={{ stage: stageF, source, assigne, dateFrom, dateTo, dateCree, ...presetExtra, ...customFilters }}
               onChange={(k, v) => {
                 if (k === "stage") setStageF(v || ALL);

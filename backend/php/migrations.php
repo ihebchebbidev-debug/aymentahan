@@ -189,9 +189,7 @@ if ($method === 'POST') {
         if (!$row) {
             fail('Migration introuvable', 404);
         }
-        if ($isAgent && ($row['assigned_to'] ?? null) !== ($me['username'] ?? null)) {
-            fail('Accès refusé', 403);
-        }
+        // agent-assignment check removed: API no longer enforces per-agent assignment
 
         $opportunityId = $row['opportunity_id'] ?? null;
         if (!$opportunityId) {
@@ -269,9 +267,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     if (!$existing) {
         fail('Migration introuvable', 404);
     }
-    if ($isAgent && ($existing['assigned_to'] ?? '') !== ($me['username'] ?? '')) {
-        fail('Accès refusé', 403);
-    }
+    // agent-assignment check removed: API no longer enforces per-agent assignment
 
     $sets = ['updated_at = NOW()'];
     $params = [':id' => $mid];

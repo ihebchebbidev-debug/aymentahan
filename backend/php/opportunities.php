@@ -453,7 +453,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $cur->execute([':id' => $oid]);
         $before = $cur->fetch();
         if (!$before) fail('Not found', 404);
-        if ($isAgent && ($before['assigned_to'] ?? '') !== $username) fail('Accès refusé', 403);
+        // agent-assignment check removed: API no longer enforces per-agent assignment
 
         $note = trim((string)($in['note'] ?? ''));
         if ($note === '') fail('Commentaire requis', 422);
@@ -503,7 +503,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     if (!$before) fail('Not found', 404);
     if (!empty($before['converted_to_contract'])) fail('Opportunité verrouillée (contrat émis)', 423);
     if (!empty($before['converted_to_migration'])) fail('Opportunité verrouillée (migration émise)', 423);
-    if ($isAgent && ($before['assigned_to'] ?? '') !== $username) fail('Accès refusé', 403);
+    // agent-assignment check removed: API no longer enforces per-agent assignment
 
     $map = [
         'title' => 'title', 'stage' => 'stage', 'amount' => 'amount',

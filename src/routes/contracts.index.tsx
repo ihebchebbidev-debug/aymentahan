@@ -31,6 +31,7 @@ import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
 import { CustomColumnsPicker } from "@/components/CustomColumnsPicker";
 import { useCustomFieldsTable, formatCustomValue } from "@/lib/useCustomFields";
 import { useColumnPrefs } from "@/lib/useColumnPrefs";
+import { useProspectTypes } from "@/hooks/use-prospect-types";
 import { pickColumns } from "@/lib/exportUtils";
 import type { Contract } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
@@ -146,6 +147,7 @@ function ContractsPage() {
     for (const c of contracts) if (c.source) set.add(c.source);
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
   }, [contracts]);
+  const types = useProspectTypes();
   const assigneOptions = useMemo(() => {
     const set = new Set<string>(agentOptions);
     for (const c of contracts) if (c.assignedTo) set.add(c.assignedTo);
@@ -324,7 +326,7 @@ function ContractsPage() {
   }, [contracts, debouncedSearch, haystackById, dateSig, dateEffet, dateVal, dateFrom, dateTo, assigne, source, statut, partenaire, cabinet, customFilters, customValuesById, presetExtra]);
 
   const presetChips = useMemo(() => {
-    const schema = autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs });
+    const schema = autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs, types });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
     return Object.entries(presetExtra)
       .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
@@ -358,8 +360,8 @@ function ContractsPage() {
             <FilterPresetPicker
               scope="contracts"
               current={currentView}
-              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs }))}
-              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs })}
+              filterKeys={schemaKeys(autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs, types }))}
+              filterSchema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs, types })}
               onApply={(f) => {
                 applyView({
                   search: typeof f.search === "string" ? f.search : "",
@@ -479,7 +481,7 @@ function ContractsPage() {
 
             <DynamicFilterBar
               scope="contracts"
-              schema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs })}
+              schema={autoFilterSchema("contracts", { agents: agentOptions, contractBilling: BILLING, rows: contracts as any, customFields: customDefs, types })}
               values={{ statut, partenaire, cabinet, source, assigne, dateSig, dateEffet, dateVal, dateFrom, dateTo, ...presetExtra, ...customFilters }}
               onChange={(k, v) => {
                 if (k === "statut") setStatut(v || ALL);

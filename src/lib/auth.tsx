@@ -211,6 +211,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!silent) setPermissionsLoading(true);
     try {
       const perms = await loadPermissionsForUser(u, opts?.fallbackPerms);
+      if (import.meta.env?.DEV) {
+        console.info('[auth] applyPermsForUser result', {
+          user: u?.username, role: u?.role,
+          fallbackCount: opts?.fallbackPerms ? Object.keys(opts.fallbackPerms).length : 0,
+          permsCount: Object.keys(perms).filter(k => perms[k]).length,
+        });
+      }
       setPermissions(perms);
       setPermissionsHydrated(true);
     } finally {
@@ -227,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(r.user);
         setLoading(false);
         const mePerms = r.effectivePermissions ?? r.permissions;
+        if (import.meta.env?.DEV) console.info('[auth] /auth_me.php returned', { user: r.user?.username, role: r.user?.role, mePermsCount: mePerms ? Object.keys(mePerms).length : 0 });
         void applyPermsForUser(r.user, { fallbackPerms: mePerms });
       })
       .catch((e: any) => {
@@ -339,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await api<{ user: AuthUser; permissions?: Record<string, boolean>; effectivePermissions?: Record<string, boolean> }>("/auth_me.php");
         setUser(me.user);
         const mePerms = me.effectivePermissions ?? me.permissions;
+        if (import.meta.env?.DEV) console.info('[auth] login: /auth_me.php follow-up', { user: me.user?.username, role: me.user?.role, mePermsCount: mePerms ? Object.keys(mePerms).length : 0 });
         await applyPermsForUser(me.user, { fallbackPerms: mePerms });
       } catch {
         await applyPermsForUser(r.user);
@@ -361,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await api<{ user: AuthUser; permissions?: Record<string, boolean>; effectivePermissions?: Record<string, boolean> }>("/auth_me.php");
       setUser(me.user);
       const mePerms = me.effectivePermissions ?? me.permissions;
+      if (import.meta.env?.DEV) console.info('[auth] verifyOtp: /auth_me.php follow-up', { user: me.user?.username, role: me.user?.role, mePermsCount: mePerms ? Object.keys(mePerms).length : 0 });
       await applyPermsForUser(me.user, { fallbackPerms: mePerms });
     } catch {
       await applyPermsForUser(r.user);
@@ -489,7 +499,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (key: string) => {
       if (!user) return false;
       if (user.role === "Administrateur") return true;
-      return !!permissions[key];
+      // If permissions are not yet hydrated, try best-effort using the
+      // properties already available on the `user` object (returned by
+      // `/auth_me.php`) so the UI doesn't incorrectly hide actions during
+      // the short hydration window after login.
+      if (!permissionsHydrated) {
+        if (Array.isArray(user.grantedPermissions) && user.grantedPermissions.includes(key)) {
+          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-granted', { key, user: user.username, role: user.role });
+          return true;
+        }
+        if (Array.isArray(user.allowedPermissions) && user.allowedPermissions.includes(key)) {
+          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-allowed', { key, user: user.username, role: user.role });
+          return true;
+        }
+        // DeniedPermissions should override grants when present on the user.
+        if (Array.isArray(user.deniedPermissions) && user.deniedPermissions.includes(key)) {
+          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-denied', { key, user: user.username, role: user.role });
+          return false;
+        }
+        if (import.meta.env?.DEV || key === 'opportunity.edit') {
+          console.info('[auth] hasPermission fallback check (not yet hydrated)', { key, user: user.username, role: user.role, granted: user.grantedPermissions, allowed: user.allowedPermissions, denied: user.deniedPermissions });
+        }
+      }
+      const p = !!permissions[key];
+      if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission final', { key, user: user.username, role: user.role, hydrated: permissionsHydrated, value: p });
+      return p;
     },
     [user, permissions],
   );

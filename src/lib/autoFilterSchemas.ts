@@ -197,6 +197,8 @@ export function autoFilterSchema(
         realField("Ancien opérateur", "oldOp", rows, "oldOperator", ["Tunisie Telecom", "Ooredoo", "Orange", "Autre"], true),
         realField("Nouvel opérateur", "newOp", rows, "newOperator", ["Tunisie Telecom", "Ooredoo", "Orange", "Autre"], true),
         realField("Assigné à", "assigne", rows, "assignedTo", input.agents ?? [], true),
+        { key: "typeId", label: "Type de prospect", type: "select",
+          options: types.length ? types : uniqStr(rows, "typeId").sort(sortFr).map((v) => ({ value: v, label: v })) },
         { key: "dateFrom", label: "Créée du", type: "date" },
         { key: "dateTo", label: "Créée au", type: "date" },
         { key: "portingNumber", label: "N° portabilité", type: "text" },

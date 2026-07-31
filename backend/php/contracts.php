@@ -197,9 +197,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
     $existing = $cur->fetch();
     if (!$existing) fail('Contrat introuvable', 404);
 
-    if ($isAgent && ($existing['assigned_to'] ?? null) !== $me['username']) {
-        fail('Accès refusé', 403);
-    }
+    // agent-assignment check removed: API no longer enforces per-agent assignment
 
     $canEditContract = user_has_permission($db, $me, 'contract.edit');
     $canAssignContract = $canEditContract || user_has_permission($db, $me, 'contract.assign');

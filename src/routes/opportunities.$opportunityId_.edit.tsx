@@ -51,7 +51,7 @@ function EditOpportunityPage() {
   const { opportunityId } = Route.useParams();
   const navigate = useNavigate();
   const { users } = useErp();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { afterOpportunityAuto, sync } = useCrmListSync();
 
   const [opp, setOpp] = useState<Opportunity | null>(null);
@@ -92,8 +92,8 @@ function EditOpportunityPage() {
 
   const canEditProspect = hasPermission("prospect.edit");
   const canEditOpportunity = hasPermission("opportunity.edit");
-  const canAssignProspect = canEditOpportunity || canEditProspect || hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
-  const canChangeProspectType = canEditOpportunity || canEditProspect || hasPermission("opportunity.change_prospect_type") || hasPermission("prospect.type");
+  const canAssignProspect = hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
+  const canChangeProspectType = hasPermission("opportunity.change_prospect_type") || hasPermission("prospect.type");
 
   useEffect(() => {
     let cancel = false;

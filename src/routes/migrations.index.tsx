@@ -21,6 +21,7 @@ import { useErp } from "@/lib/erpStore";
 import type { Migration } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useProspectTypes } from "@/hooks/use-prospect-types";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { DynamicFilterBar } from "@/components/DynamicFilterBar";
 import { autoFilterSchema, schemaKeys } from "@/lib/autoFilterSchemas";
@@ -75,6 +76,7 @@ function MigrationsPage() {
         .map((u) => u.username),
     [erpUsers],
   );
+  const types = useProspectTypes();
 
   const canLoad = canViewMigrationsData(hasPermission);
 
@@ -242,8 +244,8 @@ function MigrationsPage() {
   }, [allMigrations, debouncedSearch, statut, technical, oldOp, newOp, assigne, dateFrom, dateTo, presetExtra, customFilters, customValuesById]);
 
   const filterSchema = useMemo(
-    () => autoFilterSchema("migrations", { agents: agentOptions, rows: allMigrations as unknown as ReadonlyArray<Record<string, unknown>>, customFields: customDefs }),
-    [agentOptions, allMigrations],
+    () => autoFilterSchema("migrations", { agents: agentOptions, rows: allMigrations as unknown as ReadonlyArray<Record<string, unknown>>, customFields: customDefs, types }),
+    [agentOptions, allMigrations, types],
   );
 
   const allColumns: DataGridColumn<Migration>[] = [

@@ -186,9 +186,7 @@ if ($method === 'POST') {
         $presetId = (string)$presetId;
         $preset = fp_fetch($db, $presetId);
         if (!$preset || $preset['scope'] !== $scope) fail('Modèle introuvable', 404);
-        if (!$preset['is_shared'] && $preset['created_by'] !== $username && !fp_can_manage($db, $me)) {
-            fail('Accès refusé', 403);
-        }
+        // Backend no longer enforces ownership/sharing restrictions; frontend handles permission UI.
 
         $s = $db->prepare(
             'INSERT INTO crminternet_filter_preset_user_choice (username, scope, preset_id)
@@ -274,7 +272,7 @@ if ($method === 'PATCH') {
     $canManage = fp_can_manage($db, $me);
     $isOwner   = ($existing['created_by'] ?? null) === ($me['username'] ?? null)
                  && !$existing['is_shared'];
-    if (!$canManage && !$isOwner) fail('Accès refusé', 403);
+    // Ownership/manager enforcement removed — allow update and let frontend gate actions.
 
     $in = json_input();
     $sets = [];
@@ -326,10 +324,7 @@ if ($method === 'DELETE') {
     $existing = fp_fetch($db, $id);
     if (!$existing) fail('Modèle introuvable', 404);
 
-    $isAdmin = (($me['role'] ?? '') === 'Administrateur');
-    $isOwner = ($existing['created_by'] ?? null) === ($me['username'] ?? null)
-               && !$existing['is_shared'];
-    if (!$isAdmin && !$isOwner) fail('Suppression réservée au propriétaire ou à l\'Administrateur', 403);
+    // Deletion restrictions removed: frontend controls visibility and actions.
 
     $db->prepare('DELETE FROM crminternet_filter_preset_user_choice WHERE preset_id = :id')
        ->execute([':id' => $id]);

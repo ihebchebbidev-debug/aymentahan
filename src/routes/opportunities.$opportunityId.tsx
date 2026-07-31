@@ -49,7 +49,7 @@ function OpportunityDetailPage() {
   const { toContract, toMigration, revertOpportunity, afterOpportunityAuto } = useCrmListSync();
   const { user, hasPermission } = useAuth();
   const canEditOpportunity = hasPermission("opportunity.edit");
-  const canAssignOpportunity = canEditOpportunity || hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
+  const canAssignOpportunity = hasPermission("opportunity.assign_prospect") || hasPermission("prospect.assign");
   const canEdit = canEditOpportunity || canAssignOpportunity;
   const canConvert = hasAnyPermission(hasPermission, ["prospect.convert", "opportunity.convert"]);
   const canConvertMigration = canConvertOpportunityToMigration(hasPermission);
@@ -300,6 +300,7 @@ function OpportunityDetailPage() {
               <TabsTrigger value="attachments" className="gap-1.5"><Paperclip className="h-3.5 w-3.5" />Pièces jointes</TabsTrigger>
               <TabsTrigger value="custom" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" />Champs perso</TabsTrigger>
               <TabsTrigger value="contract-info" className="gap-1.5"><Network className="h-3.5 w-3.5" />Information contrat</TabsTrigger>
+              <TabsTrigger value="history" className="gap-1.5"><History className="h-3.5 w-3.5" />Historique du dossier</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 mt-0">
@@ -464,16 +465,14 @@ function OpportunityDetailPage() {
             </TabsContent>
 
 
-            {canViewJourney && (
-              <TabsContent value="history" className="mt-0">
-                <JourneyTimeline
-                  prospectId={opp.prospectId ?? opp.id}
-                  opportunityId={opp.id}
-                  contractId={opp.contractId ?? null}
-                  migrationId={opp.migrationId ?? null}
-                />
-              </TabsContent>
-            )}
+            <TabsContent value="history" className="mt-0">
+              <JourneyTimeline
+                prospectId={opp.prospectId ?? opp.id}
+                opportunityId={opp.id}
+                contractId={opp.contractId ?? null}
+                migrationId={opp.migrationId ?? null}
+              />
+            </TabsContent>
           </Tabs>
         </div>
 

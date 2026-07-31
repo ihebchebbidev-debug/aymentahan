@@ -8,16 +8,8 @@ $isAdmin = (($me['role'] ?? '') === 'Administrateur');
 $myName  = (string)($me['username'] ?? '');
 
 if ($method === 'GET') {
-    // Admin sees all events. Everyone else only sees their own.
-    if ($isAdmin) {
-        $rows = $db->query('SELECT * FROM crminternet_calendar_events ORDER BY date, time')->fetchAll();
-    } else {
-        $s = $db->prepare('SELECT * FROM crminternet_calendar_events
-                           WHERE agent = :u
-                           ORDER BY date, time');
-        $s->execute([':u' => $myName]);
-        $rows = $s->fetchAll();
-    }
+    // Return all events (backend no longer enforces per-agent visibility).
+    $rows = $db->query('SELECT * FROM crminternet_calendar_events ORDER BY date, time')->fetchAll();
     $events = array_map(fn($e) => [
         'id'    => $e['id'],
         'title' => $e['title'],
@@ -35,9 +27,9 @@ if ($method === 'POST') {
     $date  = $in['date'] ?? '';
     $time  = $in['time'] ?? '';
     $type  = in_array($in['type'] ?? 'rdv', ['rdv','rappel','signature'], true) ? ($in['type'] ?? 'rdv') : 'rdv';
-    // Non-admin can only create events for themselves; admin can pick any agent.
+    // Allow the client to provide an agent; fallback to the current user.
     $rawAgent = trim($in['agent'] ?? '');
-    $agent = $isAdmin ? ($rawAgent !== '' ? $rawAgent : $myName) : $myName;
+    $agent = $rawAgent !== '' ? $rawAgent : $myName;
     if (!$title || !$date || !$time || !$agent) fail('Champs requis manquants', 422);
 
     $id = $in['id'] ?? ('E-' . substr(bin2hex(random_bytes(6)), 0, 8));
@@ -56,7 +48,6 @@ if ($method === 'PUT' || $method === 'PATCH') {
     $cur->execute([':id' => $id]);
     $row = $cur->fetch();
     if (!$row) fail('Événement introuvable', 404);
-    if (!$isAdmin && $row['agent'] !== $myName) fail('Accès refusé', 403);
 
     $sets = [];
     $params = [':id' => $id];
@@ -66,8 +57,10 @@ if ($method === 'PUT' || $method === 'PATCH') {
     ] as $k => $col) {
         if (array_key_exists($k, $in)) {
             if ($k === 'type' && !in_array($in[$k], ['rdv','rappel','signature'], true)) continue;
-            // Non-admin cannot reassign to someone else.
-            if ($k === 'agent' && !$isAdmin && $in[$k] !== $myName) continue;
+            // Allow reassignments from the client; backend no longer enforces agent ownership.
+            if ($k === 'agent') {
+                // accept provided value
+            }
             $sets[] = "$col = :$k";
             $params[":$k"] = $in[$k];
         }
@@ -85,7 +78,6 @@ if ($method === 'DELETE') {
     $cur->execute([':id' => $id]);
     $row = $cur->fetch();
     if (!$row) fail('Événement introuvable', 404);
-    if (!$isAdmin && $row['agent'] !== $myName) fail('Accès refusé', 403);
     $s = $db->prepare('DELETE FROM crminternet_calendar_events WHERE id = :id');
     $s->execute([':id' => $id]);
     ok(['deleted' => $s->rowCount()]);
