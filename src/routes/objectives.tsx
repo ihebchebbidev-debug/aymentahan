@@ -16,6 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { api, API_ENABLED } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useCan } from "@/components/Can";
+import { RequirePerm } from "@/components/RequirePerm";
 
 export const Route = createFileRoute("/objectives")({
   head: () => ({
@@ -24,8 +26,16 @@ export const Route = createFileRoute("/objectives")({
       { name: "description", content: "Quotas mensuels par agent: leads, ventes, CA, conversion." },
     ],
   }),
-  component: ObjectivesPage,
+  component: GuardedObjectivesPage,
 });
+
+function GuardedObjectivesPage() {
+  return (
+    <RequirePerm perm="page.objectives" backTo="/" backLabel="Retour à l'accueil">
+      <ObjectivesPage />
+    </RequirePerm>
+  );
+}
 
 type Quota = { leads: number; won: number; revenue: number };
 type QuotasMap = Record<string, Quota>;
@@ -84,6 +94,8 @@ function progressTone(p: number) {
 }
 
 function ObjectivesPage() {
+  const can = useCan();
+  const canManageObjectives = can("guichet.manage_objectives") || can("user.edit");
   const { users, prospects, contracts } = useErp();
   const currency = useCurrency();
   const [month, setMonth] = useState(monthOptions[0].value);
@@ -180,9 +192,11 @@ function ObjectivesPage() {
                 {monthOptions.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={resetAll}>
-              <RotateCcw className="h-4 w-4 mr-1.5" /> Réinitialiser
-            </Button>
+            {canManageObjectives && (
+              <Button variant="outline" size="sm" onClick={resetAll}>
+                <RotateCcw className="h-4 w-4 mr-1.5" /> Réinitialiser
+              </Button>
+            )}
           </div>
         }
       />
@@ -270,7 +284,7 @@ function ObjectivesPage() {
                       <div className="text-[11px] text-muted-foreground">{r.username} · {r.role}</div>
                     </TableCell>
                     <TableCell className="min-w-[180px]">
-                      {ed ? (
+                      {!canManageObjectives ? null : ed ? (
                         <QuotaInput
                           value={ed.leads}
                           onChange={(v) => setEditing((e) => ({ ...e, [r.username]: { ...ed, leads: v } }))}

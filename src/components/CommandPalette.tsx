@@ -13,7 +13,7 @@ import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@/lib/queryClient";
 import { fetchMigrations } from "@/lib/migrationsApi";
-import { canViewMigrationsData } from "@/lib/permissions";
+import { canViewMigrationsData, hasRouteAccess } from "@/lib/permissions";
 import { API_ENABLED } from "@/lib/api";
 import {
   ClipboardList,
@@ -43,19 +43,20 @@ export function CommandPalette() {
   const { prospects, contracts, users, events } = useErp();
   const { user, hasPermission } = useAuth();
   const can = (perm: string) => hasPermission(perm);
+  const canRoute = (path: string) => hasRouteAccess(hasPermission, path);
 
-  const canViewProspects = can("page.prospects");
-  const canViewOpportunities = can("page.opportunities");
-  const canViewContracts = can("page.contracts");
+  const canViewProspects = canRoute("/prospects");
+  const canViewOpportunities = canRoute("/opportunities");
+  const canViewContracts = canRoute("/contracts");
   const canViewMigrations = canViewMigrationsData(can);
-  const canViewUsers = can("page.users");
-  const canViewCalendar = can("page.calendar");
-  const canViewTasks = can("page.tasks");
-  const canViewReports = can("page.reports");
-  const canViewDispatch = can("page.dispatch");
-  const canViewRoles = can("page.roles");
-  const canViewConfiguration = can("page.configuration");
-  const canViewReconciliation = can("page.backoffice") || can("page.reports");
+  const canViewUsers = canRoute("/users");
+  const canViewCalendar = canRoute("/calendar");
+  const canViewTasks = canRoute("/tasks");
+  const canViewReports = canRoute("/reports");
+  const canViewDispatch = canRoute("/dispatch");
+  const canViewRoles = canRoute("/roles");
+  const canViewConfiguration = canRoute("/configuration");
+  const canViewReconciliation = canRoute("/reconciliation");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -198,9 +199,11 @@ export function CommandPalette() {
                 <CheckSquare className="h-4 w-4 mr-2" /> Tâches
               </CommandItem>
             )}
-            <CommandItem onSelect={() => go("/notifications")}>
-              <Bell className="h-4 w-4 mr-2" /> Notifications
-            </CommandItem>
+            {canRoute("/notifications") && (
+              <CommandItem onSelect={() => go("/notifications")}>
+                <Bell className="h-4 w-4 mr-2" /> Notifications
+              </CommandItem>
+            )}
             {canViewReports && (
               <CommandItem onSelect={() => go("/reports")}>
                 <BarChart3 className="h-4 w-4 mr-2" /> Rapports

@@ -36,7 +36,7 @@ import { useOpportunityStages } from "@/hooks/use-opportunity-stages";
 import { useContractStages } from "@/hooks/use-contract-stages";
 import { useMigrationStages } from "@/hooks/use-migration-stages";
 import { useGuichetEntities } from "@/hooks/use-guichet-entities";
-import { hasRouteAccess, PUBLIC_AUTH_ROUTES, HR_PRIV_ROUTES } from "@/lib/permissions";
+import { hasRouteAccess } from "@/lib/permissions";
 import { roleLabel, isAgentRole } from "@/lib/roleLabels";
 import { useChat } from "@/lib/chatStore";
 
@@ -97,19 +97,10 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
 
 export function useNavVisibility() {
   const { hasPermission } = useAuth();
-  return (url: string) => {
-    if (url === "/documentation" || url === "/configuration" || url === "/security")
-      return hasRouteAccess(hasPermission, url);
-    if (url === "/audit")
-      return hasPermission("audit.view");
-    if (url === "/reports")
-      return hasPermission("report.view");
-    if (HR_PRIV_ROUTES.has(url)) {
-      return hasRouteAccess(hasPermission, url);
-    }
-    if (PUBLIC_AUTH_ROUTES.has(url)) return true;
-    return hasRouteAccess(hasPermission, url);
-  };
+  // Single source of truth: the same route→permission resolution the router
+  // guard (RequireAuth) uses, so a link is visible if and only if the page
+  // is reachable.
+  return (url: string) => hasRouteAccess(hasPermission, url);
 }
 
 export function AppSidebar() {
@@ -121,19 +112,7 @@ export function AppSidebar() {
   const displayRole = roleLabel(user?.role);
   const initials = displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
-  const isVisible = (url: string) => {
-    if (url === "/documentation" || url === "/configuration" || url === "/security")
-      return hasRouteAccess(hasPermission, url);
-    if (url === "/audit")
-      return hasPermission("audit.view");
-    if (url === "/reports")
-      return hasPermission("report.view");
-    if (HR_PRIV_ROUTES.has(url)) {
-      return hasRouteAccess(hasPermission, url);
-    }
-    if (PUBLIC_AUTH_ROUTES.has(url)) return true;
-    return hasRouteAccess(hasPermission, url);
-  };
+  const isVisible = useNavVisibility();
 
   const [collapsed] = useSidebarCollapsed();
 

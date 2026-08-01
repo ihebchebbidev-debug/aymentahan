@@ -21,6 +21,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "page.calendar", label: "Page : Calendrier" },
       { key: "page.tasks", label: "Page : Tâches" },
       { key: "page.notifications", label: "Page : Notifications" },
+      { key: "page.messaging", label: "Page : Messagerie" },
       { key: "page.dispatch", label: "Page : Dispatch" },
       { key: "page.backoffice", label: "Page : Backoffice" },
       { key: "page.stages", label: "Page : Stages" },
@@ -295,6 +296,7 @@ export const ROUTE_PERMISSION: Record<string, string> = {
   "/calendar": "page.calendar",
   "/tasks": "page.tasks",
   "/notifications": "page.notifications",
+  "/messaging": "page.messaging",
   "/dispatch": "page.dispatch",
   "/backoffice": "page.backoffice",
   "/reports": "page.reports",
@@ -334,12 +336,41 @@ export const ROUTE_PERMISSION_ALTERNATIVES: Record<string, string[]> = {
   "/guichet_/analytics": ["page.guichet", "guichet.read_own", "guichet.read_all"],
 };
 
+// Extra route mappings that have no dedicated permission key of their own.
+Object.assign(ROUTE_PERMISSION, {
+  "/opportunites": "page.opportunities", // legacy redirect route
+  "/reconciliation": "page.backoffice",
+  "/stages": "page.stages",
+  "/secret-roles": "page.roles",
+  "/prospects/new": "page.prospects",
+});
+
+Object.assign(ROUTE_PERMISSION_ALTERNATIVES, {
+  "/reports": ["page.reports", "report.view"],
+  "/reconciliation": ["page.backoffice", "page.reconciliation", "page.reports"],
+  "/opportunites": ["page.opportunities", "opportunity.view"],
+  "/secret-roles": ["page.roles", "role.view"],
+  "/prospects/new": ["prospect.add"],
+  "/stages": ["page.stages", "page.pipelines", "stage.manage", "pipeline.manage"],
+  // Legacy/back-end-seeded keys kept as accepted alternatives so grants made
+  // in the DB under the older key names still open the page.
+  "/backoffice": ["page.backoffice", "page.reconciliation"],
+  "/hr/attendance/dashboard": ["page.hr.attendance_dashboard", "page.hr.attendance", "hr.attendance.export"],
+  // Communication
+  "/notifications": ["page.notifications"],
+  "/messaging": [
+    "page.messaging",
+    "chat.group.create",
+    "chat.group.manage",
+    "chat.group.delete",
+    "chat.broadcast",
+  ],
+});
+
 // Routes always available (login flow, profile fallback, etc.)
 export const PUBLIC_AUTH_ROUTES = new Set<string>([
+  "/login",
   "/profile",
-  "/notifications",
-  "/messaging",
-  "/documentation",
 ]);
 
 export const HR_PRIV_ROUTES = new Set<string>([
@@ -360,18 +391,46 @@ export function permissionForPath(path: string): string | null {
   return ROUTE_PERMISSION["/"] ?? null;
 }
 
-export function hasRouteAccess(hasPermission: (key: string) => boolean, path: string): boolean {
-  const exact = ROUTE_PERMISSION_ALTERNATIVES[path];
-  if (exact) return exact.some((permission) => hasPermission(permission));
+// Dynamic sub-route rules (paths containing an :id segment can't be matched
+// exactly by the tables above). e.g. /contracts/42/edit → contract.edit
+const EDIT_SUFFIX_PERMISSIONS: Record<string, string[]> = {
+  prospects: ["prospect.edit"],
+  opportunities: ["opportunity.edit"],
+  contracts: ["contract.edit"],
+  migrations: ["migration.edit"],
+  reclamations: ["reclamation.manage", "reclamation.edit"],
+};
 
+export function hasRouteAccess(hasPermission: (key: string) => boolean, path: string): boolean {
+  // Always-available routes (profile, notifications, messaging…).
+  if (PUBLIC_AUTH_ROUTES.has(path)) return true;
+
+  // 1) Longest-prefix match on the "alternatives" table (any of the keys).
   const segments = path.split("/").filter(Boolean);
-  while (segments.length) {
-    const candidate = "/" + segments.join("/");
-    const alt = ROUTE_PERMISSION_ALTERNATIVES[candidate];
-    if (alt) return alt.some((permission) => hasPermission(permission));
-    segments.pop();
+
+  // 1a) Edit sub-routes require the matching edit permission, not just view.
+  if (segments.length >= 2 && segments[segments.length - 1] === "edit") {
+    const editPerms = EDIT_SUFFIX_PERMISSIONS[segments[0]];
+    if (editPerms) return editPerms.some((permission) => hasPermission(permission));
   }
 
-  const fallback = ROUTE_PERMISSION_ALTERNATIVES["/"];
-  return !fallback || fallback.some((permission) => hasPermission(permission));
+  const candidates: string[] = [path];
+  const walk = [...segments];
+  while (walk.length) {
+    candidates.push("/" + walk.join("/"));
+    walk.pop();
+  }
+  for (const candidate of candidates) {
+    const alt = ROUTE_PERMISSION_ALTERNATIVES[candidate];
+    if (alt) return alt.some((permission) => hasPermission(permission));
+    const single = ROUTE_PERMISSION[candidate];
+    if (single) return hasPermission(single);
+  }
+
+  // 2) Root route.
+  if (path === "/" || segments.length === 0) return hasPermission("page.dashboard");
+
+  // 3) Unknown route with no mapping at all — deny by default (fail closed).
+  //    Every real route must be declared in ROUTE_PERMISSION above.
+  return false;
 }

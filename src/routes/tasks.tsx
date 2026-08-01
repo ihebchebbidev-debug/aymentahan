@@ -96,7 +96,7 @@ function TasksPage() {
           if (!a.dueDate && b.dueDate) return 1;
           if (a.dueDate && !b.dueDate) return -1;
           if (!a.dueDate && !b.dueDate) return 0;
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          return new Date(a.dueDate as string).getTime() - new Date(b.dueDate as string).getTime();
         }
         if (sortBy === "priority") {
           const order = { high: 3, normal: 2, low: 1 } as Record<Task["priority"], number>;
@@ -215,7 +215,7 @@ function TasksPage() {
           <div className="font-semibold text-sm">{visibleTasks.length} tâche(s)</div>
           <div className="flex flex-wrap gap-2 items-center">
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher" className="w-[220px]" />
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v)}>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
               <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous statuts</SelectItem>
@@ -225,7 +225,7 @@ function TasksPage() {
                 <SelectItem value="cancelled">Annulées</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v)}>
+            <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as any)}>
               <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes priorités</SelectItem>

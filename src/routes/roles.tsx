@@ -23,7 +23,8 @@ import { useErp } from "@/lib/erpStore";
 import { PERMISSION_SECTIONS, ALL_PERMISSION_KEYS } from "@/lib/permissions";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 import { RequirePerm } from "@/components/RequirePerm";
-import { useAuth } from "@/lib/auth";
+import { useAuth, notifyPermissionsChanged } from "@/lib/auth";
+import { useCan } from "@/components/Can";
 
 export const Route = createFileRoute("/roles")({
   head: () => ({
@@ -65,6 +66,11 @@ type UsersByRole = Record<string, Array<{ id: string; username: string; fullName
 
 function RolesPage() {
   const { roles, fetchRoles, createRole, updateRole, deleteRole, assignUserRole, refresh } = useErp();
+  const can = useCan();
+  const canCreateRole = can("role.create");
+  const canEditRole = can("role.edit");
+  const canDeleteRole = can("role.delete");
+  const canEditPerms = can("role.permissions.edit");
   const [role, setRole] = useState("Administrateur");
   const [search, setSearch] = useState("");
   const [permsByRole, setPermsByRole] = useState<Record<string, Record<string, boolean>>>({});
@@ -150,6 +156,9 @@ function RolesPage() {
       // Re-fetch from DB so the UI reflects what was actually saved, not just
       // what was toggled locally. This catches any silent server-side failures.
       await loadAll();
+      // Push the change to every open session (this tab + other tabs), so the
+      // sidebar / actions repaint without anyone having to log out.
+      notifyPermissionsChanged();
       toast.success(`Permissions enregistrées avec succès pour le rôle "${role}". Les modifications sont 100% enregistrées et effectives.`);
     } catch (e: any) {
       toast.error(e?.message ?? "Échec de l'enregistrement");
@@ -221,6 +230,7 @@ function RolesPage() {
         icon={<ShieldCheck className="h-5 w-5" />}
         actions={
           <>
+            {canCreateRole && (
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-1.5" />Nouveau rôle</Button>
@@ -266,9 +276,12 @@ function RolesPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            )}
+            {canEditPerms && (
             <Button size="sm" onClick={save} disabled={saving || loading || !dirty[role]}>
               {saving ? "Enregistrement…" : dirty[role] ? "Enregistrer" : "Enregistré"}
             </Button>
+            )}
           </>
         }
       />
@@ -326,6 +339,7 @@ function RolesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {canEditRole && (
             <Button
               size="sm"
               variant="outline"
@@ -335,7 +349,8 @@ function RolesPage() {
             >
               <Pencil className="h-4 w-4 mr-1.5" />Modifier
             </Button>
-            {!currentRole.isSystem && (
+            )}
+            {!currentRole.isSystem && canDeleteRole && (
               <DeleteRoleButton
                 role={currentRole.name}
                 fallbackOptions={roles.filter((r) => r.name !== currentRole.name && r.name !== "Administrateur").map((r) => ({ value: r.name, label: r.label }))}
@@ -440,6 +455,7 @@ function RolesPage() {
             className="pl-9"
           />
         </div>
+        {canEditPerms && (
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -462,6 +478,7 @@ function RolesPage() {
             Tout désactiver
           </Button>
         </div>
+        )}
       </Card>
 
       {/* Permission sections */}
@@ -481,9 +498,11 @@ function RolesPage() {
                     {activeInSection} / {sectionKeys.length} actives
                   </p>
                 </div>
-                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSection(sectionKeys, !allOn)}>
-                  {allOn ? "Tout désactiver" : "Tout activer"}
-                </Button>
+                {canEditPerms && (
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSection(sectionKeys, !allOn)}>
+                    {allOn ? "Tout désactiver" : "Tout activer"}
+                  </Button>
+                )}
               </div>
               <div className="divide-y divide-border">
                 {visible.map((p) => (
@@ -492,7 +511,11 @@ function RolesPage() {
                     className="px-4 py-3 flex items-center justify-between hover:bg-muted/20 cursor-pointer"
                   >
                     <span className="text-sm font-medium">{p.label}</span>
-                    <Switch checked={perms[p.key] ?? false} onCheckedChange={() => toggle(p.key)} />
+                    <Switch
+                      checked={perms[p.key] ?? false}
+                      disabled={!canEditPerms}
+                      onCheckedChange={() => canEditPerms && toggle(p.key)}
+                    />
                   </label>
                 ))}
               </div>
@@ -575,6 +598,8 @@ type OverridesMap = Record<string, "allow" | "deny">;
 type UserListItem = { id: string; username: string; fullName: string; role: string };
 
 function UserOverridesPanel() {
+  const can = useCan();
+  const canOverride = can("user.override");
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [target, setTarget] = useState<string>("");
   const [targetRole, setTargetRole] = useState<string>("");
@@ -638,6 +663,7 @@ function UserOverridesPanel() {
       });
       setEffective(r.effective ?? {});
       setDirty(false);
+      notifyPermissionsChanged();
       toast.success("Permissions individuelles 100% enregistrées et fonctionnelles !");
     } catch (e: any) {
       toast.error(e?.message ?? "Échec");
@@ -676,6 +702,7 @@ function UserOverridesPanel() {
       });
       setEffective(r.effective ?? {});
       setDirty(false);
+      notifyPermissionsChanged();
       toast.success("Overrides réinitialisés — rôle par défaut restauré");
     } catch (e: any) {
       toast.error(e?.message ?? "Échec");
@@ -704,6 +731,8 @@ function UserOverridesPanel() {
   const totalDeny = Object.values(overrides).filter((v) => v === "deny").length;
   const visibleKeys = filtered.flatMap((s) => s.perms.map((p) => p.key));
   const hasAnyOverride = totalAllow + totalDeny > 0;
+
+  if (!canOverride) return null;
 
   return (
     <Card className="mt-8 shadow-elegant overflow-hidden">

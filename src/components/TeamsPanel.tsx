@@ -21,8 +21,10 @@ import { useTeams } from "@/hooks/use-teams";
 import { useErp } from "@/lib/erpStore";
 import { roleLabel } from "@/lib/roleLabels";
 import type { AppTeam } from "@/lib/types";
+import { useCan } from "@/components/Can";
 
 export function TeamsPanel() {
+  const canCreateTeam = useCan()("user.add");
   const { teams, loading, refresh } = useTeams();
   const { roles } = useErp();
   const allRoleNames = useMemo(
@@ -40,7 +42,7 @@ export function TeamsPanel() {
             héritent de l'union des permissions de tous ses rôles (le rôle individuel est ignoré).
           </p>
         </div>
-        <TeamDialog allRoles={allRoleNames} onSaved={refresh} />
+        {canCreateTeam && <TeamDialog allRoles={allRoleNames} onSaved={refresh} />}
       </div>
 
       {loading ? (
@@ -61,6 +63,9 @@ export function TeamsPanel() {
 function TeamCard({
   team, allRoles, onChanged,
 }: { team: AppTeam; allRoles: string[]; onChanged: () => void }) {
+  const can = useCan();
+  const canEdit = can("user.edit");
+  const canDelete = can("user.delete");
   const remove = async () => {
     try {
       await api(`/teams.php?id=${encodeURIComponent(team.id)}`, { method: "DELETE" });
@@ -80,7 +85,8 @@ function TeamCard({
           ) : null}
         </div>
         <div className="flex items-center gap-1">
-          <TeamDialog team={team} allRoles={allRoles} onSaved={onChanged} />
+          {canEdit && <TeamDialog team={team} allRoles={allRoles} onSaved={onChanged} />}
+          {canDelete && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="icon" variant="ghost" aria-label="Supprimer">
@@ -101,6 +107,7 @@ function TeamCard({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">

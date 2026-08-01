@@ -8,6 +8,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { useChat } from "@/lib/chatStore";
 import { useAuth } from "@/lib/auth";
+import { hasRouteAccess } from "@/lib/permissions";
 import { chatApi, type ChatUser, type Conversation } from "@/lib/chat";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,9 +30,11 @@ import { confirmDialog } from "@/components/ConfirmDialogProvider";
 export { initials, timeShort, convTitle, AttachmentBubble };
 
 export function ChatWidget() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   if (typeof window !== "undefined" && window.location.pathname.startsWith("/messaging")) return null;
   if (!user) return null;
+  // UI gate: users without messaging access never see the chat launcher.
+  if (!hasRouteAccess(hasPermission, "/messaging")) return null;
   return <ChatWidgetInner />;
 }
 
@@ -828,6 +831,10 @@ export function ManageGroupDialog({ open, onOpenChange, conv }: { open: boolean;
     !q.trim() || m.fullName.toLowerCase().includes(q.toLowerCase()) || m.username.toLowerCase().includes(q.toLowerCase())
   );
   const adminCount = conv.members.filter((m) => m.role === "admin").length;
+  const meRole = conv.members.find((m) => m.username === user?.username)?.role;
+  const isGroupAdmin = meRole === "admin" || user?.role === "Administrateur";
+  const isAppAdmin = user?.role === "Administrateur";
+  const canDelete = hasPermission("chat.group.delete") && (isAppAdmin || isGroupAdmin);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

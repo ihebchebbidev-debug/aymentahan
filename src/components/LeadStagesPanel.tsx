@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useCan } from "@/components/Can";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
@@ -35,6 +36,7 @@ const AUTO_ACTION_LABELS: Record<string, string> = {
 };
 
 export function LeadStagesPanel() {
+  const canManageStages = useCan()("stage.manage");
   const stages = useLeadStages();
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -204,9 +206,11 @@ export function LeadStagesPanel() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button size="sm" onClick={openAddModal} className="bg-primary text-primary-foreground">
-            <Plus className="h-4 w-4 mr-1.5" /> Ajouter un statut
-          </Button>
+          {canManageStages && (
+            <Button size="sm" onClick={openAddModal} className="bg-primary text-primary-foreground">
+              <Plus className="h-4 w-4 mr-1.5" /> Ajouter un statut
+            </Button>
+          )}
         </div>
       </div>
 
@@ -234,7 +238,7 @@ export function LeadStagesPanel() {
                     <td className="p-3 text-center font-medium text-muted-foreground">
                       <div className="flex items-center justify-center gap-1">
                         <button
-                          disabled={idx === 0 || loading}
+                          disabled={idx === 0 || loading || !canManageStages}
                           onClick={() => movePosition(idx, "up")}
                           className="p-1 hover:bg-muted rounded disabled:opacity-30"
                           title="Monter"
@@ -243,7 +247,7 @@ export function LeadStagesPanel() {
                         </button>
                         <span className="w-5 text-center">{stg.position}</span>
                         <button
-                          disabled={idx === stages.length - 1 || loading}
+                          disabled={idx === stages.length - 1 || loading || !canManageStages}
                           onClick={() => movePosition(idx, "down")}
                           className="p-1 hover:bg-muted rounded disabled:opacity-30"
                           title="Descendre"
@@ -292,6 +296,8 @@ export function LeadStagesPanel() {
 
                     <td className="p-3 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {canManageStages && (
+                        <>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -308,6 +314,8 @@ export function LeadStagesPanel() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                        </>
+                        )}
                       </div>
                     </td>
                   </tr>

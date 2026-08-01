@@ -111,7 +111,7 @@ function BackofficePage() {
             </Card>
           );
           return it.link ? (
-            <Link key={it.label} to={it.link as any} search={it.search}>{inner}</Link>
+            <Link key={it.label} to={it.link as any} search={it.search as any}>{inner}</Link>
           ) : (
             <div key={it.label}>{inner}</div>
           );

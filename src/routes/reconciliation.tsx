@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
+import { useCan } from "@/components/Can";
+import { RequirePerm } from "@/components/RequirePerm";
 
 type PeriodKey = "all" | "7d" | "30d" | "90d" | "custom";
 
@@ -30,8 +32,16 @@ export const Route = createFileRoute("/reconciliation")({
       { name: "description", content: "Historique des imports CSV: ajouts, mises à jour, ignorés et mappage des champs par entité." },
     ],
   }),
-  component: ReconciliationPage,
+  component: GuardedReconciliationPage,
 });
+
+function GuardedReconciliationPage() {
+  return (
+    <RequirePerm anyOf={["page.backoffice", "page.reports"]} backTo="/" backLabel="Retour à l'accueil">
+      <ReconciliationPage />
+    </RequirePerm>
+  );
+}
 
 const ENTITY_LABELS: Record<ImportEntity, string> = {
   prospect: "Prospects",
@@ -49,6 +59,9 @@ function fmtDate(iso: string) {
 }
 
 function ReconciliationPage() {
+  const can = useCan();
+  const canExport = can("report.export") || can("prospect.export") || can("contract.export");
+  const canClear = can("prospect.import") || can("contract.import");
   const runs = useImportRuns();
   const [entity, setEntity] = useState<ImportEntity | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -163,9 +176,12 @@ function ReconciliationPage() {
                 <SelectItem value="user">Utilisateurs</SelectItem>
               </SelectContent>
             </Select>
+            {canExport && (
             <Button variant="outline" size="sm" onClick={exportRunsCSV} disabled={filtered.length === 0}>
               <Download className="h-4 w-4 mr-1.5" /> Exporter Excel
             </Button>
+            )}
+            {canClear && (
             <Button
               variant="ghost" size="sm"
               onClick={async () => { if ((await confirmDialog({ title: "Suppression", description: "Vider l'historique des imports ?", tone: "destructive", confirmText: "Supprimer" }))) { clearImportRuns(); setSelectedId(null); } }}
@@ -173,6 +189,7 @@ function ReconciliationPage() {
             >
               <Trash2 className="h-4 w-4 mr-1.5" /> Vider
             </Button>
+            )}
           </div>
         }
       />

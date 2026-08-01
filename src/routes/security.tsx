@@ -1,5 +1,5 @@
 // Admin-only: configure IP allowlist (skip OTP) + admin copy emails for OTPs.
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
@@ -10,13 +10,22 @@ import { Badge } from "@/components/ui/badge";
 import { ShieldCheck, Plus, Trash2, Save, RefreshCw, Mail, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, API_ENABLED } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { RequirePerm } from "@/components/RequirePerm";
+import { useCan } from "@/components/Can";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/security")({
   head: () => ({ meta: [{ title: "Sécurité d'accès — CRM" }] }),
-  component: SecurityPage,
+  component: GuardedSecurityPage,
 });
+
+function GuardedSecurityPage() {
+  return (
+    <RequirePerm anyOf={["page.security", "security.ip.manage"]} backTo="/" backLabel="Retour à l'accueil">
+      <SecurityPage />
+    </RequirePerm>
+  );
+}
 
 function isValidIpRule(s: string): boolean {
   const v4 = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -26,9 +35,8 @@ function isValidIpRule(s: string): boolean {
 }
 
 function SecurityPage() {
-  const { user } = useAuth();
-  if (user && user.role !== "Administrateur") return <Navigate to="/" />;
-
+  const can = useCan();
+  const canManage = can("security.ip.manage");
   const [ips, setIps] = useState<string[]>([]);
   const [emails, setEmails] = useState<string[]>([]);
   const [newIp, setNewIp] = useState("");
@@ -110,20 +118,22 @@ function SecurityPage() {
           {myIp && (
             <div className="text-xs bg-muted/40 rounded px-2 py-1 flex items-center justify-between">
               <span>Votre IP publique actuelle : <strong className="font-mono">{myIp}</strong></span>
-              <Button size="sm" variant="ghost" onClick={() => setNewIp(myIp)}>Pré-remplir</Button>
+              {canManage && <Button size="sm" variant="ghost" onClick={() => setNewIp(myIp)}>Pré-remplir</Button>}
             </div>
           )}
+          {canManage && (
           <div className="flex gap-2">
             <Input placeholder="192.168.1.0/24" value={newIp} onChange={(e) => setNewIp(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addIp()} />
             <Button size="sm" onClick={addIp}><Plus className="h-3.5 w-3.5 mr-1" />Ajouter</Button>
           </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {ips.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">Aucune plage configurée — tous les utilisateurs reçoivent un OTP.</p>
             ) : ips.map((ip) => (
               <Badge key={ip} variant="secondary" className="gap-1 font-mono text-xs">
                 {ip}
-                <button onClick={() => removeIp(ip)} className="ml-1 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
+                {canManage && <button onClick={() => removeIp(ip)} className="ml-1 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>}
               </Badge>
             ))}
           </div>
@@ -137,17 +147,19 @@ function SecurityPage() {
           <p className="text-xs text-muted-foreground">
             Une copie de chaque code OTP envoyé sera également transmise à ces adresses.
           </p>
+          {canManage && (
           <div className="flex gap-2">
             <Input type="email" placeholder="admin@exemple.com" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addEmail()} />
             <Button size="sm" onClick={addEmail}><Plus className="h-3.5 w-3.5 mr-1" />Ajouter</Button>
           </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {emails.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">Aucune copie administrateur configurée.</p>
             ) : emails.map((em) => (
               <Badge key={em} variant="secondary" className="gap-1 text-xs">
                 {em}
-                <button onClick={() => removeEmail(em)} className="ml-1 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
+                {canManage && <button onClick={() => removeEmail(em)} className="ml-1 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>}
               </Badge>
             ))}
           </div>
@@ -155,9 +167,11 @@ function SecurityPage() {
       </div>
 
       <div className="flex gap-2 mt-4">
+        {canManage && (
         <Button onClick={save} disabled={saving || loading}>
           <Save className="h-4 w-4 mr-1" />{saving ? "Enregistrement…" : "Enregistrer"}
         </Button>
+        )}
         <Button variant="outline" onClick={load} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />Recharger
         </Button>

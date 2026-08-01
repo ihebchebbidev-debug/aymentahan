@@ -23,7 +23,7 @@ type Store = {
   loadMessages: (id: string) => Promise<ChatMessage[]>;
   loadOlder: (id: string) => Promise<number>;
   send: (id: string, body: string) => Promise<void>;
-  uploadFile: (id: string, file: File, caption?: string) => Promise<void>;
+  uploadFile: (id: string, file: File, caption?: string, onProgress?: (p: number) => void) => Promise<void>;
   markRead: (id: string) => Promise<void>;
   setMute: (id: string, muted: boolean) => Promise<void>;
   loadAround: (id: string, targetIso: string) => Promise<void>;

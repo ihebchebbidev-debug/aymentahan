@@ -10,6 +10,7 @@ import { ForceChangePasswordDialog } from "./ForceChangePasswordDialog";
 import { ChatWidget } from "./ChatWidget";
 import { IdleLogout } from "./IdleLogout";
 import { useAuth } from "@/lib/auth";
+import { hasRouteAccess } from "@/lib/permissions";
 import { useErp } from "@/lib/erpStore";
 import { Bell, Search, Settings, LogOut, UserCircle2, HelpCircle, Plus, Sparkles, PanelLeftClose, PanelLeftOpen, UserPlus, CalendarPlus, ListPlus, BellOff } from "lucide-react";
 import { useSidebarCollapsed } from "@/hooks/use-sidebar-collapsed";
@@ -150,7 +151,8 @@ export function AppLayout({ children, skeleton = "dashboard" }: { children: Reac
     if (n.link) navigate({ to: n.link as any }).catch(() => {});
   };
 
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
+  const canSeeNotifications = hasRouteAccess(hasPermission, "/notifications");
   const displayUsername = user?.username ?? "Utilisateur";
   const displayFullName = user?.fullName ?? displayUsername;
   const displayRole = user?.role ?? "—";
@@ -256,6 +258,7 @@ export function AppLayout({ children, skeleton = "dashboard" }: { children: Reac
                 <HelpCircle className="h-4 w-4" />
               </button>
 
+              {canSeeNotifications && (
               <Popover open={notifOpen} onOpenChange={setNotifOpen}>
                 <PopoverTrigger asChild>
                   <button
@@ -317,6 +320,7 @@ export function AppLayout({ children, skeleton = "dashboard" }: { children: Reac
                   </div>
                 </PopoverContent>
               </Popover>
+              )}
 
               <div className="hidden sm:block h-6 w-px bg-border mx-1" />
 

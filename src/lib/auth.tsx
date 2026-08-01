@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { api, API_ENABLED, getToken, setToken, authenticatedApiUrl } from "./api";
 
 export type AuthUser = {
@@ -87,6 +87,22 @@ const AuthContext = createContext<AuthState | null>(null);
 // must come from the backend on each session, never from localStorage, otherwise
 // a user whose role was emptied can keep stale page access from a previous login.
 const PERMS_CACHE_PREFIX = "erp_perms_cache_";
+
+// ---------------------------------------------------------------------
+// Live permission sync
+// Any part of the app (or another browser tab) can signal that permissions
+// changed. Every AuthProvider instance listening re-fetches immediately, so
+// a user receives new/revoked permissions without logging out and back in.
+// ---------------------------------------------------------------------
+export const PERMISSIONS_CHANGED_EVENT = "erp:permissions-changed";
+const PERMS_SYNC_STORAGE_KEY = "erp_perms_sync_ping";
+
+export function notifyPermissionsChanged() {
+  try { window.dispatchEvent(new Event(PERMISSIONS_CHANGED_EVENT)); } catch { /* ignore */ }
+  // Cross-tab: the `storage` event fires in every *other* tab of this origin.
+  try { localStorage.setItem(PERMS_SYNC_STORAGE_KEY, String(Date.now())); } catch { /* ignore */ }
+}
+
 function isPlainObject(x: unknown): x is Record<string, unknown> {
   return !!x && typeof x === "object" && !Array.isArray(x);
 }
@@ -264,29 +280,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [user]);
 
-  // Keep permissions fresh in the background: when the tab regains focus or
-  // becomes visible again, re-fetch /roles.php so an admin's change (revoke
-  // or grant) reaches the user without requiring a logout/login cycle.
+  // Keep the *whole session* fresh: re-fetch /auth_me.php (role, flags) and the
+  // effective permission set. Used by the background poller, the focus/visibility
+  // listeners and the explicit refreshPermissions() call, so an admin's change
+  // (grant, revoke, role switch) reaches the user without a logout/login cycle.
+  const syncSession = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent !== false;
+    if (!API_ENABLED || !getToken()) return;
+    try {
+      const me = await api<{
+        user: AuthUser;
+        permissions?: Record<string, boolean>;
+        effectivePermissions?: Record<string, boolean>;
+      }>("/auth_me.php");
+      if (!me?.user) return;
+      setUser((prev) => {
+        // Only swap the object when something actually changed, to avoid
+        // re-render loops in effects keyed on `user`.
+        if (prev && JSON.stringify(prev) === JSON.stringify(me.user)) return prev;
+        return me.user;
+      });
+      await applyPermsForUser(me.user, {
+        silent,
+        fallbackPerms: me.effectivePermissions ?? me.permissions,
+      });
+    } catch (e: any) {
+      // A 401 means the session was revoked server-side — drop it.
+      if (Number(e?.status ?? 0) === 401) {
+        setToken(null);
+        setUser(null);
+        setPermissions({});
+        setPermissionsHydrated(false);
+      }
+    }
+  }, [applyPermsForUser]);
+
+  // Always call the freshest syncSession from long-lived listeners.
+  const syncRef = useRef(syncSession);
+  useEffect(() => { syncRef.current = syncSession; }, [syncSession]);
+
+  // Re-hydrate permissions whenever the identity or the role changes: an admin
+  // moving a user from "Agent" to "Superviseur" must repaint the sidebar.
+  const userId = user?.id ?? null;
+  const userRole = user?.role ?? null;
   useEffect(() => {
-    if (!API_ENABLED || !user || user.role === "Administrateur") return;
+    if (!API_ENABLED || !userId) return;
+    void syncRef.current({ silent: true });
+  }, [userId, userRole]);
+
+  // Background freshness: focus / tab-visible / short poll / explicit signal.
+  useEffect(() => {
+    if (!API_ENABLED || !userId) return;
     let last = Date.now();
-    const MIN_MS = 15_000; // throttle: at most one refresh every 15 s
-    const maybeRefresh = () => {
-      if (document.visibilityState !== "visible") return;
+    const MIN_MS = 8_000; // throttle: at most one sync every 8 s
+    const run = (force = false) => {
+      if (!force && document.visibilityState !== "visible") return;
       const now = Date.now();
-      if (now - last < MIN_MS) return;
+      if (!force && now - last < MIN_MS) return;
       last = now;
-      void applyPermsForUser(user, { silent: true });
+      void syncRef.current({ silent: true });
     };
-    document.addEventListener("visibilitychange", maybeRefresh);
-    window.addEventListener("focus", maybeRefresh);
-    const interval = window.setInterval(maybeRefresh, 5 * 60_000); // safety net: every 5 min
+    const onVisibility = () => run();
+    const onFocus = () => run();
+    const onSignal = () => run(true);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PERMS_SYNC_STORAGE_KEY) run(true);
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener(PERMISSIONS_CHANGED_EVENT, onSignal);
+    window.addEventListener("storage", onStorage);
+    // Poll while the tab is visible so a grant lands within ~30 s on its own.
+    const interval = window.setInterval(() => run(), 30_000);
+
     return () => {
-      document.removeEventListener("visibilitychange", maybeRefresh);
-      window.removeEventListener("focus", maybeRefresh);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener(PERMISSIONS_CHANGED_EVENT, onSignal);
+      window.removeEventListener("storage", onStorage);
       window.clearInterval(interval);
     };
-  }, [user, applyPermsForUser]);
+  }, [userId]);
 
 
   const login = async (username: string, password: string, newEmail?: string): Promise<LoginResult> => {
@@ -505,32 +580,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // the short hydration window after login.
       if (!permissionsHydrated) {
         if (Array.isArray(user.grantedPermissions) && user.grantedPermissions.includes(key)) {
-          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-granted', { key, user: user.username, role: user.role });
           return true;
         }
         if (Array.isArray(user.allowedPermissions) && user.allowedPermissions.includes(key)) {
-          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-allowed', { key, user: user.username, role: user.role });
           return true;
         }
         // DeniedPermissions should override grants when present on the user.
         if (Array.isArray(user.deniedPermissions) && user.deniedPermissions.includes(key)) {
-          if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission early-denied', { key, user: user.username, role: user.role });
           return false;
         }
-        if (import.meta.env?.DEV || key === 'opportunity.edit') {
-          console.info('[auth] hasPermission fallback check (not yet hydrated)', { key, user: user.username, role: user.role, granted: user.grantedPermissions, allowed: user.allowedPermissions, denied: user.deniedPermissions });
-        }
       }
-      const p = !!permissions[key];
-      if (import.meta.env?.DEV || key === 'opportunity.edit') console.info('[auth] hasPermission final', { key, user: user.username, role: user.role, hydrated: permissionsHydrated, value: p });
-      return p;
+      return !!permissions[key];
     },
-    [user, permissions],
+    [user, permissions, permissionsHydrated],
   );
 
   const refreshPermissions = useCallback(async () => {
-    await applyPermsForUser(user);
-  }, [user, applyPermsForUser]);
+    await syncSession({ silent: false });
+  }, [syncSession]);
 
   return (
     <AuthContext.Provider

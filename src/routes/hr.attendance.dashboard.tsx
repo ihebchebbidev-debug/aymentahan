@@ -224,7 +224,7 @@ function AttendanceDashboard() {
                         <TableCell>{user.sessions}</TableCell>
                         <TableCell>{user.avgMinutes} min</TableCell>
                         <TableCell>
-                          <Button size="xs" variant="outline" onClick={() => void loadUserDetails(user.username)}>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => void loadUserDetails(user.username)}>
                             Voir
                           </Button>
                         </TableCell>
