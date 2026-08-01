@@ -22,6 +22,7 @@ import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
+import { CinDuplicatesCard } from "@/components/CinDuplicatesCard";
 import { LeadHistoryCard } from "@/components/LeadHistoryCard";
 import { api, API_ENABLED } from "@/lib/api";
 import { useCrmListSync } from "@/hooks/useCrmListSync";
@@ -310,6 +311,7 @@ function OpportunityDetailPage() {
                 description="Snapshot complet du lead — propagé sur l'opportunité"
                 enrichFromProspectId={opp.prospectId}
               />
+              <CinDuplicatesCard cin={opp.cin} currentId={opp.id} />
 
               <Card className="shadow-elegant">
                 <CardHeader className="pb-3">

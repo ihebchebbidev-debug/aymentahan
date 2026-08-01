@@ -1211,9 +1211,14 @@ function DashboardTab({
   const scopeLabel = canReadAll
     ? (agentId ? `Agent : ${agentName(agentId)}` : "Tous les agents")
     : "Mon activité";
-  const monthLabel = (() => {
+  const dateRangeLabel = (() => {
     const [y, m] = month.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    const start = new Date(Date.UTC(y, m - 1, 1));
+    const end = new Date(Date.UTC(y, m, 0));
+    const startLabel = start.toLocaleDateString("fr-FR");
+    const endLabel = day ? new Date(day).toLocaleDateString("fr-FR") : end.toLocaleDateString("fr-FR");
+    const fromLabel = day ? new Date(day).toLocaleDateString("fr-FR") : startLabel;
+    return `Du ${fromLabel} au ${endLabel}`;
   })();
 
   const showAgentFilter = !canReadAll && assignedEntity && user?.id;
@@ -1236,7 +1241,6 @@ function DashboardTab({
             </div>
             <Button type="button" size="sm" variant="ghost" className="h-9 px-2 rounded-l-none" onClick={() => shiftMonth(1)} aria-label="Mois suivant">›</Button>
           </div>
-          <Button type="button" size="sm" variant="outline" className="h-9" onClick={setThisMonth}>Ce mois</Button>
 
           <div className="flex items-center gap-1.5">
             <Label className="text-[11px] text-muted-foreground">Jour</Label>
@@ -1302,8 +1306,7 @@ function DashboardTab({
 
 
           <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline" className="capitalize">{monthLabel}</Badge>
-            {day && <Badge variant="outline">Jour : {day}</Badge>}
+            <Badge variant="outline" className="capitalize">{dateRangeLabel}</Badge>
             <Badge variant="outline">{entityLabel}</Badge>
             <Badge variant="outline">{scopeLabel}</Badge>
           </div>

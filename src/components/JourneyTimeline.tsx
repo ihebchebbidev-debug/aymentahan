@@ -70,6 +70,21 @@ function fmtDate(iso: string) {
   catch { return iso; }
 }
 
+function getActionSubtitle(e: JourneyEvent) {
+  if (e.kind !== "action" || !e.meta?.type) return null;
+  const actionType = String(e.meta.type);
+  const label = actionType === "note" ? "Note créée"
+    : actionType === "appel" ? "Appel téléphonique"
+    : actionType === "visite" ? "Visite"
+    : actionType === "relance" ? "Relance planifiée"
+    : actionType === "terrain" ? "Action terrain"
+    : actionType === "reseaux" ? "Réseaux sociaux"
+    : actionType === "technicien" ? "Technicien terrain"
+    : null;
+  if (!label) return null;
+  return `${label} le ${fmtDate(e.timestamp)}${e.user ? ` par @${e.user}` : ""}`;
+}
+
 export type JourneyTimelineProps = {
   migrationId?: string | null;
   prospectId: string;
@@ -221,6 +236,7 @@ export function JourneyTimeline({ prospectId, opportunityId, contractId, migrati
               <SelectItem value="prospect">Lead</SelectItem>
               <SelectItem value="opportunity">Opportunité</SelectItem>
               <SelectItem value="contract">Contrat</SelectItem>
+              <SelectItem value="migration">Migration</SelectItem>
               <SelectItem value="system">Système</SelectItem>
             </SelectContent>
           </Select>
@@ -305,10 +321,15 @@ export function JourneyTimeline({ prospectId, opportunityId, contractId, migrati
                   )}
                   {e.ip && <span className="text-[10px] text-muted-foreground">IP {e.ip}</span>}
                 </div>
+                {getActionSubtitle(e) && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {getActionSubtitle(e)}
+                  </div>
+                )}
                 {e.description && (
-                  <p className="mt-1 text-sm text-muted-foreground break-words whitespace-pre-wrap">
+                  <div className={`mt-2 text-sm break-words whitespace-pre-wrap ${e.kind === "action" ? "rounded-md border border-border bg-background p-3 text-foreground" : "text-muted-foreground"}`}>
                     {e.description}
-                  </p>
+                  </div>
                 )}
               </li>
             );

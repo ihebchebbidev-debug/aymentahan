@@ -228,20 +228,23 @@ async function fetchLeadActions(prospectId: string): Promise<JourneyEvent[]> {
       `/lead_actions.php?prospectId=${encodeURIComponent(prospectId)}&limit=${DEFAULT_PER_PAGE}`,
     );
     const TYPE_LABELS: Record<string, string> = {
-      appel: "Appel", visite: "Visite", relance: "Relance", note: "Note",
-      terrain: "Terrain", reseaux: "Réseaux", technicien: "Technicien",
+      appel: "Appel téléphonique", visite: "Visite", relance: "Relance", note: "Note créée",
+      terrain: "Action terrain", reseaux: "Réseaux sociaux", technicien: "Technicien terrain",
     };
-    return (r.actions ?? []).map((a) => ({
-      id: `la-${a.id}`,
-      timestamp: a.createdAt,
-      kind: "action",
-      entity: "prospect",
-      entityId: prospectId,
-      user: a.agentUsername ?? null, userRole: null,
-      title: TYPE_LABELS[a.type] ?? (a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : "Action"),
-      description: a.comment ?? null,
-      meta: { type: a.type },
-    } satisfies JourneyEvent));
+    return (r.actions ?? []).map((a) => {
+      const title = TYPE_LABELS[a.type] ?? (a.type ? a.type.charAt(0).toUpperCase() + a.type.slice(1) : "Action");
+      return {
+        id: `la-${a.id}`,
+        timestamp: a.createdAt,
+        kind: "action",
+        entity: "prospect",
+        entityId: prospectId,
+        user: a.agentUsername ?? null, userRole: null,
+        title,
+        description: a.comment ?? null,
+        meta: { type: a.type },
+      } satisfies JourneyEvent;
+    });
   } catch { return []; }
 }
 

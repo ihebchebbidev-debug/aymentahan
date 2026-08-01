@@ -160,6 +160,17 @@ if ($method === 'PATCH' || $method === 'PUT') {
         if ($k === 'assignedTo' && !$isAdmin && $v !== $me['username']) {
             continue;
         }
+        if ($k === 'description') {
+            $note = trim((string)$v);
+            if ($note === '') {
+                continue;
+            }
+            $before = $db->prepare('SELECT description FROM crminternet_tasks WHERE id = :id');
+            $before->execute([':id' => $id]);
+            $current = trim((string)$before->fetchColumn());
+            $timestamp = date('Y-m-d H:i:s');
+            $v = $current !== '' ? ($current . "\n\n[{$timestamp}] {$me['username']}: " . $note) : "[{$timestamp}] {$me['username']}: " . $note;
+        }
         $sets[] = "$col = :$k";
         $params[":$k"] = $v;
         if ($k === 'status' && $v === 'done') {

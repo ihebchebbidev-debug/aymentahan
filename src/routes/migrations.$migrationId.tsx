@@ -27,6 +27,7 @@ import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
+import { CinDuplicatesCard } from "@/components/CinDuplicatesCard";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { OriginOpportunityCard } from "@/components/OriginOpportunityCard";
 import { LastModifiedInfo } from "@/components/LastModifiedInfo";
@@ -87,7 +88,10 @@ function MigrationDetailPage() {
 
   const canLoad = canViewMigrationsData(hasPermission);
 
-  const canEdit = hasPermission("migration.edit");
+  const canEditMigration = hasPermission("migration.edit");
+  const canAssignMigration = canEditMigration || hasPermission("migration.assign");
+  const canChangeMigrationType = canEditMigration || hasPermission("migration.type");
+  const canEdit = canEditMigration || canAssignMigration || canChangeMigrationType;
   const canRevert = hasPermission("migration.revert");
   const canDelete = hasPermission("migration.delete");
   const canExport = hasPermission("migration.export");
@@ -381,6 +385,7 @@ function MigrationDetailsView({
                 description="Snapshot issu de l'opportunité convertie"
                 enrichFromProspectId={m.prospectId ?? null}
               />
+              <CinDuplicatesCard cin={(m as any).cin} currentId={m.id} />
 
               <Card className="shadow-elegant">
                 <CardHeader className="pb-3">

@@ -35,6 +35,7 @@ import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
 import { JourneyTimeline } from "@/components/JourneyTimeline";
 import { ClientIdentityCard } from "@/components/ClientIdentityCard";
+import { CinDuplicatesCard } from "@/components/CinDuplicatesCard";
 import { OriginOpportunityCard } from "@/components/OriginOpportunityCard";
 import { LeadHistoryCard } from "@/components/LeadHistoryCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -399,6 +400,7 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
                 description="Snapshot complet du lead — propagé sur le contrat"
                 enrichFromProspectId={(contract as any).prospectId ?? null}
               />
+              <CinDuplicatesCard cin={(contract as any).cin} currentId={contract.id} />
               <Card className="shadow-elegant">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
