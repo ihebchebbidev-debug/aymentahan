@@ -470,7 +470,7 @@ function OpportunitiesPage() {
       cell: (o) => <span className="text-muted-foreground">{o.ancienLigne || "—"}</span> },
   ];
   const customColumns: DataGridColumn<Opportunity>[] = customDefs
-    .filter((d) => colPrefs.isVisible(d.key))
+    .filter((d) => colPrefs.isVisible(`cf-${d.key}`))
     .map((d) => ({
       key: `cf-${d.key}`,
       header: d.label,
@@ -510,7 +510,7 @@ function OpportunitiesPage() {
                     try {
                       const labels = [
                         ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                       ];
                       await exportXLSX("opportunites.xlsx", pickColumns(exportRows as any, labels) as any, "Opportunités");
                       toast.success("Export Excel");
@@ -521,7 +521,7 @@ function OpportunitiesPage() {
                   <DropdownMenuItem onClick={() => {
                     const labels = [
                       ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                     ];
                     exportJSON("opportunites.json", pickColumns(exportRows as any, labels) as any);
                     toast.success("Export JSON");
@@ -663,7 +663,7 @@ function OpportunitiesPage() {
                     );
                     const labels = [
                       ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                     ];
                     exportCSV("opportunites-selection.csv", pickColumns(rows, labels) as any);
                     toast.success(`${rows.length} opportunité(s) exportée(s)`);

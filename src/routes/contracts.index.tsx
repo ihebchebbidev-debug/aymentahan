@@ -407,7 +407,7 @@ function ContractsPage() {
                   <DropdownMenuItem onClick={() => {
                     const labels = [
                       ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                     ];
                     const projected = pickColumns(exportRows as any, labels);
                     downloadBlob("contrats.csv", toCSV(projected as any, labels), "text/csv;charset=utf-8;");
@@ -419,7 +419,7 @@ function ContractsPage() {
                     try {
                       const labels = [
                         ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                       ];
                       const projected = pickColumns(exportRows as any, labels);
                       await exportXLSX("contrats.xlsx", projected as any, "Contrats");
@@ -431,7 +431,7 @@ function ContractsPage() {
                   <DropdownMenuItem onClick={() => {
                     const labels = [
                       ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                      ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                      ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                     ];
                     exportJSON("contrats.json", pickColumns(exportRows as any, labels));
                     toast.success("Export JSON généré");
@@ -567,7 +567,7 @@ function ContractsPage() {
                       );
                       const labels = [
                         ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                        ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                        ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                       ];
                       exportCSV("contrats-selection.csv", pickColumns(rows, labels));
                       toast.success(`${rows.length} contrat(s) exporté(s)`);
@@ -704,7 +704,7 @@ function ContractsPage() {
                 cell: (c) => <span className="text-muted-foreground">{c.ancienLigne || "—"}</span> },
             ];
             const customColumns: DataGridColumn<Contract>[] = customDefs
-              .filter((d) => colPrefs.isVisible(d.key))
+              .filter((d) => colPrefs.isVisible(`cf-${d.key}`))
               .map((d) => ({
                 key: `cf-${d.key}`,
                 header: d.label,

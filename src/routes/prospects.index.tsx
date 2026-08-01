@@ -535,7 +535,7 @@ function ProspectsPage() {
     },
   ];
   const customColumns: DataGridColumn<Prospect>[] = customDefs
-    .filter((d) => colPrefs.isVisible(d.key))
+    .filter((d) => colPrefs.isVisible(`cf-${d.key}`))
     .map((d) => ({
       key: `cf-${d.key}`,
       header: d.label,
@@ -848,7 +848,7 @@ function ProspectsPage() {
                   );
                   const labels = [
                     ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => c.label),
-                    ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+                    ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
                   ];
                   exportCSV("prospects-selection.csv", pickColumns(rows, labels) as any);
                   toast.success(`${rows.length} prospect(s) exporté(s)`);

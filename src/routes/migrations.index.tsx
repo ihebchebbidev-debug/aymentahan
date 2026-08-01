@@ -380,7 +380,7 @@ function MigrationsPage() {
   const exportRowsFull = withCustomFields(baseExportRows, customDefs, customValuesById);
   const exportLabels = [
     ...BASE_COLS_META.filter((c) => colPrefs.isVisible(c.key)).map((c) => BASE_EXPORT_LABELS[c.key] ?? c.label),
-    ...customDefs.filter((d) => colPrefs.isVisible(d.key)).map((d) => d.label),
+    ...customDefs.filter((d) => colPrefs.isVisible(`cf-${d.key}`)).map((d) => d.label),
   ];
   const exportRows = pickColumns(exportRowsFull, exportLabels);
 

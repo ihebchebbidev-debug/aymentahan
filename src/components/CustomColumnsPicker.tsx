@@ -86,20 +86,23 @@ export function CustomColumnsPicker({ baseCols = [], defs = [], isVisible, onTog
               Champs personnalisés
             </div>
             <div className="space-y-1 max-h-56 overflow-auto">
-              {defs.map((f) => (
-                <Label
-                  key={f.id}
-                  htmlFor={`col-cf-${f.id}`}
-                  className="flex items-center gap-2 cursor-pointer text-sm font-normal py-0.5"
-                >
-                  <Checkbox
-                    id={`col-cf-${f.id}`}
-                    checked={isVisible(f.key)}
-                    onCheckedChange={(v) => onToggle(f.key, !!v)}
-                  />
-                  <span className="truncate">{f.label}</span>
-                </Label>
-              ))}
+              {defs.map((f) => {
+                const key = `cf-${f.key}`;
+                return (
+                  <Label
+                    key={f.id}
+                    htmlFor={`col-cf-${f.id}`}
+                    className="flex items-center gap-2 cursor-pointer text-sm font-normal py-0.5"
+                  >
+                    <Checkbox
+                      id={`col-cf-${f.id}`}
+                      checked={isVisible(key)}
+                      onCheckedChange={(v) => onToggle(key, !!v)}
+                    />
+                    <span className="truncate">{f.label}</span>
+                  </Label>
+                );
+              })}
             </div>
           </div>
         )}
