@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
+import { CommentThread } from "@/components/CommentThread";
 import { api, API_ENABLED } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -299,21 +300,10 @@ function ReclamationDetailPage() {
                 </div>
                 <span className="text-xs text-muted-foreground">{descriptionHistory.length} entrée{descriptionHistory.length > 1 ? 's' : ''}</span>
               </div>
-              <div className="space-y-3 rounded-lg border bg-background p-3">
-                {descriptionHistory.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">Aucun commentaire dans la description.</div>
-                ) : (
-                  descriptionHistory.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-border bg-muted p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <span>{item.author ?? 'Commentaire'}</span>
-                        {item.date ? <span>{item.date}</span> : null}
-                      </div>
-                      <div className="whitespace-pre-wrap text-sm text-foreground mt-2">{item.body}</div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <CommentThread
+                entries={descriptionHistory}
+                emptyLabel="Aucun commentaire dans la description."
+              />
               <div className="space-y-2 mt-4">
                 <Textarea
                   rows={3}

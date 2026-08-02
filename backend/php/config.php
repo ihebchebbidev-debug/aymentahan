@@ -617,9 +617,39 @@ function ensure_opportunity_field_permissions(PDO $db): void {
 }
 
 function user_has_permission(PDO $db, array $me, string $permission): bool {
-    // Permissions are intentionally bypassed in the API per requested change.
-    // All permission checks return true so the frontend controls visibility.
-    return true;
+    $permission = trim($permission);
+    if ($permission === '') return false;
+    if (($me['role'] ?? '') === 'Administrateur') return true;
+    $username = (string)($me['username'] ?? '');
+    $role     = trim((string)($me['role'] ?? ''));
+
+    // Per-user deny override always wins — explicit admin action.
+    $ov = user_overrides_for($db, $username);
+    if (in_array($permission, $ov['deny'], true))  return false;
+    if (in_array($permission, $ov['allow'], true)) return true;
+
+    // Temporary grants are explicit admin exceptions.
+    $g = active_grants_for($db, $username);
+    if (in_array($permission, $g['permissions'], true)) return true;
+    foreach ($g['roles'] as $extraRole) {
+        try {
+            $s = $db->prepare("SELECT enabled FROM crminternet_role_permissions
+                               WHERE role = :r AND permission = :p");
+            $s->execute([':r' => $extraRole, ':p' => $permission]);
+            if ((int)$s->fetchColumn() === 1) return true;
+        } catch (Throwable $e) {}
+    }
+
+    // Only the user's own assigned role decides access.
+    if ($role === '') return false;
+    try {
+        $s = $db->prepare("SELECT enabled FROM crminternet_role_permissions
+                           WHERE role = :r AND permission = :p");
+        $s->execute([':r' => $role, ':p' => $permission]);
+        return (int)$s->fetchColumn() === 1;
+    } catch (Throwable $e) {
+        return false;
+    }
 }
 
 function user_has_any_permission(PDO $db, array $me, array $permissions): bool {

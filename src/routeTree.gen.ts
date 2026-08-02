@@ -9,146 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuditRouteImport } from './routes/audit'
-import { Route as BackofficeRouteImport } from './routes/backoffice'
-import { Route as ConfigurationRouteImport } from './routes/configuration'
-import { Route as DispatchRouteImport } from './routes/dispatch'
-import { Route as DocumentationRouteImport } from './routes/documentation'
-import { Route as GuichetRouteImport } from './routes/guichet'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as MessagingRouteImport } from './routes/messaging'
-import { Route as NotificationsRouteImport } from './routes/notifications'
-import { Route as ObjectivesRouteImport } from './routes/objectives'
-import { Route as OpportunitesRouteImport } from './routes/opportunites'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as ReconciliationRouteImport } from './routes/reconciliation'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as RolesRouteImport } from './routes/roles'
-import { Route as SecretRolesRouteImport } from './routes/secret-roles'
-import { Route as SecurityRouteImport } from './routes/security'
-import { Route as SignupInternalX7k2RouteImport } from './routes/signup-internal-x7k2'
-import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as UsersRouteImport } from './routes/users'
-import { Route as CalendarIndexRouteImport } from './routes/calendar.index'
-import { Route as CalendarDateRouteImport } from './routes/calendar.$date'
-import { Route as ContractsIndexRouteImport } from './routes/contracts.index'
-import { Route as ContractsContractIdRouteImport } from './routes/contracts.$contractId'
-import { Route as GuichetAnalyticsRouteImport } from './routes/guichet_.analytics'
-import { Route as HrAttendanceRouteImport } from './routes/hr.attendance'
-import { Route as HrCommissionsRouteImport } from './routes/hr.commissions'
-import { Route as HrExternalAgentsRouteImport } from './routes/hr.external-agents'
-import { Route as HrPayrollRouteImport } from './routes/hr.payroll'
-import { Route as JourneyProspectIdRouteImport } from './routes/journey.$prospectId'
-import { Route as MigrationsIndexRouteImport } from './routes/migrations.index'
-import { Route as MigrationsMigrationIdRouteImport } from './routes/migrations.$migrationId'
-import { Route as OpportunitiesIndexRouteImport } from './routes/opportunities.index'
-import { Route as OpportunitiesOpportunityIdRouteImport } from './routes/opportunities.$opportunityId'
-import { Route as ProspectsIndexRouteImport } from './routes/prospects.index'
-import { Route as ProspectsProspectIdRouteImport } from './routes/prospects.$prospectId'
-import { Route as ProspectsNewRouteImport } from './routes/prospects.new'
+import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as SignupInternalX7k2RouteImport } from './routes/signup-internal-x7k2'
+import { Route as SecurityRouteImport } from './routes/security'
+import { Route as SecretRolesRouteImport } from './routes/secret-roles'
+import { Route as RolesRouteImport } from './routes/roles'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ReconciliationRouteImport } from './routes/reconciliation'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as OpportunitesRouteImport } from './routes/opportunites'
+import { Route as ObjectivesRouteImport } from './routes/objectives'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as MessagingRouteImport } from './routes/messaging'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as GuichetRouteImport } from './routes/guichet'
+import { Route as DocumentationRouteImport } from './routes/documentation'
+import { Route as DispatchRouteImport } from './routes/dispatch'
+import { Route as ConfigurationRouteImport } from './routes/configuration'
+import { Route as BackofficeRouteImport } from './routes/backoffice'
+import { Route as AuditRouteImport } from './routes/audit'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReclamationsIndexRouteImport } from './routes/reclamations.index'
-import { Route as ReclamationsIdRouteImport } from './routes/reclamations.$id'
+import { Route as ProspectsIndexRouteImport } from './routes/prospects.index'
+import { Route as OpportunitiesIndexRouteImport } from './routes/opportunities.index'
+import { Route as MigrationsIndexRouteImport } from './routes/migrations.index'
+import { Route as ContractsIndexRouteImport } from './routes/contracts.index'
+import { Route as CalendarIndexRouteImport } from './routes/calendar.index'
 import { Route as UsersUsernameRouteImport } from './routes/users.$username'
-import { Route as ContractsContractIdEditRouteImport } from './routes/contracts.$contractId_.edit'
-import { Route as HrAttendanceDashboardRouteImport } from './routes/hr.attendance.dashboard'
-import { Route as MigrationsMigrationIdEditRouteImport } from './routes/migrations.$migrationId_.edit'
-import { Route as OpportunitiesOpportunityIdEditRouteImport } from './routes/opportunities.$opportunityId_.edit'
+import { Route as ReclamationsIdRouteImport } from './routes/reclamations.$id'
+import { Route as ProspectsNewRouteImport } from './routes/prospects.new'
+import { Route as ProspectsProspectIdRouteImport } from './routes/prospects.$prospectId'
+import { Route as OpportunitiesOpportunityIdRouteImport } from './routes/opportunities.$opportunityId'
+import { Route as MigrationsMigrationIdRouteImport } from './routes/migrations.$migrationId'
+import { Route as JourneyProspectIdRouteImport } from './routes/journey.$prospectId'
+import { Route as HrPayrollRouteImport } from './routes/hr.payroll'
+import { Route as HrExternalAgentsRouteImport } from './routes/hr.external-agents'
+import { Route as HrCommissionsRouteImport } from './routes/hr.commissions'
+import { Route as HrAttendanceRouteImport } from './routes/hr.attendance'
+import { Route as GuichetAnalyticsRouteImport } from './routes/guichet_.analytics'
+import { Route as ContractsContractIdRouteImport } from './routes/contracts.$contractId'
+import { Route as CalendarDateRouteImport } from './routes/calendar.$date'
 import { Route as ProspectsProspectIdEditRouteImport } from './routes/prospects.$prospectId_.edit'
+import { Route as OpportunitiesOpportunityIdEditRouteImport } from './routes/opportunities.$opportunityId_.edit'
+import { Route as MigrationsMigrationIdEditRouteImport } from './routes/migrations.$migrationId_.edit'
+import { Route as HrAttendanceDashboardRouteImport } from './routes/hr.attendance.dashboard'
+import { Route as ContractsContractIdEditRouteImport } from './routes/contracts.$contractId_.edit'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuditRoute = AuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BackofficeRoute = BackofficeRouteImport.update({
-  id: '/backoffice',
-  path: '/backoffice',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConfigurationRoute = ConfigurationRouteImport.update({
-  id: '/configuration',
-  path: '/configuration',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DispatchRoute = DispatchRouteImport.update({
-  id: '/dispatch',
-  path: '/dispatch',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentationRoute = DocumentationRouteImport.update({
-  id: '/documentation',
-  path: '/documentation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GuichetRoute = GuichetRouteImport.update({
-  id: '/guichet',
-  path: '/guichet',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MessagingRoute = MessagingRouteImport.update({
-  id: '/messaging',
-  path: '/messaging',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationsRoute = NotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ObjectivesRoute = ObjectivesRouteImport.update({
-  id: '/objectives',
-  path: '/objectives',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OpportunitesRoute = OpportunitesRouteImport.update({
-  id: '/opportunites',
-  path: '/opportunites',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReconciliationRoute = ReconciliationRouteImport.update({
-  id: '/reconciliation',
-  path: '/reconciliation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RolesRoute = RolesRouteImport.update({
-  id: '/roles',
-  path: '/roles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SecretRolesRoute = SecretRolesRouteImport.update({
-  id: '/secret-roles',
-  path: '/secret-roles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SecurityRoute = SecurityRouteImport.update({
-  id: '/security',
-  path: '/security',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupInternalX7k2Route = SignupInternalX7k2RouteImport.update({
-  id: '/signup-internal-x7k2',
-  path: '/signup-internal-x7k2',
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TasksRoute = TasksRouteImport.update({
@@ -156,59 +66,114 @@ const TasksRoute = TasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
+const SignupInternalX7k2Route = SignupInternalX7k2RouteImport.update({
+  id: '/signup-internal-x7k2',
+  path: '/signup-internal-x7k2',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CalendarIndexRoute = CalendarIndexRouteImport.update({
-  id: '/calendar/',
-  path: '/calendar/',
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CalendarDateRoute = CalendarDateRouteImport.update({
-  id: '/calendar/$date',
-  path: '/calendar/$date',
+const SecretRolesRoute = SecretRolesRouteImport.update({
+  id: '/secret-roles',
+  path: '/secret-roles',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContractsIndexRoute = ContractsIndexRouteImport.update({
-  id: '/contracts/',
-  path: '/contracts/',
+const RolesRoute = RolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContractsContractIdRoute = ContractsContractIdRouteImport.update({
-  id: '/contracts/$contractId',
-  path: '/contracts/$contractId',
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GuichetAnalyticsRoute = GuichetAnalyticsRouteImport.update({
-  id: '/guichet_/analytics',
-  path: '/guichet/analytics',
+const ReconciliationRoute = ReconciliationRouteImport.update({
+  id: '/reconciliation',
+  path: '/reconciliation',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HrAttendanceRoute = HrAttendanceRouteImport.update({
-  id: '/hr/attendance',
-  path: '/hr/attendance',
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HrCommissionsRoute = HrCommissionsRouteImport.update({
-  id: '/hr/commissions',
-  path: '/hr/commissions',
+const OpportunitesRoute = OpportunitesRouteImport.update({
+  id: '/opportunites',
+  path: '/opportunites',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HrExternalAgentsRoute = HrExternalAgentsRouteImport.update({
-  id: '/hr/external-agents',
-  path: '/hr/external-agents',
+const ObjectivesRoute = ObjectivesRouteImport.update({
+  id: '/objectives',
+  path: '/objectives',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HrPayrollRoute = HrPayrollRouteImport.update({
-  id: '/hr/payroll',
-  path: '/hr/payroll',
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
-const JourneyProspectIdRoute = JourneyProspectIdRouteImport.update({
-  id: '/journey/$prospectId',
-  path: '/journey/$prospectId',
+const MessagingRoute = MessagingRouteImport.update({
+  id: '/messaging',
+  path: '/messaging',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuichetRoute = GuichetRouteImport.update({
+  id: '/guichet',
+  path: '/guichet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentationRoute = DocumentationRouteImport.update({
+  id: '/documentation',
+  path: '/documentation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DispatchRoute = DispatchRouteImport.update({
+  id: '/dispatch',
+  path: '/dispatch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfigurationRoute = ConfigurationRouteImport.update({
+  id: '/configuration',
+  path: '/configuration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BackofficeRoute = BackofficeRouteImport.update({
+  id: '/backoffice',
+  path: '/backoffice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuditRoute = AuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReclamationsIndexRoute = ReclamationsIndexRouteImport.update({
+  id: '/reclamations/',
+  path: '/reclamations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspectsIndexRoute = ProspectsIndexRouteImport.update({
+  id: '/prospects/',
+  path: '/prospects/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OpportunitiesIndexRoute = OpportunitiesIndexRouteImport.update({
+  id: '/opportunities/',
+  path: '/opportunities/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MigrationsIndexRoute = MigrationsIndexRouteImport.update({
@@ -216,14 +181,34 @@ const MigrationsIndexRoute = MigrationsIndexRouteImport.update({
   path: '/migrations/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MigrationsMigrationIdRoute = MigrationsMigrationIdRouteImport.update({
-  id: '/migrations/$migrationId',
-  path: '/migrations/$migrationId',
+const ContractsIndexRoute = ContractsIndexRouteImport.update({
+  id: '/contracts/',
+  path: '/contracts/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OpportunitiesIndexRoute = OpportunitiesIndexRouteImport.update({
-  id: '/opportunities/',
-  path: '/opportunities/',
+const CalendarIndexRoute = CalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsersUsernameRoute = UsersUsernameRouteImport.update({
+  id: '/$username',
+  path: '/$username',
+  getParentRoute: () => UsersRoute,
+} as any)
+const ReclamationsIdRoute = ReclamationsIdRouteImport.update({
+  id: '/reclamations/$id',
+  path: '/reclamations/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspectsNewRoute = ProspectsNewRouteImport.update({
+  id: '/prospects/new',
+  path: '/prospects/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspectsProspectIdRoute = ProspectsProspectIdRouteImport.update({
+  id: '/prospects/$prospectId',
+  path: '/prospects/$prospectId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OpportunitiesOpportunityIdRoute =
@@ -232,61 +217,76 @@ const OpportunitiesOpportunityIdRoute =
     path: '/opportunities/$opportunityId',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ProspectsIndexRoute = ProspectsIndexRouteImport.update({
-  id: '/prospects/',
-  path: '/prospects/',
+const MigrationsMigrationIdRoute = MigrationsMigrationIdRouteImport.update({
+  id: '/migrations/$migrationId',
+  path: '/migrations/$migrationId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProspectsProspectIdRoute = ProspectsProspectIdRouteImport.update({
-  id: '/prospects/$prospectId',
-  path: '/prospects/$prospectId',
+const JourneyProspectIdRoute = JourneyProspectIdRouteImport.update({
+  id: '/journey/$prospectId',
+  path: '/journey/$prospectId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProspectsNewRoute = ProspectsNewRouteImport.update({
-  id: '/prospects/new',
-  path: '/prospects/new',
+const HrPayrollRoute = HrPayrollRouteImport.update({
+  id: '/hr/payroll',
+  path: '/hr/payroll',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReclamationsIndexRoute = ReclamationsIndexRouteImport.update({
-  id: '/reclamations/',
-  path: '/reclamations/',
+const HrExternalAgentsRoute = HrExternalAgentsRouteImport.update({
+  id: '/hr/external-agents',
+  path: '/hr/external-agents',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReclamationsIdRoute = ReclamationsIdRouteImport.update({
-  id: '/reclamations/$id',
-  path: '/reclamations/$id',
+const HrCommissionsRoute = HrCommissionsRouteImport.update({
+  id: '/hr/commissions',
+  path: '/hr/commissions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersUsernameRoute = UsersUsernameRouteImport.update({
-  id: '/$username',
-  path: '/$username',
-  getParentRoute: () => UsersRoute,
-} as any)
-const ContractsContractIdEditRoute = ContractsContractIdEditRouteImport.update({
-  id: '/contracts/$contractId_/edit',
-  path: '/contracts/$contractId/edit',
+const HrAttendanceRoute = HrAttendanceRouteImport.update({
+  id: '/hr/attendance',
+  path: '/hr/attendance',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HrAttendanceDashboardRoute = HrAttendanceDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => HrAttendanceRoute,
+const GuichetAnalyticsRoute = GuichetAnalyticsRouteImport.update({
+  id: '/guichet_/analytics',
+  path: '/guichet/analytics',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const MigrationsMigrationIdEditRoute =
-  MigrationsMigrationIdEditRouteImport.update({
-    id: '/migrations/$migrationId_/edit',
-    path: '/migrations/$migrationId/edit',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const ContractsContractIdRoute = ContractsContractIdRouteImport.update({
+  id: '/contracts/$contractId',
+  path: '/contracts/$contractId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarDateRoute = CalendarDateRouteImport.update({
+  id: '/calendar/$date',
+  path: '/calendar/$date',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspectsProspectIdEditRoute = ProspectsProspectIdEditRouteImport.update({
+  id: '/prospects/$prospectId_/edit',
+  path: '/prospects/$prospectId/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OpportunitiesOpportunityIdEditRoute =
   OpportunitiesOpportunityIdEditRouteImport.update({
     id: '/opportunities/$opportunityId_/edit',
     path: '/opportunities/$opportunityId/edit',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ProspectsProspectIdEditRoute = ProspectsProspectIdEditRouteImport.update({
-  id: '/prospects/$prospectId_/edit',
-  path: '/prospects/$prospectId/edit',
+const MigrationsMigrationIdEditRoute =
+  MigrationsMigrationIdEditRouteImport.update({
+    id: '/migrations/$migrationId_/edit',
+    path: '/migrations/$migrationId/edit',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const HrAttendanceDashboardRoute = HrAttendanceDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => HrAttendanceRoute,
+} as any)
+const ContractsContractIdEditRoute = ContractsContractIdEditRouteImport.update({
+  id: '/contracts/$contractId_/edit',
+  path: '/contracts/$contractId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -631,137 +631,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/audit': {
-      id: '/audit'
-      path: '/audit'
-      fullPath: '/audit'
-      preLoaderRoute: typeof AuditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/backoffice': {
-      id: '/backoffice'
-      path: '/backoffice'
-      fullPath: '/backoffice'
-      preLoaderRoute: typeof BackofficeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/configuration': {
-      id: '/configuration'
-      path: '/configuration'
-      fullPath: '/configuration'
-      preLoaderRoute: typeof ConfigurationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dispatch': {
-      id: '/dispatch'
-      path: '/dispatch'
-      fullPath: '/dispatch'
-      preLoaderRoute: typeof DispatchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documentation': {
-      id: '/documentation'
-      path: '/documentation'
-      fullPath: '/documentation'
-      preLoaderRoute: typeof DocumentationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/guichet': {
-      id: '/guichet'
-      path: '/guichet'
-      fullPath: '/guichet'
-      preLoaderRoute: typeof GuichetRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/messaging': {
-      id: '/messaging'
-      path: '/messaging'
-      fullPath: '/messaging'
-      preLoaderRoute: typeof MessagingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notifications': {
-      id: '/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof NotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/objectives': {
-      id: '/objectives'
-      path: '/objectives'
-      fullPath: '/objectives'
-      preLoaderRoute: typeof ObjectivesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/opportunites': {
-      id: '/opportunites'
-      path: '/opportunites'
-      fullPath: '/opportunites'
-      preLoaderRoute: typeof OpportunitesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reconciliation': {
-      id: '/reconciliation'
-      path: '/reconciliation'
-      fullPath: '/reconciliation'
-      preLoaderRoute: typeof ReconciliationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/roles': {
-      id: '/roles'
-      path: '/roles'
-      fullPath: '/roles'
-      preLoaderRoute: typeof RolesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/secret-roles': {
-      id: '/secret-roles'
-      path: '/secret-roles'
-      fullPath: '/secret-roles'
-      preLoaderRoute: typeof SecretRolesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/security': {
-      id: '/security'
-      path: '/security'
-      fullPath: '/security'
-      preLoaderRoute: typeof SecurityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup-internal-x7k2': {
-      id: '/signup-internal-x7k2'
-      path: '/signup-internal-x7k2'
-      fullPath: '/signup-internal-x7k2'
-      preLoaderRoute: typeof SignupInternalX7k2RouteImport
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tasks': {
@@ -771,130 +645,137 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
+    '/signup-internal-x7k2': {
+      id: '/signup-internal-x7k2'
+      path: '/signup-internal-x7k2'
+      fullPath: '/signup-internal-x7k2'
+      preLoaderRoute: typeof SignupInternalX7k2RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/calendar/': {
-      id: '/calendar/'
-      path: '/calendar'
-      fullPath: '/calendar/'
-      preLoaderRoute: typeof CalendarIndexRouteImport
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/calendar/$date': {
-      id: '/calendar/$date'
-      path: '/calendar/$date'
-      fullPath: '/calendar/$date'
-      preLoaderRoute: typeof CalendarDateRouteImport
+    '/secret-roles': {
+      id: '/secret-roles'
+      path: '/secret-roles'
+      fullPath: '/secret-roles'
+      preLoaderRoute: typeof SecretRolesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contracts/': {
-      id: '/contracts/'
-      path: '/contracts'
-      fullPath: '/contracts/'
-      preLoaderRoute: typeof ContractsIndexRouteImport
+    '/roles': {
+      id: '/roles'
+      path: '/roles'
+      fullPath: '/roles'
+      preLoaderRoute: typeof RolesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contracts/$contractId': {
-      id: '/contracts/$contractId'
-      path: '/contracts/$contractId'
-      fullPath: '/contracts/$contractId'
-      preLoaderRoute: typeof ContractsContractIdRouteImport
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/guichet_/analytics': {
-      id: '/guichet_/analytics'
-      path: '/guichet/analytics'
-      fullPath: '/guichet/analytics'
-      preLoaderRoute: typeof GuichetAnalyticsRouteImport
+    '/reconciliation': {
+      id: '/reconciliation'
+      path: '/reconciliation'
+      fullPath: '/reconciliation'
+      preLoaderRoute: typeof ReconciliationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hr/attendance': {
-      id: '/hr/attendance'
-      path: '/hr/attendance'
-      fullPath: '/hr/attendance'
-      preLoaderRoute: typeof HrAttendanceRouteImport
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hr/commissions': {
-      id: '/hr/commissions'
-      path: '/hr/commissions'
-      fullPath: '/hr/commissions'
-      preLoaderRoute: typeof HrCommissionsRouteImport
+    '/opportunites': {
+      id: '/opportunites'
+      path: '/opportunites'
+      fullPath: '/opportunites'
+      preLoaderRoute: typeof OpportunitesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hr/external-agents': {
-      id: '/hr/external-agents'
-      path: '/hr/external-agents'
-      fullPath: '/hr/external-agents'
-      preLoaderRoute: typeof HrExternalAgentsRouteImport
+    '/objectives': {
+      id: '/objectives'
+      path: '/objectives'
+      fullPath: '/objectives'
+      preLoaderRoute: typeof ObjectivesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hr/payroll': {
-      id: '/hr/payroll'
-      path: '/hr/payroll'
-      fullPath: '/hr/payroll'
-      preLoaderRoute: typeof HrPayrollRouteImport
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/journey/$prospectId': {
-      id: '/journey/$prospectId'
-      path: '/journey/$prospectId'
-      fullPath: '/journey/$prospectId'
-      preLoaderRoute: typeof JourneyProspectIdRouteImport
+    '/messaging': {
+      id: '/messaging'
+      path: '/messaging'
+      fullPath: '/messaging'
+      preLoaderRoute: typeof MessagingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/migrations/': {
-      id: '/migrations/'
-      path: '/migrations'
-      fullPath: '/migrations/'
-      preLoaderRoute: typeof MigrationsIndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/migrations/$migrationId': {
-      id: '/migrations/$migrationId'
-      path: '/migrations/$migrationId'
-      fullPath: '/migrations/$migrationId'
-      preLoaderRoute: typeof MigrationsMigrationIdRouteImport
+    '/guichet': {
+      id: '/guichet'
+      path: '/guichet'
+      fullPath: '/guichet'
+      preLoaderRoute: typeof GuichetRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/opportunities/': {
-      id: '/opportunities/'
-      path: '/opportunities'
-      fullPath: '/opportunities/'
-      preLoaderRoute: typeof OpportunitiesIndexRouteImport
+    '/documentation': {
+      id: '/documentation'
+      path: '/documentation'
+      fullPath: '/documentation'
+      preLoaderRoute: typeof DocumentationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/opportunities/$opportunityId': {
-      id: '/opportunities/$opportunityId'
-      path: '/opportunities/$opportunityId'
-      fullPath: '/opportunities/$opportunityId'
-      preLoaderRoute: typeof OpportunitiesOpportunityIdRouteImport
+    '/dispatch': {
+      id: '/dispatch'
+      path: '/dispatch'
+      fullPath: '/dispatch'
+      preLoaderRoute: typeof DispatchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prospects/': {
-      id: '/prospects/'
-      path: '/prospects'
-      fullPath: '/prospects/'
-      preLoaderRoute: typeof ProspectsIndexRouteImport
+    '/configuration': {
+      id: '/configuration'
+      path: '/configuration'
+      fullPath: '/configuration'
+      preLoaderRoute: typeof ConfigurationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prospects/$prospectId': {
-      id: '/prospects/$prospectId'
-      path: '/prospects/$prospectId'
-      fullPath: '/prospects/$prospectId'
-      preLoaderRoute: typeof ProspectsProspectIdRouteImport
+    '/backoffice': {
+      id: '/backoffice'
+      path: '/backoffice'
+      fullPath: '/backoffice'
+      preLoaderRoute: typeof BackofficeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prospects/new': {
-      id: '/prospects/new'
-      path: '/prospects/new'
-      fullPath: '/prospects/new'
-      preLoaderRoute: typeof ProspectsNewRouteImport
+    '/audit': {
+      id: '/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reclamations/': {
@@ -904,11 +785,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReclamationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reclamations/$id': {
-      id: '/reclamations/$id'
-      path: '/reclamations/$id'
-      fullPath: '/reclamations/$id'
-      preLoaderRoute: typeof ReclamationsIdRouteImport
+    '/prospects/': {
+      id: '/prospects/'
+      path: '/prospects'
+      fullPath: '/prospects/'
+      preLoaderRoute: typeof ProspectsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/opportunities/': {
+      id: '/opportunities/'
+      path: '/opportunities'
+      fullPath: '/opportunities/'
+      preLoaderRoute: typeof OpportunitiesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/migrations/': {
+      id: '/migrations/'
+      path: '/migrations'
+      fullPath: '/migrations/'
+      preLoaderRoute: typeof MigrationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contracts/': {
+      id: '/contracts/'
+      path: '/contracts'
+      fullPath: '/contracts/'
+      preLoaderRoute: typeof ContractsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendar/': {
+      id: '/calendar/'
+      path: '/calendar'
+      fullPath: '/calendar/'
+      preLoaderRoute: typeof CalendarIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/users/$username': {
@@ -918,25 +827,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersUsernameRouteImport
       parentRoute: typeof UsersRoute
     }
-    '/contracts/$contractId_/edit': {
-      id: '/contracts/$contractId_/edit'
-      path: '/contracts/$contractId/edit'
-      fullPath: '/contracts/$contractId/edit'
-      preLoaderRoute: typeof ContractsContractIdEditRouteImport
+    '/reclamations/$id': {
+      id: '/reclamations/$id'
+      path: '/reclamations/$id'
+      fullPath: '/reclamations/$id'
+      preLoaderRoute: typeof ReclamationsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hr/attendance/dashboard': {
-      id: '/hr/attendance/dashboard'
-      path: '/dashboard'
-      fullPath: '/hr/attendance/dashboard'
-      preLoaderRoute: typeof HrAttendanceDashboardRouteImport
-      parentRoute: typeof HrAttendanceRoute
+    '/prospects/new': {
+      id: '/prospects/new'
+      path: '/prospects/new'
+      fullPath: '/prospects/new'
+      preLoaderRoute: typeof ProspectsNewRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/migrations/$migrationId_/edit': {
-      id: '/migrations/$migrationId_/edit'
-      path: '/migrations/$migrationId/edit'
-      fullPath: '/migrations/$migrationId/edit'
-      preLoaderRoute: typeof MigrationsMigrationIdEditRouteImport
+    '/prospects/$prospectId': {
+      id: '/prospects/$prospectId'
+      path: '/prospects/$prospectId'
+      fullPath: '/prospects/$prospectId'
+      preLoaderRoute: typeof ProspectsProspectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/opportunities/$opportunityId': {
+      id: '/opportunities/$opportunityId'
+      path: '/opportunities/$opportunityId'
+      fullPath: '/opportunities/$opportunityId'
+      preLoaderRoute: typeof OpportunitiesOpportunityIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/migrations/$migrationId': {
+      id: '/migrations/$migrationId'
+      path: '/migrations/$migrationId'
+      fullPath: '/migrations/$migrationId'
+      preLoaderRoute: typeof MigrationsMigrationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/journey/$prospectId': {
+      id: '/journey/$prospectId'
+      path: '/journey/$prospectId'
+      fullPath: '/journey/$prospectId'
+      preLoaderRoute: typeof JourneyProspectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hr/payroll': {
+      id: '/hr/payroll'
+      path: '/hr/payroll'
+      fullPath: '/hr/payroll'
+      preLoaderRoute: typeof HrPayrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hr/external-agents': {
+      id: '/hr/external-agents'
+      path: '/hr/external-agents'
+      fullPath: '/hr/external-agents'
+      preLoaderRoute: typeof HrExternalAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hr/commissions': {
+      id: '/hr/commissions'
+      path: '/hr/commissions'
+      fullPath: '/hr/commissions'
+      preLoaderRoute: typeof HrCommissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hr/attendance': {
+      id: '/hr/attendance'
+      path: '/hr/attendance'
+      fullPath: '/hr/attendance'
+      preLoaderRoute: typeof HrAttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guichet_/analytics': {
+      id: '/guichet_/analytics'
+      path: '/guichet/analytics'
+      fullPath: '/guichet/analytics'
+      preLoaderRoute: typeof GuichetAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contracts/$contractId': {
+      id: '/contracts/$contractId'
+      path: '/contracts/$contractId'
+      fullPath: '/contracts/$contractId'
+      preLoaderRoute: typeof ContractsContractIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendar/$date': {
+      id: '/calendar/$date'
+      path: '/calendar/$date'
+      fullPath: '/calendar/$date'
+      preLoaderRoute: typeof CalendarDateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prospects/$prospectId_/edit': {
+      id: '/prospects/$prospectId_/edit'
+      path: '/prospects/$prospectId/edit'
+      fullPath: '/prospects/$prospectId/edit'
+      preLoaderRoute: typeof ProspectsProspectIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/opportunities/$opportunityId_/edit': {
@@ -946,11 +932,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OpportunitiesOpportunityIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prospects/$prospectId_/edit': {
-      id: '/prospects/$prospectId_/edit'
-      path: '/prospects/$prospectId/edit'
-      fullPath: '/prospects/$prospectId/edit'
-      preLoaderRoute: typeof ProspectsProspectIdEditRouteImport
+    '/migrations/$migrationId_/edit': {
+      id: '/migrations/$migrationId_/edit'
+      path: '/migrations/$migrationId/edit'
+      fullPath: '/migrations/$migrationId/edit'
+      preLoaderRoute: typeof MigrationsMigrationIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hr/attendance/dashboard': {
+      id: '/hr/attendance/dashboard'
+      path: '/dashboard'
+      fullPath: '/hr/attendance/dashboard'
+      preLoaderRoute: typeof HrAttendanceDashboardRouteImport
+      parentRoute: typeof HrAttendanceRoute
+    }
+    '/contracts/$contractId_/edit': {
+      id: '/contracts/$contractId_/edit'
+      path: '/contracts/$contractId/edit'
+      fullPath: '/contracts/$contractId/edit'
+      preLoaderRoute: typeof ContractsContractIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

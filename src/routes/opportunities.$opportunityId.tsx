@@ -406,21 +406,10 @@ function OpportunityDetailPage() {
                       </div>
                       <span className="text-xs text-muted-foreground">{noteHistory.length} entrée{noteHistory.length > 1 ? 's' : ''}</span>
                     </div>
-                    <div className="space-y-3 rounded-lg border bg-background p-3">
-                      {noteHistory.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">Aucun commentaire. Ajoutez le premier message.</div>
-                      ) : (
-                        noteHistory.map((note) => (
-                          <div key={note.id} className="rounded-lg border border-border bg-muted p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                              <span>{note.author ?? 'Note'}</span>
-                              {note.date ? <span>{note.date}</span> : null}
-                            </div>
-                            <div className="whitespace-pre-wrap text-sm text-foreground mt-2">{note.body}</div>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                    <CommentThread
+                      entries={noteHistory}
+                      emptyLabel="Aucun commentaire. Ajoutez le premier message."
+                    />
                     <div className="space-y-2">
                       <Textarea
                         rows={3}

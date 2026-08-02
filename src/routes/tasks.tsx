@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { CommentThread } from "@/components/CommentThread";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api, API_ENABLED } from "@/lib/api";
@@ -319,7 +320,10 @@ function TasksPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Description actuelle</Label>
-                  <div className="rounded-md border border-border bg-background p-3 whitespace-pre-wrap text-sm text-foreground min-h-[120px]">{selectedTask.description || "Aucune description"}</div>
+                  <CommentThread
+                    entries={selectedTask.description ? [{ id: "task-description", author: "Description", date: null, body: selectedTask.description }] : []}
+                    emptyLabel="Aucune description"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Ajouter une note à l'historique</Label>

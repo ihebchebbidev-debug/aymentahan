@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
+import { CommentThread } from "@/components/CommentThread";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
 import { LeadActionsTimeline } from "@/components/LeadActionsTimeline";
@@ -371,6 +372,22 @@ function ProspectDetailPage() {
                     )}
                   </div>
 
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-elegant">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Commentaires</CardTitle>
+                  <CardDescription>Observations du prospect présentées comme un fil.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CommentThread
+                    entries={[
+                      ...(comment.trim() ? [{ id: "observation-1", author: "Observation 1", date: null, body: comment }] : []),
+                      ...(comment2.trim() ? [{ id: "observation-2", author: "Observation 2", date: null, body: comment2 }] : []),
+                    ]}
+                    emptyLabel="Aucune observation enregistrée."
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
