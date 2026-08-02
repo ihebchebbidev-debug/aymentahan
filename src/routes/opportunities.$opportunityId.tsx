@@ -17,6 +17,7 @@ import { useErp } from "@/lib/erpStore";
 import { useAuth } from "@/lib/auth";
 import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { buildAttachmentExtraSources } from "@/lib/attachmentLineage";
+import { CommentThread } from "@/components/CommentThread";
 import { CustomFieldsCard } from "@/components/CustomFieldsCard";
 import { ContractInfoCard } from "@/components/ContractInfoCard";
 import { Network } from "lucide-react";
