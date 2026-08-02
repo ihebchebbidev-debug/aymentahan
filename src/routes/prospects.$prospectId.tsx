@@ -383,9 +383,9 @@ function ProspectDetailPage() {
                 <CardContent>
                   <CommentThread
                     entries={[
-                      ...(comment.trim() ? [{ id: "observation-1", author: "Observation 1", date: null, body: comment }] : []),
-                      ...(comment2.trim() ? [{ id: "observation-2", author: "Observation 2", date: null, body: comment2 }] : []),
-                    ]}
+                      { id: "observation-1", author: "Observation 1", date: null, body: comment || "Aucune observation 1" },
+                      { id: "observation-2", author: "Observation 2", date: null, body: comment2 || "Aucune observation 2" },
+                    ].filter((entry) => entry.body.trim())}
                     emptyLabel="Aucune observation enregistrée."
                   />
                 </CardContent>

@@ -319,10 +319,10 @@ function TasksPage() {
                   <div className="space-y-1"><Label>Créée par</Label><Input value={selectedTask.createdBy} disabled /></div>
                 </div>
                 <div className="space-y-1">
-                  <Label>Description actuelle</Label>
+                  <Label>Commentaires</Label>
                   <CommentThread
                     entries={selectedTask.description ? [{ id: "task-description", author: "Description", date: null, body: selectedTask.description }] : []}
-                    emptyLabel="Aucune description"
+                    emptyLabel="Aucun commentaire pour cette tâche"
                   />
                 </div>
                 <div className="space-y-1">
