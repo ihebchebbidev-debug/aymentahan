@@ -10,7 +10,20 @@ $from = $_GET['from'] ?? date('Y-m-01');
 $to   = $_GET['to']   ?? date('Y-m-d');
 $format = $_GET['format'] ?? 'json';
 $team = isset($_GET['team']) ? trim((string)$_GET['team']) : '';
+$entityId = isset($_GET['entityId']) ? trim((string)$_GET['entityId']) : '';
+$agentId = isset($_GET['agentId']) ? trim((string)$_GET['agentId']) : '';
 $teamIsNone = ($team === '__none__');
+
+$hasGuichetEntityColumn = true;
+try {
+    $colCheck = $db->query("SHOW COLUMNS FROM crminternet_users LIKE 'guichet_entity_id'");
+    if (!$colCheck->fetch()) {
+        $db->exec("ALTER TABLE crminternet_users ADD COLUMN guichet_entity_id VARCHAR(40) NULL");
+        try { $db->exec("ALTER TABLE crminternet_users ADD INDEX idx_users_guichet_entity (guichet_entity_id)"); } catch (Throwable $e) {}
+    }
+} catch (Throwable $e) {
+    $hasGuichetEntityColumn = false;
+}
 if ($teamIsNone) {
     $teamFilter = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
@@ -22,6 +35,17 @@ if ($teamIsNone) {
 // Use the real "Équipe" (crminternet_teams.name) assigned to each user via
 // team_id — this is the dynamic list managed in Users > Équipe(s).
 $NO_TEAM = 'Sans équipe';
+
+$agentFilterSql = '';
+$agentFilterParams = [];
+if ($hasGuichetEntityColumn && $entityId !== '') {
+    $agentFilterSql .= ' AND u.guichet_entity_id = :entityId ';
+    $agentFilterParams[':entityId'] = $entityId;
+}
+if ($agentId !== '') {
+    $agentFilterSql .= ' AND u.id = :agentId ';
+    $agentFilterParams[':agentId'] = $agentId;
+}
 
 // Per-agent KPIs
 $agentSql = "
@@ -52,12 +76,14 @@ $agentSql = "
   ) c ON c.assigned_to = u.username
   WHERE u.role IN ('Agent','Manager','AgentSuivi','AgentActivation','AgentVente','AgentGuichet','AgentTechnicoCommercial') AND u.active = 1
   $teamFilter
+  $agentFilterSql
   GROUP BY u.id
   ORDER BY revenue DESC
 ";
 $s = $db->prepare($agentSql);
 $params = [':from1'=>$from, ':to1'=>$to, ':from2'=>$from, ':to2'=>$to];
 if ($team !== '' && !$teamIsNone) $params[':team'] = $team;
+$params = array_merge($params, $agentFilterParams);
 $s->execute($params);
 $agents = array_map(function($r) use ($NO_TEAM) {
     $h = (int)$r['handled'];
@@ -109,6 +135,17 @@ if ($teamIsNone) {
     $funnelJoin = '';
     $funnelWhereTeam = '';
 }
+$funnelWhereExtra = '';
+$funnelExtraParams = [];
+if ($hasGuichetEntityColumn && $entityId !== '') {
+    $funnelWhereExtra .= ' AND u.guichet_entity_id = :entityId ';
+    $funnelExtraParams[':entityId'] = $entityId;
+}
+if ($agentId !== '') {
+    $funnelWhereExtra .= ' AND u.id = :agentId ';
+    $funnelExtraParams[':agentId'] = $agentId;
+}
+
 $funnel = $db->prepare("
   SELECT
     SUM(CASE WHEN p.outcome='pending' THEN 1 ELSE 0 END) pending,
@@ -119,9 +156,11 @@ $funnel = $db->prepare("
   $funnelJoin
   WHERE p.created_at BETWEEN :f AND :t
   $funnelWhereTeam
+  $funnelWhereExtra
 ");
 $fp = [':f'=>$from, ':t'=>$to];
 if ($team !== '' && !$teamIsNone) $fp[':team'] = $team;
+$fp = array_merge($fp, $funnelExtraParams);
 $funnel->execute($fp);
 $f = $funnel->fetch();
 
@@ -136,16 +175,29 @@ if ($teamIsNone) {
     $monthlyJoin = '';
     $monthlyWhereTeam = '';
 }
+$monthlyWhereExtra = '';
+$monthlyExtraParams = [];
+if ($hasGuichetEntityColumn && $entityId !== '') {
+    $monthlyWhereExtra .= ' AND u.guichet_entity_id = :entityId ';
+    $monthlyExtraParams[':entityId'] = $entityId;
+}
+if ($agentId !== '') {
+    $monthlyWhereExtra .= ' AND u.id = :agentId ';
+    $monthlyExtraParams[':agentId'] = $agentId;
+}
+
 $monthly = $db->prepare("
   SELECT DATE_FORMAT(c.signature_date,'%Y-%m') ym, COUNT(*) cnt, SUM(c.premium) rev
   FROM crminternet_contracts c
   $monthlyJoin
   WHERE c.signature_date >= DATE_SUB(:t, INTERVAL 12 MONTH)
   $monthlyWhereTeam
+  $monthlyWhereExtra
   GROUP BY ym ORDER BY ym
 ");
 $mp = [':t'=>$to];
 if ($team !== '' && !$teamIsNone) $mp[':team'] = $team;
+$mp = array_merge($mp, $monthlyExtraParams);
 $monthly->execute($mp);
 $months = array_map(fn($r)=>['month'=>$r['ym'],'contracts'=>(int)$r['cnt'],'revenue'=>(float)$r['rev']], $monthly->fetchAll());
 
@@ -161,6 +213,17 @@ if ($teamIsNone) {
     $srcWhereTeam = '';
 }
 
+$srcWhereExtra = '';
+$srcExtraParams = [];
+if ($hasGuichetEntityColumn && $entityId !== '') {
+    $srcWhereExtra .= ' AND u.guichet_entity_id = :entityId ';
+    $srcExtraParams[':entityId'] = $entityId;
+}
+if ($agentId !== '') {
+    $srcWhereExtra .= ' AND u.id = :agentId ';
+    $srcExtraParams[':agentId'] = $agentId;
+}
+
 $src = $db->prepare("
   SELECT CASE
            WHEN COALESCE(NULLIF(pt.name, ''), NULLIF(pt.label, '')) IS NOT NULL THEN COALESCE(NULLIF(pt.name, ''), NULLIF(pt.label, ''))
@@ -174,10 +237,12 @@ $src = $db->prepare("
   LEFT JOIN crminternet_prospect_types pt ON pt.id = p.type_id
   WHERE p.created_at BETWEEN :f AND :t
   $srcWhereTeam
+  $srcWhereExtra
   GROUP BY type_label ORDER BY total DESC
 ");
 $sp = [':f'=>$from, ':t'=>$to];
 if ($team !== '' && !$teamIsNone) $sp[':team'] = $team;
+$sp = array_merge($sp, $srcExtraParams);
 $src->execute($sp);
 $sources = array_map(fn($r)=>[
     'source'=>$r['type_label'], 'total'=>(int)$r['total'], 'won'=>(int)$r['won'],

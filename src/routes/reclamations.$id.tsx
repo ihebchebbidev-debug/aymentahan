@@ -285,9 +285,6 @@ function ReclamationDetailPage() {
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Description" className="md:col-span-2">
-                  <Textarea rows={3} value={row.description ?? ""} disabled={!canEdit} onChange={(e) => update({ description: e.target.value })} />
-                </Field>
                 <Field label="Remarques" className="md:col-span-2"><Textarea rows={2} value={row.remarques ?? ""} disabled={!canEdit} onChange={(e) => update({ remarques: e.target.value })} /></Field>
               </div>
             </Card>
@@ -296,7 +293,7 @@ function ReclamationDetailPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <Label className="text-sm">Historique de la description</Label>
-                  <p className="text-xs text-muted-foreground">Les commentaires sont conservés et affichés comme un fil.</p>
+                  <p className="text-xs text-muted-foreground">Les commentaires s'ajoutent à l'historique sans écraser le contenu précédent.</p>
                 </div>
                 <span className="text-xs text-muted-foreground">{descriptionHistory.length} entrée{descriptionHistory.length > 1 ? 's' : ''}</span>
               </div>
@@ -309,7 +306,7 @@ function ReclamationDetailPage() {
                   rows={3}
                   value={draftDescriptionComment}
                   onChange={(e) => setDraftDescriptionComment(e.target.value)}
-                  placeholder={canEdit ? 'Ajouter un commentaire à la description…' : 'Vous ne pouvez pas ajouter de commentaire.'}
+                  placeholder={canEdit ? 'Ajouter un commentaire à l’historique…' : 'Vous ne pouvez pas ajouter de commentaire.'}
                   disabled={!canEdit}
                 />
                 {canEdit && (

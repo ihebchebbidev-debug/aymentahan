@@ -52,6 +52,38 @@ export const Route = createFileRoute("/prospects/$prospectId")({
 
 const STATUS_FALLBACK = LEAD_STATUSES;
 
+function parseCommentEntries(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return [] as Array<{ id: string; author: string | null; date: string | null; body: string }>;
+
+  return trimmed.split(/\n{2,}/).filter(Boolean).map((entry, index) => {
+    const lines = entry.split(/\n/);
+    const first = lines[0];
+    const rest = lines.slice(1).join("\n");
+    const match = first.match(/^\[([^\]]+)\]\s+([^:]+):\s*(.*)$/);
+    if (match) {
+      const [, date, author, firstBody] = match;
+      const body = [firstBody, rest].filter(Boolean).join("\n");
+      return { id: `comment-${index}-${date}`, author, date, body };
+    }
+    return { id: `comment-${index}`, author: null, date: null, body: entry };
+  });
+}
+
+function buildCommentText(existing: string | null | undefined, comment: string, author: string) {
+  const base = existing?.trim();
+  const now = new Date();
+  const timestamp = now.toLocaleString("fr-FR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const entry = `[${timestamp}] ${author}: ${comment}`;
+  return base ? `${base}\n\n${entry}` : entry;
+}
+
 function ProspectDetailPage() {
   const { prospectId } = Route.useParams();
   const navigate = useNavigate();
@@ -73,6 +105,7 @@ function ProspectDetailPage() {
 
   const [comment, setComment] = useState(prospect?.comment ?? "");
   const [comment2, setComment2] = useState(prospect?.comment2 ?? "");
+  const [draftComment, setDraftComment] = useState("");
   const [types, setTypes] = useState<ProspectType[]>([]);
   const [restoredMeta, setRestoredMeta] = useState<{ prospectId: string; opportunityId?: string | null; restoredAt?: string } | null>(null);
   const [linkedOpportunityMeta, setLinkedOpportunityMeta] = useState<{ contractId: string | null; migrationId: string | null } | null>(null);
@@ -90,7 +123,7 @@ function ProspectDetailPage() {
   const agent = useMemo(() => users.find((u) => u.username === prospect?.assignedTo), [users, prospect]);
 
   const catalogStatusNames = useLeadStatusNames();
-  useEffect(() => { setComment(prospect?.comment ?? ""); setComment2(prospect?.comment2 ?? ""); }, [prospect?.comment, prospect?.comment2]);
+  useEffect(() => { setComment(prospect?.comment ?? ""); setComment2(prospect?.comment2 ?? ""); setDraftComment(""); }, [prospect?.comment, prospect?.comment2]);
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("crm:reverted-prospect");
@@ -134,6 +167,9 @@ function ProspectDetailPage() {
     if (prospect?.status) set.add(prospect.status);
     return [...set].sort((a, b) => a.localeCompare(b, "fr"));
   }, [catalogStatusNames, prospect?.status]);
+  const commentEntries = useMemo(() => {
+    return [...parseCommentEntries(comment), ...parseCommentEntries(comment2)].filter((entry) => entry.body.trim());
+  }, [comment, comment2]);
   const currentTypeName = (types.find((t) => t.id === prospect?.typeId)?.name ?? "").trim().toLowerCase();
   const isStreetType = currentTypeName === "street";
   const showAncienLigne = currentTypeName === "résiliation" || currentTypeName === "resiliation" || currentTypeName === "migration";
@@ -169,9 +205,19 @@ function ProspectDetailPage() {
     );
   }
 
-  const saveComments = async () => {
-    await updateProspect(prospect.id, { comment, comment2 });
-    toast.success("Commentaires enregistrés");
+  const addComment = async () => {
+    const text = draftComment.trim();
+    if (!text) return;
+    try {
+      const author = user?.fullName || user?.username || "Commentaire";
+      const nextText = buildCommentText(comment, text, author);
+      await updateProspect(prospect.id, { comment: nextText, comment2 });
+      setComment(nextText);
+      setDraftComment("");
+      toast.success("Commentaire ajouté");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Échec de l'ajout du commentaire");
+    }
   };
   const changeStatus = async (status: string) => {
     try {
@@ -359,15 +405,18 @@ function ProspectDetailPage() {
                     )}
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Observation 1</Label>
-                    <Textarea rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Notes de suivi…" disabled={!canEdit} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Observation 2</Label>
-                    <Textarea rows={3} value={comment2} onChange={(e) => setComment2(e.target.value)} placeholder="Notes complémentaires…" disabled={!canEdit} />
+                    <Label className="text-xs flex items-center gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Nouvelle observation</Label>
+                    <Textarea
+                      rows={3}
+                      value={draftComment}
+                      onChange={(e) => setDraftComment(e.target.value)}
+                      placeholder={canEdit ? "Ajouter une observation à l'historique…" : "Vous ne pouvez pas ajouter d'observation."}
+                      disabled={!canEdit}
+                    />
                     {canEdit && (
-                      <div className="flex justify-end">
-                        <Button size="sm" onClick={saveComments}>Enregistrer les commentaires</Button>
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => setDraftComment("")} disabled={!draftComment.trim()}>Effacer</Button>
+                        <Button size="sm" onClick={addComment} disabled={!draftComment.trim()}>Ajouter</Button>
                       </div>
                     )}
                   </div>
@@ -382,10 +431,7 @@ function ProspectDetailPage() {
                 </CardHeader>
                 <CardContent>
                   <CommentThread
-                    entries={[
-                      { id: "observation-1", author: "Observation 1", date: null, body: comment || "Aucune observation 1" },
-                      { id: "observation-2", author: "Observation 2", date: null, body: comment2 || "Aucune observation 2" },
-                    ].filter((entry) => entry.body.trim())}
+                    entries={commentEntries}
                     emptyLabel="Aucune observation enregistrée."
                   />
                 </CardContent>

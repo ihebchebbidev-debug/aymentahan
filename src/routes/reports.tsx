@@ -18,6 +18,7 @@ import { formatAmount } from "@/lib/currency";
 import { useErp } from "@/lib/erpStore";
 import { useCustomFieldsTable } from "@/lib/useCustomFields";
 import { useAuth } from "@/lib/auth";
+import { useGuichetEntities } from "@/hooks/use-guichet-entities";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -73,13 +74,18 @@ function previousPeriod(from: string, to: string): { from: string; to: string } 
 
 function ReportsPage() {
   const { prospects, contracts, users } = useErp();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const entities = useGuichetEntities();
   const canExport = hasPermission("report.export");
+  const canReadAll = hasPermission("guichet.read_all") || user?.role === "Administrateur";
+  const assignedEntity = canReadAll ? "" : (user?.guichetEntityId || "");
   const pCustom = useCustomFieldsTable("prospect");
   const cCustom = useCustomFieldsTable("contract");
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [team, setTeam] = useState<string>("");
+  const [entityId, setEntityId] = useState(assignedEntity);
+  const [agentId, setAgentId] = useState<string>(canReadAll ? "all" : "entity");
   const [data, setData] = useState<Report | null>(null);
   const [prev, setPrev] = useState<Report | null>(null);
   const [compare, setCompare] = useState(true);
@@ -91,19 +97,45 @@ function ReportsPage() {
     return Array.from(set).sort();
   }, [users]);
 
-  const load = async (range?: { from: string; to: string; team?: string }) => {
+  useEffect(() => {
+    setEntityId(assignedEntity);
+    setAgentId(canReadAll ? "all" : "entity");
+  }, [assignedEntity, canReadAll]);
+
+  const agentOptions = useMemo(() => {
+    const sameEntity = !assignedEntity ? users : users.filter((u) => (u.guichetEntityId || "") === assignedEntity);
+    return sameEntity.filter((u) => ["Agent", "Manager", "AgentSuivi", "AgentActivation", "AgentVente", "AgentGuichet", "AgentTechnicoCommercial", "Administrateur"].includes(u.role));
+  }, [users, assignedEntity]);
+
+  const agentLabel = (id: string) => {
+    if (id === "all") return "Tous les agents";
+    if (id === "entity") return "Toute mon entité";
+    const u = users.find((x) => x.id === id || x.username === id);
+    return u?.fullName || u?.username || id;
+  };
+
+  const load = async (range?: { from: string; to: string; team?: string; entityId?: string; agentId?: string }) => {
     if (!API_ENABLED) { toast.error("API désactivée"); return; }
     const f = range?.from ?? from;
     const t = range?.to ?? to;
     const tm = range?.team ?? team;
+    const effectiveEntity = range?.entityId ?? (entityId || assignedEntity || undefined);
+    const effectiveAgent = range?.agentId ?? agentId;
+    const agentQuery = effectiveAgent && effectiveAgent !== "all" && effectiveAgent !== "entity" ? effectiveAgent : undefined;
     setLoading(true);
     try {
-      const r = await api<Report>("/reports.php", { query: { from: f, to: t, team: tm || undefined } });
+      const r = await api<Report>("/reports.php", { query: {
+        from: f,
+        to: t,
+        team: tm || undefined,
+        entityId: effectiveEntity,
+        agentId: agentQuery,
+      } });
       setData(r);
       if (compare) {
         const pp = previousPeriod(f, t);
         try {
-          const r2 = await api<Report>("/reports.php", { query: { from: pp.from, to: pp.to, team: tm || undefined } });
+          const r2 = await api<Report>("/reports.php", { query: { from: pp.from, to: pp.to, team: tm || undefined, entityId: effectiveEntity, agentId: agentQuery } });
           setPrev(r2);
         } catch { setPrev(null); }
       } else setPrev(null);
@@ -117,7 +149,7 @@ function ReportsPage() {
   const applyPreset = (p: Preset) => {
     const r = p.compute();
     setFrom(r.from); setTo(r.to);
-    void load({ ...r, team });
+    void load({ ...r, team, entityId, agentId });
   };
 
   // CSV export removed — Excel (.xlsx) is the only supported format.
@@ -203,13 +235,42 @@ function ReportsPage() {
 
           <div className="space-y-1">
             <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Agence</Label>
-            <Select value={team || "__all__"} onValueChange={(v) => { const nv = v === "__all__" ? "" : v; setTeam(nv); void load({ from, to, team: nv }); }}>
+            <Select value={team || "__all__"} onValueChange={(v) => { const nv = v === "__all__" ? "" : v; setTeam(nv); void load({ from, to, team: nv, entityId, agentId }); }}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Toutes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Toutes les agences</SelectItem>
                 <SelectItem value="__none__">Aucune agence</SelectItem>
                 {teamOptions.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {canReadAll && (
+            <div className="space-y-1">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Entité</Label>
+              <Select value={entityId || "all"} onValueChange={(v) => { const nv = v === "all" ? "" : v; setEntityId(nv); void load({ from, to, team, entityId: nv, agentId }); }}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Toutes" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les entités</SelectItem>
+                  {entities.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Par agent</Label>
+            <Select value={agentId} onValueChange={(v) => { setAgentId(v); void load({ from, to, team, entityId, agentId: v }); }}>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {canReadAll ? <SelectItem value="all">Tous les agents</SelectItem> : <SelectItem value="entity">Toute mon entité</SelectItem>}
+                {!canReadAll && <SelectItem value="entity">Toute mon entité</SelectItem>}
+                {agentOptions.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -261,8 +322,10 @@ function ReportsPage() {
           </div>
         </div>
         {prev && (
-          <div className="mt-3 text-xs text-muted-foreground">
-            Comparé à <span className="font-medium text-foreground">{prev.period.from} → {prev.period.to}</span>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Portée : {canReadAll ? (entityId ? `Entité ${entityId}` : "Toutes les entités") : (agentId === "entity" ? "Toute mon entité" : agentLabel(agentId))}</span>
+            {agentId !== "all" && agentId !== "entity" && <span>• {agentLabel(agentId)}</span>}
+            {prev && <span>• Comparé à <span className="font-medium text-foreground">{prev.period.from} → {prev.period.to}</span></span>}
           </div>
         )}
       </Card>
