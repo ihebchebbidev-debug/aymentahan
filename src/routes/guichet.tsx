@@ -1178,19 +1178,15 @@ function DashboardTab({
 }) {
   const { user } = useAuth();
   const { users } = useErp();
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [day, setDay] = useState<string>("");
+  const [month, setMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
   // canReadAll: pas de filtre par défaut. Agent affecté à une entité : voit toute l'entité par défaut
   // (toggle "Mes données" possible). Sinon (legacy) : limité à soi.
   const [agentId, setAgentId] = useState<string>(canReadAll ? "" : (assignedEntity ? "" : (user?.id ?? "")));
   const [data, setData] = useState<GuichetDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [perAgent, setPerAgent] = useState<{ agentId: string; revenue: number; amounts: Record<string, number> }[]>([]);
-
-  // Keep day inside the selected month (clear it if month changes away).
-  useEffect(() => {
-    if (day && !day.startsWith(month)) setDay("");
-  }, [month, day]);
 
   // Sync agentId ONCE after auth loads — do NOT depend on agentId itself,
   // otherwise the user's "Mes données uniquement" selection is reverted
@@ -1212,7 +1208,8 @@ function DashboardTab({
   const setThisMonth = () => setMonth(new Date().toISOString().slice(0, 7));
   const resetFilters = () => {
     setThisMonth();
-    setDay("");
+    setFrom("");
+    setTo("");
     setAgentId(canReadAll ? "" : (assignedEntity ? "" : (user?.id ?? "")));
     if (!assignedEntity) setEntityId("");
   };
@@ -1222,7 +1219,8 @@ function DashboardTab({
     setLoading(true);
     getDashboard({
       month,
-      day: day || undefined,
+      from: from || undefined,
+      to: to || undefined,
       entityId: entityId || undefined,
       agentId: agentId || undefined,
     })
@@ -1230,7 +1228,7 @@ function DashboardTab({
       .catch((e: any) => toast.error(e?.message ?? "Erreur dashboard"))
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [month, day, entityId, agentId]);
+  }, [month, from, to, entityId, agentId]);
 
   // Per-agent revenue (admin viewing all agents) — sourced from backend (all agents, not just top-10 SIM).
   useEffect(() => {
@@ -1249,15 +1247,17 @@ function DashboardTab({
   const entityLabel = entityId ? (entities.find((e) => e.id === entityId)?.name ?? "Entité") : "Toutes les interfaces";
   const scopeLabel = canReadAll
     ? (agentId ? `Agent : ${agentName(agentId)}` : "Tous les agents")
-    : "Mon activité";
+    : (agentId ? `Agent : ${agentName(agentId)}` : "Toute mon entité");
   const dateRangeLabel = (() => {
+    if (from && to) {
+      const fromLabel = new Date(from).toLocaleDateString("fr-FR");
+      const toLabel = new Date(to).toLocaleDateString("fr-FR");
+      return `Du ${fromLabel} au ${toLabel}`;
+    }
     const [y, m] = month.split("-").map(Number);
     const start = new Date(Date.UTC(y, m - 1, 1));
     const end = new Date(Date.UTC(y, m, 0));
-    const startLabel = start.toLocaleDateString("fr-FR");
-    const endLabel = day ? new Date(day).toLocaleDateString("fr-FR") : end.toLocaleDateString("fr-FR");
-    const fromLabel = day ? new Date(day).toLocaleDateString("fr-FR") : startLabel;
-    return `Du ${fromLabel} au ${endLabel}`;
+    return `Du ${start.toLocaleDateString("fr-FR")} au ${end.toLocaleDateString("fr-FR")}`;
   })();
 
   const showAgentFilter = !canReadAll && assignedEntity && user?.id;
@@ -1281,21 +1281,11 @@ function DashboardTab({
             <Button type="button" size="sm" variant="ghost" className="h-9 px-2 rounded-l-none" onClick={() => shiftMonth(1)} aria-label="Mois suivant">›</Button>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <Label className="text-[11px] text-muted-foreground">Jour</Label>
-            <Input
-              type="date"
-              value={day}
-              min={`${month}-01`}
-              max={`${month}-31`}
-              onChange={(e) => setDay(e.target.value)}
-              className="h-9 w-40"
-            />
-            {day && (
-              <Button type="button" size="sm" variant="ghost" className="h-9 px-2" onClick={() => setDay("")}>
-                ✕
-              </Button>
-            )}
+          <div className="flex items-center gap-1">
+            <Label className="text-[11px] text-muted-foreground">Du</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-36" />
+            <Label className="text-[11px] text-muted-foreground">Au</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-36" />
           </div>
 
           {canReadAll && !assignedEntity && (

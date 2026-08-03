@@ -54,11 +54,18 @@ if ($canAll) {
 if ($assignedEntity) {
     // Verrou serveur : entité forcée à la franchise affectée.
     $entityId = $assignedEntity;
-    // L'agent peut voir toute la franchise (agentId vide) ou filtrer SUR LUI-MÊME.
-    // Toute tentative de filtrer un autre agent est ignorée (sécurité).
+    // L'agent peut voir toute la franchise (agentId vide) ou filtrer sur un agent
+    // de la même franchise. Toute tentative de filtrer un agent d'une autre
+    // entité est ignorée.
     $selfId = $currentUserId;
     if ($agentId && $agentId !== $selfId) {
-        $agentId = null;
+        $check = $db->prepare(
+            "SELECT 1 FROM crminternet_users WHERE id = :id AND guichet_entity_id = :ent LIMIT 1"
+        );
+        $check->execute([':id' => $agentId, ':ent' => $assignedEntity]);
+        if (!$check->fetchColumn()) {
+            $agentId = null;
+        }
     }
 } elseif (!$canAll) {
     // Pas d'affectation entité : restreint au scope de l'utilisateur courant.
