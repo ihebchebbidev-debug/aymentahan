@@ -114,15 +114,22 @@ function GuichetPage() {
   const [entities, setEntities] = useState<GuichetEntity[]>([]);
   const [q, setQ] = useState("");
   const [entityId, setEntityIdState] = useState(urlEntityId);
-  const [agentFilter, setAgentFilter] = useState<string>("all");
+  const [agentFilter, setAgentFilter] = useState<string>(canReadAll ? "all" : (assignedEntity ? "entity" : "all"));
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [month, setMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const month = "";
   const status = "";
   const type = "";
 
   useEffect(() => { setEntityIdState(assignedEntity || urlEntityId); }, [urlEntityId, assignedEntity]);
+  useEffect(() => {
+    if (canReadAll) {
+      setAgentFilter("all");
+    } else if (assignedEntity) {
+      setAgentFilter("entity");
+    }
+  }, [canReadAll, assignedEntity]);
   const setEntityId = (id: string) => {
     if (assignedEntity) return; // verrouillé sur la franchise affectée
     setEntityIdState(id);
@@ -196,7 +203,7 @@ function GuichetPage() {
     if (status) base = base.filter((d) => d.status === status);
     if (type) base = base.filter((d) => (d.entries ?? []).some((e) => e.type === type));
     if (month) base = base.filter((d) => (d.createdAt ?? "").slice(0, 7) === month);
-    if (agentFilter && agentFilter !== "all") base = base.filter((d) => d.agentId === agentFilter);
+    if (agentFilter && agentFilter !== "all" && agentFilter !== "entity") base = base.filter((d) => d.agentId === agentFilter);
     if (dateFrom || dateTo) base = base.filter((d) => entryDateMatchesRange(d, dateFrom || undefined, dateTo || undefined));
     if (!q.trim()) return base;
     const s = q.trim().toLowerCase();
@@ -463,25 +470,57 @@ function GuichetPage() {
                 value={q} onChange={(e) => setQ(e.target.value)}
                 className="h-9 w-full sm:w-64"
               />
-              {canReadAll && (
-                <Select value={agentFilter} onValueChange={setAgentFilter}>
-                  <SelectTrigger className="h-9 w-full sm:w-44"><SelectValue placeholder="Agent" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les agents</SelectItem>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
               <div className="flex items-center gap-1">
                 <Label className="text-[11px] text-muted-foreground">Du</Label>
                 <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-36" />
                 <Label className="text-[11px] text-muted-foreground">Au</Label>
                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-36" />
               </div>
-              {(q || (agentFilter && agentFilter !== "all") || dateFrom || dateTo) && (
-                <Button size="sm" variant="ghost" onClick={() => { setQ(""); setAgentFilter("all"); setDateFrom(""); setDateTo(""); }}>
+              <div className="flex items-center gap-1">
+                <Label className="text-[11px] text-muted-foreground">Mois</Label>
+                <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-40" />
+              </div>
+
+              {canReadAll && !assignedEntity && (
+                <Select value={entityId || "all"} onValueChange={(v) => setEntityId(v === "all" ? "" : v)}>
+                  <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Entité" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les entités</SelectItem>
+                    {entities.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {(canReadAll || (assignedEntity && user?.id)) && (
+                <Select value={agentFilter} onValueChange={setAgentFilter}>
+                  <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Agent" /></SelectTrigger>
+                  <SelectContent>
+                    {canReadAll ? (
+                      <>
+                        <SelectItem value="all">Tous les agents</SelectItem>
+                        {users.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
+                        ))}
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="entity">Toute mon entité</SelectItem>
+                        <SelectItem value={user.id}>{user.fullName || user.username}</SelectItem>
+                        {users
+                          .filter((u) => u.id !== user.id && u.guichetEntityId === assignedEntity)
+                          .map((u) => (
+                            <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
+                          ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {(q || (agentFilter && agentFilter !== "all" && agentFilter !== "entity") || dateFrom || dateTo || month) && (
+                <Button size="sm" variant="ghost" onClick={() => { setQ(""); setAgentFilter(canReadAll ? "all" : "entity"); setDateFrom(""); setDateTo(""); setMonth(""); }}>
                   Réinitialiser
                 </Button>
               )}
@@ -1285,8 +1324,8 @@ function DashboardTab({
 
           {!canReadAll && assignedEntity && user?.id && (
             <Select
-              value={agentId === user.id ? "self" : "entity"}
-              onValueChange={(v) => setAgentId(v === "self" ? user.id! : "")}
+              value={agentId === user.id ? "self" : (agentId ? agentId : "entity")}
+              onValueChange={(v) => setAgentId(v === "self" ? user.id! : (v === "entity" ? "" : v))}
             >
               <SelectTrigger className="h-9 w-56">
                 <SelectValue placeholder={agentId === user.id ? (user.fullName || user.username) : "Toute mon entité"} />
@@ -1294,6 +1333,11 @@ function DashboardTab({
               <SelectContent>
                 <SelectItem value="entity">Toute mon entité</SelectItem>
                 <SelectItem value="self">{user.fullName || user.username}</SelectItem>
+                {users
+                  .filter((u) => u.id !== user.id && u.guichetEntityId === assignedEntity)
+                  .map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           )}
