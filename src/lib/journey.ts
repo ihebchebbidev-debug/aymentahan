@@ -279,9 +279,24 @@ export async function loadProspectJourney(args: {
   }
   const lists = await Promise.all(tasks);
   const all = lists.flat();
-  // Dedupe by id (audit + activity may overlap if backend mirrors them)
+  // Keep only events that are directly tied to the current bundle IDs
+  // (protect against backend returning unrelated rows). This ensures the
+  // timeline shows only items for this prospect + its linked entities.
+  const allowedProspectId = args.prospectId;
+  const allowedOppId = args.opportunityId ?? null;
+  const allowedContractId = args.contractId ?? null;
+  const allowedMigrationId = args.migrationId ?? null;
+  const pruned = all.filter((e) => {
+    if (e.entity === "prospect") return e.entityId === allowedProspectId;
+    if (e.entity === "opportunity") return e.entityId === allowedOppId;
+    if (e.entity === "contract") return e.entityId === allowedContractId;
+    if (e.entity === "migration") return e.entityId === allowedMigrationId;
+    return false;
+  });
+
+  // Dedupe by a stable fingerprint (audit + activity may overlap).
   const seen = new Set<string>();
-  const events = all.filter((e) => {
+  const events = pruned.filter((e) => {
     const k = `${e.timestamp}|${e.title}|${e.user}|${e.description ?? ""}`;
     if (seen.has(k)) return false;
     seen.add(k);
