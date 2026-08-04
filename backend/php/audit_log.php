@@ -1,6 +1,6 @@
 <?php
 // Admin endpoint: read audit log entries.
-// GET /audit_log.php?from=YYYY-MM-DD&to=YYYY-MM-DD&user=&role=&action=&entity=&q=&sort=desc&limit=200&offset=0
+// GET /audit_log.php?from=YYYY-MM-DD&to=YYYY-MM-DD&user=&role=&action=&entity=&entity_id=&q=&sort=desc&limit=200&offset=0
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/api_limits.php';
 $me = require_auth();
@@ -40,6 +40,7 @@ if (!empty($_GET['user']))   { $where[] = 'a.user_username = :u';  $params[':u']
 if (!empty($_GET['role']))   { $where[] = 'a.user_role = :r';      $params[':r']    = $_GET['role']; }
 if (!empty($_GET['action'])) { $where[] = 'a.action = :a';         $params[':a']    = $_GET['action']; }
 if (!empty($_GET['entity'])) { $where[] = 'a.entity_type = :e';    $params[':e']    = $_GET['entity']; }
+if (!empty($_GET['entity_id'])) { $where[] = 'a.entity_id = :id';   $params[':id']   = $_GET['entity_id']; }
 if (!empty($_GET['q']))      {
     // Native PDO prepares forbid reusing the same named placeholder.
     $where[] = '(a.action LIKE :q1 OR a.path LIKE :q2 OR a.entity_id LIKE :q3 OR a.details LIKE :q4 OR a.user_username LIKE :q5 OR a.ip LIKE :q6)';
