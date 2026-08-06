@@ -68,6 +68,14 @@ function row_to_contract(array $r): array {
                     $debit = (int)$oppDebit;
                 }
             }
+            if ($debit === null) {
+                $info = $db->prepare("SELECT debit FROM crminternet_contract_info WHERE entity_type = 'contract' AND entity_id = :id LIMIT 1");
+                $info->execute([':id' => $r['id']]);
+                $infoDebit = $info->fetchColumn();
+                if (isset($infoDebit) && $infoDebit !== null && $infoDebit !== '') {
+                    $debit = (int)$infoDebit;
+                }
+            }
             if ($debit === null && !empty($r['prospect_id'])) {
                 $pros = $db->prepare('SELECT debit FROM crminternet_prospects WHERE id = :id LIMIT 1');
                 $pros->execute([':id' => $r['prospect_id']]);

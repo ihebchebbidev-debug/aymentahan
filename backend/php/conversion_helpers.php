@@ -80,14 +80,14 @@ function conv_backfill_debit_values(PDO $db): void {
     }
 
     try {
-        if (conv_table_has_column($db, 'crminternet_contracts', 'debit')
-            && conv_table_has_column($db, 'crminternet_opportunities', 'debit')
-            && conv_table_has_column($db, 'crminternet_prospects', 'debit')) {
+        if (conv_table_has_column($db, 'crminternet_contracts', 'debit')) {
             $db->exec("UPDATE crminternet_contracts c
+                LEFT JOIN crminternet_contract_info ci
+                    ON ci.entity_type = 'contract' AND ci.entity_id = c.id
                 LEFT JOIN crminternet_opportunities o ON o.id = c.opportunity_id
                 LEFT JOIN crminternet_prospects p ON p.id = c.prospect_id
-                SET c.debit = COALESCE(o.debit, p.debit)
-                WHERE c.debit IS NULL AND (o.debit IS NOT NULL OR p.debit IS NOT NULL)");
+                SET c.debit = COALESCE(ci.debit, o.debit, p.debit)
+                WHERE c.debit IS NULL AND (ci.debit IS NOT NULL OR o.debit IS NOT NULL OR p.debit IS NOT NULL)");
         }
     } catch (Throwable $e) {
         /* best-effort */
