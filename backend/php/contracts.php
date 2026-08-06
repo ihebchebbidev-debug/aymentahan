@@ -11,6 +11,7 @@ if (is_file(__DIR__ . '/crm_normalize.php')) require_once __DIR__ . '/crm_normal
 $me = require_auth();
 $db = (new Database())->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
+conv_backfill_debit_values($db);
 
 /* ------------------------------------------------------------------ */
 /* Runtime schema (idempotent, best-effort)                            */
@@ -55,6 +56,31 @@ schema_ensure_once('contracts', '20260513', function () use ($db) {
 /* Serialization                                                       */
 /* ------------------------------------------------------------------ */
 function row_to_contract(array $r): array {
+    $debit = isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null;
+    if ($debit === null && (!empty($r['opportunity_id']) || !empty($r['prospect_id']))) {
+        try {
+            $db = (new Database())->getConnection();
+            if (!empty($r['opportunity_id'])) {
+                $opp = $db->prepare('SELECT debit FROM crminternet_opportunities WHERE id = :id LIMIT 1');
+                $opp->execute([':id' => $r['opportunity_id']]);
+                $oppDebit = $opp->fetchColumn();
+                if (isset($oppDebit) && $oppDebit !== null && $oppDebit !== '') {
+                    $debit = (int)$oppDebit;
+                }
+            }
+            if ($debit === null && !empty($r['prospect_id'])) {
+                $pros = $db->prepare('SELECT debit FROM crminternet_prospects WHERE id = :id LIMIT 1');
+                $pros->execute([':id' => $r['prospect_id']]);
+                $prosDebit = $pros->fetchColumn();
+                if (isset($prosDebit) && $prosDebit !== null && $prosDebit !== '') {
+                    $debit = (int)$prosDebit;
+                }
+            }
+        } catch (Throwable $e) {
+            // Keep the contract's own value or null; best effort only.
+        }
+    }
+
     return [
         'id'             => $r['id']                ?? '',
         'civility'       => $r['civility']          ?? 'M',
@@ -82,7 +108,7 @@ function row_to_contract(array $r): array {
         'effectiveDate'  => $r['effective_date']    ?? null,
         'validationDate' => $r['validation_date']   ?? null,
         'premium'        => (float)($r['premium']   ?? 0),
-        'debit'          => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
+        'debit'          => $debit,
         'billingStatus'  => $r['billing_status']    ?? '',
         'stageId'        => $r['stage_id']          ?? null,
         'opportunityId'  => $r['opportunity_id']    ?? null,

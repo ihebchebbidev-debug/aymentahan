@@ -11,6 +11,7 @@ $me = require_auth();
 $db = (new Database())->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
+conv_backfill_debit_values($db);
 
 function ensure_opportunities_runtime_schema(PDO $db): void {
     $stmts = [
@@ -53,6 +54,21 @@ schema_ensure_once('terminal_migrations', '20260531', function () use ($db) {
 });
 
 function row_to_opportunity(array $r): array {
+    $debit = isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null;
+    if ($debit === null && !empty($r['prospect_id'])) {
+        try {
+            $db = (new Database())->getConnection();
+            $s = $db->prepare('SELECT debit FROM crminternet_prospects WHERE id = :id LIMIT 1');
+            $s->execute([':id' => $r['prospect_id']]);
+            $prospectDebit = $s->fetchColumn();
+            if (isset($prospectDebit) && $prospectDebit !== null && $prospectDebit !== '') {
+                $debit = (int)$prospectDebit;
+            }
+        } catch (Throwable $e) {
+            // best effort
+        }
+    }
+
     return [
         'id'                  => $r['id'],
         'prospectId'          => $r['prospect_id'],
@@ -89,7 +105,7 @@ function row_to_opportunity(array $r): array {
         'createdBy'           => $r['created_by'],
         'updatedBy'           => $r['updated_by'] ?? null,
         'updatedAt'           => $r['updated_at'] ?? null,
-        'debit'               => isset($r['debit']) && $r['debit'] !== null && $r['debit'] !== '' ? (int)$r['debit'] : null,
+        'debit'               => $debit,
         'convertedToContract' => !empty($r['converted_to_contract']),
         'contractId'          => $r['contract_id'] ?? null,
         'convertedToMigration' => !empty($r['converted_to_migration']),

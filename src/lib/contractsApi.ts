@@ -2,6 +2,19 @@ import { api, ApiError } from "./api";
 import { fetchAllPaginated } from "./paginatedFetch";
 import type { Contract } from "./types";
 
+function normalizeContract(raw: Partial<Contract> | null | undefined): Contract {
+  const debitRaw = raw?.debit;
+  let debit: number | null = null;
+  if (debitRaw !== undefined && debitRaw !== null && debitRaw !== "") {
+    const parsed = typeof debitRaw === "number" ? debitRaw : Number(debitRaw);
+    debit = Number.isFinite(parsed) ? parsed : null;
+  }
+  return {
+    ...(raw as Contract),
+    debit,
+  } as Contract;
+}
+
 export async function fetchContracts(): Promise<Contract[]> {
   // Chunked load (2000 rows per HTTP call) — scales past 200k rows without OOM.
   // Server falls back to single-shot when has_more=false on page 1.
@@ -10,9 +23,10 @@ export async function fetchContracts(): Promise<Contract[]> {
   // conversion from opportunity → contract).
   const cacheBuster = { _t: Date.now() };
   try {
-    return await fetchAllPaginated<Contract>("/contracts.php", "contracts", {
+    const rows = await fetchAllPaginated<Contract>("/contracts.php", "contracts", {
       baseQuery: cacheBuster,
     });
+    return rows.map(normalizeContract);
   } catch (e) {
     // If the backend is mis-routed (returns prospects instead of contracts),
     // surface the same explicit error as before so the user knows to redeploy.

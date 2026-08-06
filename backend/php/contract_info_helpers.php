@@ -68,10 +68,10 @@ if (!function_exists('contract_info_clone_entity')) {
             $u = $username ?: ($row['updated_by'] ?? $row['created_by'] ?? 'system');
             $ins = $db->prepare("INSERT INTO crminternet_contract_info
                 (entity_type, entity_id, type_conn, reference_tt, tel_ligne, date_activation,
-                 etape, interface_type, fsi, motif_retour_tt, etat, remarque,
+                 etape, interface_type, fsi, motif_retour_tt, etat, remarque, debit,
                  created_by, updated_by)
                 VALUES
-                (:et,:eid,:tc,:rt,:tl,:da,:ep,:it,:fsi,:mrt,:etat,:rem,:cb,:ub)");
+                (:et,:eid,:tc,:rt,:tl,:da,:ep,:it,:fsi,:mrt,:etat,:rem,:dbt,:cb,:ub)");
             $ins->execute([
                 ':et'  => $toEntity,
                 ':eid' => $toId,
@@ -85,6 +85,7 @@ if (!function_exists('contract_info_clone_entity')) {
                 ':mrt' => $row['motif_retour_tt'] ?? '',
                 ':etat'=> $row['etat']            ?? '',
                 ':rem' => $row['remarque']        ?? '',
+                ':dbt' => isset($row['debit']) && $row['debit'] !== null && $row['debit'] !== '' ? (int)$row['debit'] : null,
                 ':cb'  => $u,
                 ':ub'  => $u,
             ]);

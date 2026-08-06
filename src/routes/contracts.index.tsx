@@ -98,6 +98,9 @@ function ContractsPage() {
     queryKey: ["contracts"],
     queryFn: fetchContracts,
     enabled: API_ENABLED && !!user,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     // Defaults from createAppQueryClient apply:
     //   - background refetch on every mount/focus (data always fresh)
     //   - keep previous data while refetch runs (table never blanks)
@@ -676,7 +679,10 @@ function ContractsPage() {
               { key: "premium", header: `Cotisation (${currency.symbol})`, accessor: (c) => c.premium ?? 0, hideBelow: "lg",
                 cell: (c) => <span className="tabular-nums">{Number(c.premium ?? 0).toLocaleString("fr-FR")}</span> },
               { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",
-                cell: (c) => <span className="text-muted-foreground">{c.debit ? `${c.debit} Mbps` : "—"}</span>,
+                cell: (c) => {
+                  const debitValue = c.debit == null || c.debit === "" ? null : Number(c.debit);
+                  return <span className="text-muted-foreground">{debitValue != null ? `${debitValue} Mbps` : "—"}</span>;
+                },
                 hideBelow: "md" },
               { key: "signatureDate", header: "Date SI", accessor: (c) => c.signatureDate, hideBelow: "lg" },
               { key: "effectiveDate", header: "Date effet", accessor: (c) => c.effectiveDate ?? "", hideBelow: "lg",

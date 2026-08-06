@@ -66,6 +66,34 @@ function conv_backfill_contract_references(PDO $db): void {
     }
 }
 
+function conv_backfill_debit_values(PDO $db): void {
+    try {
+        if (conv_table_has_column($db, 'crminternet_opportunities', 'debit')
+            && conv_table_has_column($db, 'crminternet_prospects', 'debit')) {
+            $db->exec("UPDATE crminternet_opportunities o
+                JOIN crminternet_prospects p ON p.id = o.prospect_id
+                SET o.debit = p.debit
+                WHERE o.debit IS NULL AND p.debit IS NOT NULL");
+        }
+    } catch (Throwable $e) {
+        /* best-effort */
+    }
+
+    try {
+        if (conv_table_has_column($db, 'crminternet_contracts', 'debit')
+            && conv_table_has_column($db, 'crminternet_opportunities', 'debit')
+            && conv_table_has_column($db, 'crminternet_prospects', 'debit')) {
+            $db->exec("UPDATE crminternet_contracts c
+                LEFT JOIN crminternet_opportunities o ON o.id = c.opportunity_id
+                LEFT JOIN crminternet_prospects p ON p.id = c.prospect_id
+                SET c.debit = COALESCE(o.debit, p.debit)
+                WHERE c.debit IS NULL AND (o.debit IS NOT NULL OR p.debit IS NOT NULL)");
+        }
+    } catch (Throwable $e) {
+        /* best-effort */
+    }
+}
+
 /**
  * Insère une opportunité construite à partir d'un prospect (snapshot complet).
  * Les éventuelles surcharges (titre, montant, probabilité, stage, créateur)
@@ -80,14 +108,14 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
          city, gouvernorat, delegation, zone, address, localisation_xy, code_postal,
          comment1, comment2, source, type_id, lead_status, lost_reason,
          title, stage, amount, probability, expected_close_date,
-         assigned_to, notes, created_by)
+         assigned_to, notes, debit, created_by)
         VALUES
         (:id, :pid, :civ, :ln, :fn,
          :ph, :ph2, :anim, :anc, :cin, :bd, :em,
          :ci, :gv, :dl, :zn, :ad, :gps, :cp,
          :c1, :c2, :src, :tid, :lst, :lr,
          :title, :stg, :amt, :prob, :ecd,
-         :at, :notes, :cb)";
+         :at, :notes, :dbt, :cb)";
     $db->prepare($sql)->execute([
         ':id'    => $oid,
         ':pid'   => $p['id'] ?? null,
@@ -121,6 +149,7 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
         ':ecd'   => $extra['expected_close_date'] ?? null,
         ':at'    => $extra['assigned_to'] ?? ($p['assigned_to'] ?? null),
         ':notes' => $extra['notes'] ?? '',
+        ':dbt'   => $extra['debit'] ?? ($p['debit'] ?? null),
         ':cb'    => $extra['created_by'] ?? null,
     ]);
 }
@@ -153,7 +182,12 @@ function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array
     $leadStatus = conv_v($o, 'lead_status', conv_v($o, 'status', null));
     $createdAt = conv_v($o, 'created_at', conv_v($extra, 'created_at', date('Y-m-d H:i:s')));
     $updatedBy = conv_v($o, 'updated_by', conv_v($o, 'created_by', conv_v($extra, 'updated_by', null)));
-    $debitValue = isset($o['debit']) && $o['debit'] !== null && $o['debit'] !== '' ? (int)$o['debit'] : null;
+    $debitValue = null;
+    if (array_key_exists('debit', $extra) && ($extra['debit'] !== null && $extra['debit'] !== '')) {
+        $debitValue = (int)$extra['debit'];
+    } elseif (isset($o['debit']) && $o['debit'] !== null && $o['debit'] !== '') {
+        $debitValue = (int)$o['debit'];
+    }
 
     $params = [
         ':id'   => $cid,
@@ -232,6 +266,7 @@ function conversion_insert_contract_from_prospect(PDO $db, string $cid, array $p
         'lead_status'     => $p['status'] ?? null,
         'amount'          => 0,
         'assigned_to'     => $p['assigned_to'] ?? '',
+        'debit'           => $p['debit'] ?? null,
     ];
     conversion_insert_contract_from_opportunity($db, $cid, $oFake, $extra);
 }
@@ -453,6 +488,7 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
             'created_by'  => $username,
             'notes'       => (string) ($opts['notes'] ?? ''),
             'type_id'     => $row['type_id'] ?? $row['typeId'] ?? null,
+            'debit'       => $row['debit'] ?? null,
         ]);
         $db->prepare(
             'UPDATE crminternet_prospects SET converted = 1, converted_at = NOW(), opportunity_id = :oid WHERE id = :id'
@@ -579,6 +615,7 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             'billing_status' => (string) ($opts['billing_status'] ?? 'Pré-validé'),
             'assigned_to'    => (string) ($opts['assigned_to'] ?? ''),
             'type_id'        => $o['type_id'] ?? $o['typeId'] ?? null,
+            'debit'          => $o['debit'] ?? null,
         ]);
         $db->prepare(
             'UPDATE crminternet_opportunities SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW() WHERE id = :id'
