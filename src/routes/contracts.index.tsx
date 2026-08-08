@@ -680,7 +680,7 @@ function ContractsPage() {
                 cell: (c) => <span className="tabular-nums">{Number(c.premium ?? 0).toLocaleString("fr-FR")}</span> },
               { key: "debit", header: "Débit", accessor: (c) => c.debit ?? "",
                 cell: (c) => {
-                  const debitValue = c.debit == null || c.debit === "" ? null : Number(c.debit);
+                  const debitValue = c.debit == null || (c.debit as unknown) === "" ? null : Number(c.debit);
                   return <span className="text-muted-foreground">{debitValue != null ? `${debitValue} Mbps` : "—"}</span>;
                 },
                 hideBelow: "md" },

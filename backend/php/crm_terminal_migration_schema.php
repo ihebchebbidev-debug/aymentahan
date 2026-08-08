@@ -316,6 +316,11 @@ function ensure_crm_migrations_table_schema(PDO $db): void
         'ALTER TABLE crminternet_migrations ADD COLUMN workflow_status VARCHAR(80) NOT NULL DEFAULT \'Créer\'',
         'ALTER TABLE crminternet_migrations ADD COLUMN stage_id VARCHAR(40) NULL',
         'ALTER TABLE crminternet_migrations ADD COLUMN deleted_at DATETIME NULL',
+        // Audit trail (Synthèse card): créé le/par, modifié le/par.
+        'ALTER TABLE crminternet_migrations ADD COLUMN created_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP',
+        'ALTER TABLE crminternet_migrations ADD COLUMN created_by VARCHAR(80) NULL',
+        'ALTER TABLE crminternet_migrations ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'ALTER TABLE crminternet_migrations ADD COLUMN updated_by VARCHAR(80) NULL',
     ];
     foreach ($alters as $sql) {
         crm_try_alter($db, $sql);

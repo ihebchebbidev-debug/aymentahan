@@ -33,6 +33,7 @@ export type Prospect = {
   createdAt: string;
   createdBy?: string | null;
   updatedBy?: string | null;
+  updatedAt?: string | null;
   debit?: number | null;
   city: string;
   address?: string;
@@ -295,6 +296,7 @@ export type Contract = {
   createdAt?: string | null;
   createdBy?: string | null;
   updatedBy?: string | null;
+  updatedAt?: string | null;
 };
 
 export type ProspectType = {

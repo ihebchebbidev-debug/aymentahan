@@ -1,3 +1,4 @@
+import { LifecycleSynthesisCard } from "@/components/LifecycleSynthesisCard";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
@@ -545,8 +546,16 @@ function ContractDetailsView({ contract }: { contract: import("@/lib/types").Con
 
         {/* Right column — synthèse + adhérent + agent (mirrors prospect detail layout) */}
         <div className="space-y-4">
+          <LifecycleSynthesisCard
+            entity="contract"
+            id={contract.id}
+            prospectId={(contract as any).prospectId ?? null}
+            opportunityId={contract.opportunityId ?? null}
+            contractId={contract.id}
+          />
+
           <Card className="shadow-elegant">
-            <CardHeader className="pb-3"><CardTitle className="text-base">Synthèse</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Détails</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Statut</span>

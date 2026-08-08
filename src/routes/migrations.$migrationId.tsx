@@ -1,3 +1,4 @@
+import { LifecycleSynthesisCard } from "@/components/LifecycleSynthesisCard";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
@@ -526,8 +527,16 @@ function MigrationDetailsView({
         </div>
 
         <div className="space-y-4">
+          <LifecycleSynthesisCard
+            entity="migration"
+            id={m.id}
+            prospectId={m.prospectId ?? null}
+            opportunityId={m.opportunityId ?? null}
+            migrationId={m.id}
+          />
+
           <Card className="shadow-elegant">
-            <CardHeader className="pb-3"><CardTitle className="text-base">Synthèse</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Détails</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Workflow</span>

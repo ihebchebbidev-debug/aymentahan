@@ -246,9 +246,11 @@ if ($method === 'PATCH' || $method === 'PUT') {
     }
     // agent-assignment check removed: API no longer enforces per-agent assignment
 
-    $sets = ['updated_at = NOW()'];
-    $params = [':id' => $mid];
     $username = $me['username'] ?? '';
+    // Audit stamp — always written on every update so the Synthèse card can
+    // show "Modifié le / par" without relying on the activity log.
+    $sets = ['updated_at = NOW()', 'updated_by = :__ub'];
+    $params = [':id' => $mid, ':__ub' => $username];
 
     /* ---- workflow stage (workflow_status + stage_id) ---------------- */
     $newWorkflow = null;
@@ -366,7 +368,8 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $params[":f_$k"] = $val;
     }
 
-    if (count($sets) <= 1) {
+    // $sets always starts with the 2 audit-stamp entries (updated_at, updated_by).
+    if (count($sets) <= 2) {
         fail('Aucun champ', 422);
     }
 

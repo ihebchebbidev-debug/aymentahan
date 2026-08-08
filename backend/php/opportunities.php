@@ -349,8 +349,8 @@ if ($method === 'POST') {
                     $sql = "INSERT INTO crminternet_opportunities
                         (id, civility, last_name, first_name, phone, phone2, cin, birth_date, email, city,
                          gouvernorat, delegation, address, localisation_xy, code_postal, source, title, stage, amount, probability,
-                         expected_close_date, assigned_to, notes, created_by, type_id, comment1, comment2)
-                        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:ci,:gov,:del,:ad,:loc,:cp,:src,:t,:stg,:amt,:pr,:cd,:at,:nt,:cb,:tid,:c1,:c2)
+                         expected_close_date, assigned_to, notes, created_by, type_id, comment1, comment2, created_at, updated_by)
+                        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:ci,:gov,:del,:ad,:loc,:cp,:src,:t,:stg,:amt,:pr,:cd,:at,:nt,:cb,:tid,:c1,:c2,NOW(),:cb2)
                         ON DUPLICATE KEY UPDATE
                           civility=VALUES(civility), last_name=VALUES(last_name), first_name=VALUES(first_name),
                           phone=VALUES(phone), phone2=VALUES(phone2), cin=VALUES(cin), birth_date=VALUES(birth_date),
@@ -360,7 +360,8 @@ if ($method === 'POST') {
                           source=VALUES(source),
                           title=VALUES(title), stage=VALUES(stage), amount=VALUES(amount), probability=VALUES(probability),
                           expected_close_date=VALUES(expected_close_date), assigned_to=VALUES(assigned_to),
-                          notes=VALUES(notes), type_id=VALUES(type_id), comment1=VALUES(comment1), comment2=VALUES(comment2)";
+                          notes=VALUES(notes), type_id=VALUES(type_id), comment1=VALUES(comment1), comment2=VALUES(comment2),
+                          updated_by=VALUES(updated_by), updated_at=NOW()";
                     $bd = $r['birthDate'] ?? null;
                     if (is_string($bd) && strlen($bd) >= 10) $bd = substr($bd,0,10);
                     if ($bd && !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$bd)) $bd = null;
@@ -389,6 +390,7 @@ if ($method === 'POST') {
                         ':at'=>(string)($r['assignedTo'] ?? $username),
                         ':nt'=>(string)($r['notes'] ?? ''),
                         ':cb'=>$username,
+                        ':cb2'=>$username,
                         ':tid'=>isset($r['typeId']) && $r['typeId'] !== '' ? (string)$r['typeId'] : null,
                         ':c1'=>$r['comment1'] ?? null,
                         ':c2'=>$r['comment2'] ?? null,
@@ -414,8 +416,8 @@ if ($method === 'POST') {
         $ins = $db->prepare("INSERT INTO crminternet_opportunities
             (id, civility, last_name, first_name, phone, phone2, cin, birth_date, email, city,
              gouvernorat, delegation, address, localisation_xy, code_postal, source, title, stage,
-             amount, probability, expected_close_date, assigned_to, notes, created_by, type_id, comment1, comment2)
-            VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:ci,:gov,:del,:ad,:loc,:cp,:src,:title,:stg,:amt,:pr,:cd,:at,:nt,:cb,:tid,:c1,:c2)");
+             amount, probability, expected_close_date, assigned_to, notes, created_by, type_id, comment1, comment2, created_at, updated_by)
+            VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:ci,:gov,:del,:ad,:loc,:cp,:src,:title,:stg,:amt,:pr,:cd,:at,:nt,:cb,:tid,:c1,:c2,NOW(),:cb2)");
         $ins->execute([
             ':id' => $oid,
             ':civ'=> ($in['civility'] ?? 'M') === 'Mme' ? 'Mme' : 'M',
@@ -441,6 +443,7 @@ if ($method === 'POST') {
             ':at' => (string)($in['assignedTo'] ?? $username),
             ':nt' => (string)($in['notes'] ?? ''),
             ':cb' => $username,
+            ':cb2' => $username,
             ':tid'=> isset($in['typeId']) && $in['typeId'] !== '' ? (string)$in['typeId'] : null,
             ':c1' => $in['comment1'] ?? null,
             ':c2' => $in['comment2'] ?? null,
@@ -473,8 +476,8 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $newEntry = sprintf('[%s] %s: %s', date('Y-m-d H:i'), $username, str_replace(["\r\n", "\r"], "\n", $note));
         $updatedNotes = $currentNotes !== '' ? ($currentNotes . "\n\n" . $newEntry) : $newEntry;
 
-        $db->prepare('UPDATE crminternet_opportunities SET notes = :notes WHERE id = :id')
-            ->execute([':notes' => $updatedNotes, ':id' => $oid]);
+        $db->prepare('UPDATE crminternet_opportunities SET notes = :notes, updated_by = :ub, updated_at = NOW() WHERE id = :id')
+            ->execute([':notes' => $updatedNotes, ':ub' => $username, ':id' => $oid]);
 
         ok(['message' => 'Commentaire ajouté', 'notes' => $updatedNotes]);
     }
@@ -508,7 +511,10 @@ if ($method === 'PATCH' || $method === 'PUT') {
         'source' => 'source',
         'typeId' => 'type_id',
     ];
-    $sets = []; $params = [':id' => $oid]; $diffs = [];
+    // Audit stamp — every opportunity update records who/when.
+    $sets = ['updated_by = :__ub', 'updated_at = NOW()'];
+    $params = [':id' => $oid, ':__ub' => $username];
+    $diffs = [];
     foreach ($map as $k => $col) {
         if (!array_key_exists($k, $in)) continue;
         $v = $in[$k];
@@ -528,7 +534,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $sets[] = "$col = :$k"; $params[":$k"] = $v;
         $diffs[$col] = $v;
     }
-    if (!$sets) fail('Aucun champ', 422);
+    if (count($sets) <= 2) fail('Aucun champ', 422);
     if (array_key_exists('stage', $in)) {
         pipeline_assert_transition($db, 'opportunity', $before['stage'] ?? '', (string)$in['stage']);
     }

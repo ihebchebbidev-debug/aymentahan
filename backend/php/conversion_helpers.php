@@ -71,9 +71,11 @@ function conv_backfill_debit_values(PDO $db): void {
         if (conv_table_has_column($db, 'crminternet_opportunities', 'debit')
             && conv_table_has_column($db, 'crminternet_prospects', 'debit')) {
             $db->exec("UPDATE crminternet_opportunities o
-                JOIN crminternet_prospects p ON p.id = o.prospect_id
+                LEFT JOIN crminternet_prospects p ON p.id = o.prospect_id
                 SET o.debit = p.debit
-                WHERE o.debit IS NULL AND p.debit IS NOT NULL");
+                WHERE (o.debit IS NULL OR o.debit = '')
+                  AND p.debit IS NOT NULL
+                  AND p.debit <> ''");
         }
     } catch (Throwable $e) {
         /* best-effort */
@@ -87,7 +89,12 @@ function conv_backfill_debit_values(PDO $db): void {
                 LEFT JOIN crminternet_opportunities o ON o.id = c.opportunity_id
                 LEFT JOIN crminternet_prospects p ON p.id = c.prospect_id
                 SET c.debit = COALESCE(ci.debit, o.debit, p.debit)
-                WHERE c.debit IS NULL AND (ci.debit IS NOT NULL OR o.debit IS NOT NULL OR p.debit IS NOT NULL)");
+                WHERE (c.debit IS NULL OR c.debit = '')
+                  AND (
+                    (ci.debit IS NOT NULL AND ci.debit <> '')
+                    OR (o.debit IS NOT NULL AND o.debit <> '')
+                    OR (p.debit IS NOT NULL AND p.debit <> '')
+                  )");
         }
     } catch (Throwable $e) {
         /* best-effort */
@@ -108,14 +115,14 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
          city, gouvernorat, delegation, zone, address, localisation_xy, code_postal,
          comment1, comment2, source, type_id, lead_status, lost_reason,
          title, stage, amount, probability, expected_close_date,
-         assigned_to, notes, debit, created_by)
+         assigned_to, notes, debit, created_by, created_at, updated_by)
         VALUES
         (:id, :pid, :civ, :ln, :fn,
          :ph, :ph2, :anim, :anc, :cin, :bd, :em,
          :ci, :gv, :dl, :zn, :ad, :gps, :cp,
          :c1, :c2, :src, :tid, :lst, :lr,
          :title, :stg, :amt, :prob, :ecd,
-         :at, :notes, :dbt, :cb)";
+         :at, :notes, :dbt, :cb, NOW(), :cb2)";
     $db->prepare($sql)->execute([
         ':id'    => $oid,
         ':pid'   => $p['id'] ?? null,
@@ -151,6 +158,7 @@ function conversion_insert_opportunity_from_prospect(PDO $db, string $oid, array
         ':notes' => $extra['notes'] ?? '',
         ':dbt'   => $extra['debit'] ?? ($p['debit'] ?? null),
         ':cb'    => $extra['created_by'] ?? null,
+        ':cb2'   => $extra['created_by'] ?? null,
     ]);
 }
 
@@ -170,18 +178,24 @@ function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array
          city, gouvernorat, delegation, zone, address, localisation_xy, code_postal,
          comment1, comment2, source, type_id, lead_status,
          partner, cabinet, signature_date, effective_date,
-         premium, billing_status, stage_id, assigned_to, debit, created_by, updated_by, created_at{$refSql})
+         premium, billing_status, stage_id, assigned_to, debit, created_by, updated_by, created_at, updated_at{$refSql})
         VALUES
         (:id, :oid, :pid, :civ, :ln, :fn,
          :ph, :ph2, :anim, :anc, :cin, :bd, :em,
          :ci, :gv, :dl, :zn, :ad, :gps, :cp,
          :c1, :c2, :src, :tid, :lst,
          :pa, :ca, :sd, :ed,
-         :pr, :bs, :sid, :at, :dbt, :cb, :ub, :cat{$refVal})";
+         :pr, :bs, :sid, :at, :dbt, :cb, :ub, :cat, :uat{$refVal})";
     $comment2 = conv_v($o, 'comment2', conv_v($o, 'notes', null));
     $leadStatus = conv_v($o, 'lead_status', conv_v($o, 'status', null));
-    $createdAt = conv_v($o, 'created_at', conv_v($extra, 'created_at', date('Y-m-d H:i:s')));
-    $updatedBy = conv_v($o, 'updated_by', conv_v($o, 'created_by', conv_v($extra, 'updated_by', null)));
+    // Le contrat possède sa PROPRE traçabilité : il est créé au moment de la
+    // conversion, par l'utilisateur qui convertit — on ne recopie donc PAS
+    // created_at/created_by de l'opportunité (sinon "Créé le" du contrat
+    // afficherait la date de l'opportunité). Le stade amont reste consultable
+    // dans la carte Synthèse via son propre bloc.
+    $createdAt = conv_v($extra, 'created_at', date('Y-m-d H:i:s'));
+    $createdBy = conv_v($extra, 'created_by', conv_v($o, 'created_by', null));
+    $updatedBy = conv_v($extra, 'updated_by', $createdBy);
     $debitValue = null;
     if (array_key_exists('debit', $extra) && ($extra['debit'] !== null && $extra['debit'] !== '')) {
         $debitValue = (int)$extra['debit'];
@@ -224,9 +238,10 @@ function conversion_insert_contract_from_opportunity(PDO $db, string $cid, array
         ':sid'  => conv_v($extra, 'stage_id', null),
         ':at'   => conv_v($extra, 'assigned_to', conv_v($o, 'assigned_to', '')),
         ':dbt'  => $debitValue,
-        ':cb'   => conv_v($o, 'created_by', null),
+        ':cb'   => $createdBy,
         ':ub'   => $updatedBy,
         ':cat'  => $createdAt,
+        ':uat'  => $createdAt,
     ];
     if ($hasRef) {
         $params[':ref'] = conv_contract_reference_value($cid, $extra['reference'] ?? null);
@@ -304,7 +319,7 @@ function conversion_insert_migration_from_opportunity(PDO $db, string $mid, arra
          old_operator, new_operator, porting_number, migration_type,
          requested_date, completed_date, technical_status, external_ref,
          stage_id, workflow_status, assigned_to, validated_at, validated_by, notes,
-         created_by, created_at, updated_at)
+         created_by, created_at, updated_at, updated_by)
         VALUES
         (:id, :oid, :pid, :tid, :civ, :ln, :fn,
          :ph, :ph2, :anim, :anc, :cin, :bd, :em,
@@ -313,7 +328,7 @@ function conversion_insert_migration_from_opportunity(PDO $db, string $mid, arra
          :oo, :no, :port, :mtype,
          :rd, :cd, :tstat, :eref,
          :sid, :ws, :at, :vat, :vby, :notes,
-         :cb, :ca, :ua)";
+         :cb, :ca, :ua, :ub)";
     $tid = $extra['type_id'] ?? $o['type_id'] ?? $o['typeId'] ?? null;
     $db->prepare($sql)->execute([
         ':id' => $mid,
@@ -358,6 +373,7 @@ function conversion_insert_migration_from_opportunity(PDO $db, string $mid, arra
         ':cb' => $extra['created_by'] ?? null,
         ':ca' => $now,
         ':ua' => $now,
+        ':ub' => $extra['created_by'] ?? null,
     ]);
 }
 
@@ -616,6 +632,7 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             'assigned_to'    => (string) ($opts['assigned_to'] ?? ''),
             'type_id'        => $o['type_id'] ?? $o['typeId'] ?? null,
             'debit'          => $o['debit'] ?? null,
+            'created_by'     => $username,
         ]);
         $db->prepare(
             'UPDATE crminternet_opportunities SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW() WHERE id = :id'
@@ -728,6 +745,7 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
             'billing_status' => (string) ($opts['billing_status'] ?? 'Pré-validé'),
             'assigned_to'    => $p['assigned_to'] ?? '—',
             'type_id'        => $p['type_id'] ?? $p['typeId'] ?? null,
+            'created_by'     => $username,
         ]);
 
         conv_tx_commit($db);

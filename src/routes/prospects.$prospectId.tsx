@@ -1,3 +1,4 @@
+import { LifecycleSynthesisCard } from "@/components/LifecycleSynthesisCard";
 import { DatePicker } from "@/components/ui/date-picker";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppLayout } from "@/components/AppLayout";
@@ -472,21 +473,19 @@ function ProspectDetailPage() {
         </div>
 
         <div className="space-y-4">
+          <LifecycleSynthesisCard
+            entity="prospect"
+            id={prospect.id}
+            prospectId={prospect.id}
+            opportunityId={linkedOpportunityId}
+            contractId={linkedOpportunityMeta?.contractId ?? null}
+            migrationId={linkedOpportunityMeta?.migrationId ?? null}
+          />
+
           <Card className="shadow-elegant">
-            <CardHeader className="pb-3"><CardTitle className="text-base">Synthèse</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Statut</span>
-                <Badge variant="outline">{prospect.status}</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Créé le</span>
-                <span>{prospect.createdAt}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Agent</span>
-                <span>{agent ? agent.fullName : <span className="italic text-muted-foreground">Non assigné</span>}</span>
-              </div>
+            <CardHeader className="pb-3"><CardTitle className="text-base">Agent</CardTitle></CardHeader>
+            <CardContent className="text-sm">
+              {agent ? agent.fullName : <span className="italic text-muted-foreground">Non assigné</span>}
             </CardContent>
           </Card>
 

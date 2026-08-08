@@ -38,6 +38,7 @@ function ensure_contracts_runtime_schema(PDO $db): void {
         "ALTER TABLE crminternet_contracts ADD COLUMN created_at DATETIME NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN created_by VARCHAR(80) NULL",
         "ALTER TABLE crminternet_contracts ADD COLUMN updated_by VARCHAR(80) NULL",
+        "ALTER TABLE crminternet_contracts ADD COLUMN updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
         "ALTER TABLE crminternet_contracts ADD COLUMN ancien_ligne VARCHAR(40) NULL",
     ];
     foreach ($stmts as $sql) {
@@ -128,6 +129,7 @@ function row_to_contract(array $r): array {
         'createdAt'      => $r['created_at']        ?? ($r['signature_date'] ? $r['signature_date']." 00:00:00" : null),
         'createdBy'      => $r['created_by']        ?? null,
         'updatedBy'      => $r['updated_by']        ?? null,
+        'updatedAt'      => $r['updated_at']        ?? null,
     ];
 }
 
@@ -235,8 +237,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
 
     // API permission enforcement disabled; frontend controls visibility.
 
-    $sets   = [];
-    $params = [':id' => $cid];
+    // Audit stamp — every contract update records who/when.
+    $sets   = ['updated_by = :__ub', 'updated_at = NOW()'];
+    $params = [':id' => $cid, ':__ub' => (string)($me['username'] ?? '')];
 
     /* ---- billingStatus / stageId (dynamic pipeline) ------------------ */
     $newStageName = null;
@@ -395,7 +398,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         $params[":f_$k"]   = $val;
     }
 
-    if (!$sets) fail('Aucun champ à mettre à jour', 422);
+    if (count($sets) <= 2) fail('Aucun champ à mettre à jour', 422);
 
     $sql = 'UPDATE crminternet_contracts SET ' . implode(', ', $sets) . ' WHERE id = :id';
     $db->prepare($sql)->execute($params);
@@ -477,8 +480,8 @@ if ($method === 'POST') {
     $refUpdate = $hasRef ? ', reference=IF(reference = \'\', VALUES(reference), reference)' : '';
 
     $ins = $db->prepare("INSERT INTO crminternet_contracts
-        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,debit,billing_status,source,assigned_to,type_id,comment1,comment2{$refCols})
-        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:dbt,:bs,:src,:at,:tid,:c1,:c2{$refVals})
+        (id,civility,last_name,first_name,phone,phone2,cin,birth_date,email,city,gouvernorat,delegation,address,localisation_xy,code_postal,partner,cabinet,signature_date,effective_date,validation_date,premium,debit,billing_status,source,assigned_to,type_id,comment1,comment2,created_at,created_by,updated_by{$refCols})
+        VALUES (:id,:civ,:ln,:fn,:ph,:ph2,:cin,:bd,:em,:city,:gov,:del,:ad,:loc,:cp,:p,:cab,:sd,:ed,:vd,:pr,:dbt,:bs,:src,:at,:tid,:c1,:c2,NOW(),:cb,:ub{$refVals})
         ON DUPLICATE KEY UPDATE
           civility=VALUES(civility), last_name=VALUES(last_name), first_name=VALUES(first_name),
           phone=VALUES(phone), phone2=VALUES(phone2), cin=VALUES(cin), birth_date=VALUES(birth_date),
@@ -489,7 +492,8 @@ if ($method === 'POST') {
           effective_date=VALUES(effective_date), validation_date=VALUES(validation_date),
           premium=VALUES(premium), debit=VALUES(debit), billing_status=VALUES(billing_status),
           source=VALUES(source), assigned_to=VALUES(assigned_to), type_id=VALUES(type_id),
-          comment1=VALUES(comment1), comment2=VALUES(comment2){$refUpdate}");
+          comment1=VALUES(comment1), comment2=VALUES(comment2),
+          updated_by=VALUES(updated_by), updated_at=NOW(){$refUpdate}");
 
     $cfIns = $db->prepare('INSERT INTO crminternet_custom_field_values (entity, entity_id, field_key, value)
                            VALUES (:e,:id,:k,:v)
@@ -597,6 +601,8 @@ if ($method === 'POST') {
                 ':tid' => isset($r['typeId']) && $r['typeId'] !== '' ? (string)$r['typeId'] : null,
                 ':c1'  => $r['comment1'] ?? null,
                 ':c2'  => $r['comment2'] ?? null,
+                ':cb'  => (string)($me['username'] ?? ''),
+                ':ub'  => (string)($me['username'] ?? ''),
             ];
             if ($hasRef) {
                 $rowParams[':ref'] = conv_contract_reference_value($id, $r['reference'] ?? null);

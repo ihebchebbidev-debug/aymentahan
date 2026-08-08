@@ -3,7 +3,7 @@ import { fetchAllPaginated } from "./paginatedFetch";
 import type { Contract } from "./types";
 
 function normalizeContract(raw: Partial<Contract> | null | undefined): Contract {
-  const debitRaw = raw?.debit;
+  const debitRaw = raw?.debit as unknown;
   let debit: number | null = null;
   if (debitRaw !== undefined && debitRaw !== null && debitRaw !== "") {
     const parsed = typeof debitRaw === "number" ? debitRaw : Number(debitRaw);

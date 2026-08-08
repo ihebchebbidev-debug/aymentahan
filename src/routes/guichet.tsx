@@ -507,9 +507,9 @@ function GuichetPage() {
                     ) : (
                       <>
                         <SelectItem value="entity">Toute mon entité</SelectItem>
-                        <SelectItem value={user.id}>{user.fullName || user.username}</SelectItem>
+                        <SelectItem value={user?.id ?? ""}>{user?.fullName || user?.username}</SelectItem>
                         {users
-                          .filter((u) => u.id !== user.id && u.guichetEntityId === assignedEntity)
+                          .filter((u) => u.id !== user?.id && u.guichetEntityId === assignedEntity)
                           .map((u) => (
                             <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
                           ))}
