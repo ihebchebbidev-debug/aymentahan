@@ -32,8 +32,8 @@ export const Route = createFileRoute("/reports")({
 
 type Report = {
   period: { from: string; to: string; team?: string };
-  agents: { username: string; fullName: string; team?: string; handled: number; won: number; lost: number; contracts: number; revenue: number; conversion: number }[];
-  teams?: { team: string; agents: number; handled: number; won: number; lost: number; contracts: number; revenue: number; conversion: number }[];
+  agents: { username: string; fullName: string; team?: string; handled: number; won: number; lost: number; opportunities?: number; contracts: number; migrations?: number; revenue: number; conversion: number }[];
+  teams?: { team: string; agents: number; handled: number; won: number; lost: number; opportunities?: number; contracts: number; migrations?: number; revenue: number; conversion: number }[];
   funnel: { pending: number; won: number; lost: number; total: number };
   monthly: { month: string; contracts: number; revenue: number }[];
   sources: { source: string; total: number; won: number; conversion: number }[];
@@ -209,11 +209,6 @@ function ReportsPage() {
     } catch (e: any) { toast.error("Échec Excel", { description: e?.message }); }
   };
 
-  const prevByUser = useMemo(() => {
-    if (!prev) return new Map<string, Report["agents"][number]>();
-    return new Map(prev.agents.map((a) => [a.username, a]));
-  }, [prev]);
-
   return (
     <AppLayout skeleton="dashboard">
       <PageHeader
@@ -340,7 +335,12 @@ function ReportsPage() {
           </div>
 
           <Card className="mt-6 shadow-elegant">
-            <div className="px-4 py-3 border-b font-semibold text-sm">Performance par agent</div>
+            <div className="px-4 py-3 border-b">
+              <div className="font-semibold text-sm">Performance par agent</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Leads / Gagnés / Perdus attribués au « Modifié par » du prospect • Opportunités au « Créé par » • Contrats &amp; migrations attribués à l'agent du prospect d'origine
+              </div>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -348,34 +348,27 @@ function ReportsPage() {
                   <TableHead className="text-right">Leads</TableHead>
                   <TableHead className="text-right">Gagnés</TableHead>
                   <TableHead className="text-right">Perdus</TableHead>
+                  <TableHead className="text-right">Opportunités</TableHead>
                   <TableHead className="text-right">Contrats</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
-                  {prev && <TableHead className="text-right">Δ Revenue</TableHead>}
+                  <TableHead className="text-right">Migration</TableHead>
                   <TableHead className="text-right">Conv. %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.agents.map((a) => {
-                  const p = prevByUser.get(a.username);
-                  return (
-                    <TableRow key={a.username}>
-                      <TableCell><div className="font-medium">{a.fullName}</div><div className="text-xs text-muted-foreground">{a.username}</div></TableCell>
-                      <TableCell className="text-right">{a.handled}</TableCell>
-                      <TableCell className="text-right text-success">{a.won}</TableCell>
-                      <TableCell className="text-right text-destructive">{a.lost}</TableCell>
-                      <TableCell className="text-right">{a.contracts}</TableCell>
-                      <TableCell className="text-right font-medium">{formatAmount(a.revenue)}</TableCell>
-                      {prev && (
-                        <TableCell className="text-right">
-                          <DeltaInline current={a.revenue} previous={p?.revenue ?? 0} format={(n) => formatAmount(n)} />
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right">{a.conversion}%</TableCell>
-                    </TableRow>
-                  );
-                })}
+                {data.agents.map((a) => (
+                  <TableRow key={a.username}>
+                    <TableCell><div className="font-medium">{a.fullName}</div><div className="text-xs text-muted-foreground">{a.username}</div></TableCell>
+                    <TableCell className="text-right">{a.handled}</TableCell>
+                    <TableCell className="text-right text-success">{a.won}</TableCell>
+                    <TableCell className="text-right text-destructive">{a.lost}</TableCell>
+                    <TableCell className="text-right">{a.opportunities ?? 0}</TableCell>
+                    <TableCell className="text-right">{a.contracts}</TableCell>
+                    <TableCell className="text-right">{a.migrations ?? 0}</TableCell>
+                    <TableCell className="text-right">{a.conversion}%</TableCell>
+                  </TableRow>
+                ))}
                 {data.agents.length === 0 && (
-                  <TableRow><TableCell colSpan={prev ? 8 : 7} className="text-center text-muted-foreground py-8">Aucune donnée</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Aucune donnée</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -437,7 +430,9 @@ function ReportsPage() {
                     <TableHead className="text-right">Leads</TableHead>
                     <TableHead className="text-right">Gagnés</TableHead>
                     <TableHead className="text-right">Perdus</TableHead>
+                    <TableHead className="text-right">Opportunités</TableHead>
                     <TableHead className="text-right">Contrats</TableHead>
+                    <TableHead className="text-right">Migration</TableHead>
                     <TableHead className="text-right">Revenue</TableHead>
                     <TableHead className="text-right">Conv. %</TableHead>
                   </TableRow>
@@ -456,7 +451,9 @@ function ReportsPage() {
                       <TableCell className="text-right">{t.handled}</TableCell>
                       <TableCell className="text-right text-success">{t.won}</TableCell>
                       <TableCell className="text-right text-destructive">{t.lost}</TableCell>
+                      <TableCell className="text-right">{t.opportunities ?? 0}</TableCell>
                       <TableCell className="text-right">{t.contracts}</TableCell>
+                      <TableCell className="text-right">{t.migrations ?? 0}</TableCell>
                       <TableCell className="text-right font-medium">{formatAmount(t.revenue)}</TableCell>
                       <TableCell className="text-right">{t.conversion}%</TableCell>
                     </TableRow>

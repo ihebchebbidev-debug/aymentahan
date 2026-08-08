@@ -48,40 +48,58 @@ if ($agentId !== '') {
 }
 
 // Per-agent KPIs
+// Règles d'attribution demandées par le client :
+//  - Prospects (leads / gagnés / perdus) : attribués à `updated_by` (Modifié par),
+//    car la création des prospects est faite par l'admin/import, pas par l'agent.
+//  - Opportunités : attribuées à `created_by` (Créé par).
+//  - Contrats & migrations : attribués à l'agent du prospect d'origine (updated_by),
+//    afin que la victoire revienne à celui qui a réellement travaillé le prospect.
+// Le rapprochement se fait sur username OU nom complet (insensible à la casse).
+$MATCH = "(LOWER(TRIM(%s)) = LOWER(TRIM(u.username)) OR (u.full_name IS NOT NULL AND u.full_name <> '' AND LOWER(TRIM(%s)) = LOWER(TRIM(u.full_name))))";
+$mProspect = sprintf($MATCH, 'p.updated_by', 'p.updated_by');
+$mOwnerC   = sprintf($MATCH, 'po.updated_by', 'po.updated_by');
+$mOwnerM   = sprintf($MATCH, 'pm.updated_by', 'pm.updated_by');
+$mOpp      = sprintf($MATCH, 'o.created_by', 'o.created_by');
+
+$WON_SQL  = "(p.outcome = 'won'  OR LOWER(TRIM(p.status)) IN ('vendu','ok'))";
+$LOST_SQL = "(p.outcome = 'lost' OR LOWER(TRIM(p.status)) LIKE 'refus%')";
+
 $agentSql = "
   SELECT u.username, u.full_name, COALESCE(t.name, '') AS team_name,
-    COALESCE(SUM(p.cnt),0)  AS handled,
-    COALESCE(SUM(p.won),0)  AS won,
-    COALESCE(SUM(p.lost),0) AS lost,
-    COALESCE(c.contracts_count,0) AS contracts_count,
-    COALESCE(c.revenue,0)   AS revenue
+    (SELECT COUNT(*) FROM crminternet_prospects p
+       WHERE p.created_at BETWEEN :from1 AND :to1 AND $mProspect) AS handled,
+    (SELECT COUNT(*) FROM crminternet_prospects p
+       WHERE p.created_at BETWEEN :from1b AND :to1b AND $mProspect AND $WON_SQL) AS won,
+    (SELECT COUNT(*) FROM crminternet_prospects p
+       WHERE p.created_at BETWEEN :from1c AND :to1c AND $mProspect AND $LOST_SQL) AS lost,
+    (SELECT COUNT(*) FROM crminternet_opportunities o
+       WHERE o.created_at BETWEEN :from5 AND :to5 AND $mOpp) AS opportunities_count,
+    (SELECT COUNT(*) FROM crminternet_contracts c
+       LEFT JOIN crminternet_opportunities oc ON oc.id = c.opportunity_id
+       LEFT JOIN crminternet_prospects po ON po.id = COALESCE(c.prospect_id, oc.prospect_id)
+       WHERE c.signature_date BETWEEN :from2 AND :to2 AND $mOwnerC) AS contracts_count,
+    (SELECT COALESCE(SUM(c.premium),0) FROM crminternet_contracts c
+       LEFT JOIN crminternet_opportunities oc ON oc.id = c.opportunity_id
+       LEFT JOIN crminternet_prospects po ON po.id = COALESCE(c.prospect_id, oc.prospect_id)
+       WHERE c.signature_date BETWEEN :from3 AND :to3 AND $mOwnerC) AS revenue,
+    (SELECT COUNT(*) FROM crminternet_migrations mg
+       LEFT JOIN crminternet_opportunities om ON om.id = mg.opportunity_id
+       LEFT JOIN crminternet_prospects pm ON pm.id = COALESCE(mg.prospect_id, om.prospect_id)
+       WHERE mg.deleted_at IS NULL AND DATE(mg.created_at) BETWEEN :from4 AND :to4 AND $mOwnerM) AS migrations_count
   FROM crminternet_users u
   LEFT JOIN crminternet_teams t ON t.id = u.team_id
-  LEFT JOIN (
-    SELECT assigned_to,
-      COUNT(*) cnt,
-      SUM(CASE WHEN outcome='won' THEN 1 ELSE 0 END) won,
-      SUM(CASE WHEN outcome='lost' THEN 1 ELSE 0 END) lost
-    FROM crminternet_prospects
-    WHERE created_at BETWEEN :from1 AND :to1
-    GROUP BY assigned_to
-  ) p ON p.assigned_to = u.username
-  LEFT JOIN (
-    SELECT assigned_to,
-      COUNT(*) contracts_count,
-      SUM(premium) revenue
-    FROM crminternet_contracts
-    WHERE signature_date BETWEEN :from2 AND :to2
-    GROUP BY assigned_to
-  ) c ON c.assigned_to = u.username
   WHERE u.role IN ('Agent','Manager','AgentSuivi','AgentActivation','AgentVente','AgentGuichet','AgentTechnicoCommercial') AND u.active = 1
   $teamFilter
   $agentFilterSql
   GROUP BY u.id
-  ORDER BY revenue DESC
+  ORDER BY contracts_count DESC, won DESC
 ";
 $s = $db->prepare($agentSql);
-$params = [':from1'=>$from, ':to1'=>$to, ':from2'=>$from, ':to2'=>$to];
+$params = [
+    ':from1'=>$from, ':to1'=>$to, ':from1b'=>$from, ':to1b'=>$to, ':from1c'=>$from, ':to1c'=>$to,
+    ':from2'=>$from, ':to2'=>$to, ':from3'=>$from, ':to3'=>$to,
+    ':from4'=>$from, ':to4'=>$to, ':from5'=>$from, ':to5'=>$to,
+];
 if ($team !== '' && !$teamIsNone) $params[':team'] = $team;
 $params = array_merge($params, $agentFilterParams);
 $s->execute($params);
@@ -95,11 +113,14 @@ $agents = array_map(function($r) use ($NO_TEAM) {
         'handled'   => $h,
         'won'       => (int)$r['won'],
         'lost'      => (int)$r['lost'],
+        'opportunities' => (int)($r['opportunities_count'] ?? 0),
         'contracts' => (int)$r['contracts_count'],
+        'migrations' => (int)($r['migrations_count'] ?? 0),
         'revenue'   => (float)$r['revenue'],
         'conversion' => $h > 0 ? round(((int)$r['won'] / $h) * 100, 1) : 0.0,
     ];
 }, $s->fetchAll());
+
 
 
 // Per-team (agence) aggregation derived from the agent rows above so the
@@ -108,13 +129,15 @@ $teamsAgg = [];
 foreach ($agents as $a) {
     $t = $a['team'];
     if (!isset($teamsAgg[$t])) {
-        $teamsAgg[$t] = ['team'=>$t,'agents'=>0,'handled'=>0,'won'=>0,'lost'=>0,'contracts'=>0,'revenue'=>0.0];
+        $teamsAgg[$t] = ['team'=>$t,'agents'=>0,'handled'=>0,'won'=>0,'lost'=>0,'opportunities'=>0,'contracts'=>0,'migrations'=>0,'revenue'=>0.0];
     }
     $teamsAgg[$t]['agents']    += 1;
     $teamsAgg[$t]['handled']   += $a['handled'];
     $teamsAgg[$t]['won']       += $a['won'];
     $teamsAgg[$t]['lost']      += $a['lost'];
+    $teamsAgg[$t]['opportunities'] += $a['opportunities'];
     $teamsAgg[$t]['contracts'] += $a['contracts'];
+    $teamsAgg[$t]['migrations'] += $a['migrations'];
     $teamsAgg[$t]['revenue']   += $a['revenue'];
 }
 $teams = array_values(array_map(function($t){
@@ -254,10 +277,10 @@ if ($format === 'csv') {
     $tag = $team !== '' ? '_'.preg_replace('/[^A-Za-z0-9_-]/','',$team) : '';
     header('Content-Disposition: attachment; filename="report_agents_'.$from.'_'.$to.$tag.'.csv"');
     $out = fopen('php://output','w');
-    fputcsv($out, ['Agent','Username','Agence','Leads traités','Gagnés','Perdus','Contrats','Revenue','Conversion %']);
+    fputcsv($out, ['Agent','Username','Agence','Leads traités','Gagnés','Perdus','Opportunités','Contrats','Migrations','Revenue','Conversion %']);
     foreach ($agents as $a) {
         $teamLabel = ($a['team'] !== '' && $a['team'] !== null) ? $a['team'] : $NO_TEAM;
-        fputcsv($out, [$a['fullName'],$a['username'],$teamLabel,$a['handled'],$a['won'],$a['lost'],$a['contracts'],$a['revenue'],$a['conversion']]);
+        fputcsv($out, [$a['fullName'],$a['username'],$teamLabel,$a['handled'],$a['won'],$a['lost'],$a['opportunities'],$a['contracts'],$a['migrations'],$a['revenue'],$a['conversion']]);
     }
     fclose($out);
     exit;

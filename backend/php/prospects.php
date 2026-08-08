@@ -438,7 +438,7 @@ if ($method === 'POST') {
           phone=VALUES(phone), phone2=VALUES(phone2), ancien_ligne=VALUES(ancien_ligne), animateur=VALUES(animateur), cin=VALUES(cin), birth_date=VALUES(birth_date),
           email=VALUES(email), source=VALUES(source), status=VALUES(status),
           assigned_to=VALUES(assigned_to),
-          created_by=IF(created_by IS NULL OR created_by = '', VALUES(created_by), created_by),
+          created_by=IF(created_by IS NULL OR created_by = \'\', VALUES(created_by), created_by),
           updated_by=VALUES(updated_by), updated_at=NOW(), city=VALUES(city), address=VALUES(address), zone=VALUES(zone),
           gouvernorat=VALUES(gouvernorat), delegation=VALUES(delegation),
           localisation_xy=VALUES(localisation_xy), code_postal=VALUES(code_postal),
