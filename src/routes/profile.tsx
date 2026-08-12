@@ -157,7 +157,8 @@ function ProfilePage() {
             {!edit || !canEdit ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5">
                 <Field icon={<UserIcon className="h-4 w-4" />} label="Nom complet" value={user?.fullName || "—"} />
-                <Field icon={<Mail className="h-4 w-4" />} label="Email" value={user?.email || "—"} />
+                <Field icon={<Mail className="h-4 w-4" />} label="Email personnel" value={user?.email || "—"} />
+                {/* Email professionnel : réservé à l'administration, jamais affiché ici. */}
                 <Field icon={<UserIcon className="h-4 w-4" />} label="Username" value={username} />
                 <Field icon={<Shield className="h-4 w-4" />} label="Rôle" value={user?.role || "—"} />
                 <Field icon={<Users className="h-4 w-4" />} label="Équipe" value={user?.team || "—"} />
@@ -170,8 +171,9 @@ function ProfilePage() {
                     <Input id="fullName" value={form.fullName} onChange={(e) => setF("fullName")(e.target.value)} required maxLength={120} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Email personnel</Label>
                     <Input id="email" type="email" value={form.email} onChange={(e) => setF("email")(e.target.value)} maxLength={255} />
+                    <p className="text-xs text-muted-foreground">Les codes OTP sont envoyés à votre email professionnel, modifiable uniquement par l'administration.</p>
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-2">

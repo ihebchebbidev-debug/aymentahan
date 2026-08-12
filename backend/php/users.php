@@ -5,12 +5,18 @@ $me = require_auth();
 $db = (new Database())->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 
-function row_to_user(array $u): array {
+function row_to_user(array $u, bool $canSeeWorkEmail = false): array {
+    $workEmail = trim((string)($u['work_email'] ?? ''));
     return [
         'id'             => $u['id'],
         'username'       => $u['username'],
         'fullName'       => $u['full_name'],
         'email'          => $u['email'],
+        // Email professionnel : visible uniquement par le titulaire, les administrateurs
+        // et les profils disposant de la permission user.view_work_email.
+        'workEmail'      => $canSeeWorkEmail ? ($workEmail !== '' ? $workEmail : null) : null,
+        'workEmailSet'   => $workEmail !== '',
+        'workEmailHidden'=> !$canSeeWorkEmail && $workEmail !== '',
         'role'           => $u['role'],
         'team'           => $u['team'],
         'active'         => (bool)$u['active'],
@@ -46,6 +52,59 @@ function ensure_user_extra_columns(PDO $db): void {
     try { $db->exec("ALTER TABLE crminternet_users ADD INDEX IF NOT EXISTS idx_users_team (team_id)"); } catch (Throwable $e) {}
 }
 ensure_user_extra_columns($db);
+ensure_work_email_column($db);
+ensure_emails_not_unique($db);
+
+/**
+ * Qui peut voir / modifier l'email professionnel d'un AUTRE utilisateur :
+ * Administrateur, ou toute personne ayant la permission user.view_work_email
+ * (rôle, rôle accordé temporairement, ou override individuel).
+ */
+function can_view_work_email(PDO $db, array $me): bool {
+    if (($me['role'] ?? '') === 'Administrateur') return true;
+    $username = (string)($me['username'] ?? '');
+    if ($username === '') return false;
+
+    $overrides = user_overrides_for($db, $username);
+    if (in_array('user.view_work_email', $overrides['deny'], true))  return false;
+    if (in_array('user.view_work_email', $overrides['allow'], true)) return true;
+
+    $grants = active_grants_for($db, $username);
+    if (in_array('user.view_work_email', $grants['permissions'], true)) return true;
+
+    $roles = array_merge([(string)($me['role'] ?? '')], $grants['roles']);
+    $roles = array_values(array_filter(array_unique($roles)));
+    if (!$roles) return false;
+    try {
+        $in = implode(',', array_fill(0, count($roles), '?'));
+        $st = $db->prepare("SELECT 1 FROM crminternet_role_permissions
+                            WHERE permission = 'user.view_work_email' AND enabled = 1
+                              AND role IN ($in) LIMIT 1");
+        $st->execute($roles);
+        return (bool)$st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+$canSeeWorkEmail = can_view_work_email($db, $me);
+
+/**
+ * Qui peut AJOUTER / MODIFIER l'email professionnel : uniquement les
+ * administrateurs (rôle Administrateur, y compris via un rôle accordé
+ * temporairement). La lecture reste régie par can_view_work_email().
+ */
+function can_edit_work_email(PDO $db, array $me): bool {
+    if (($me['role'] ?? '') === 'Administrateur') return true;
+    $username = (string)($me['username'] ?? '');
+    if ($username === '') return false;
+    try {
+        $grants = active_grants_for($db, $username);
+        return in_array('Administrateur', $grants['roles'] ?? [], true);
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+$canEditWorkEmail = can_edit_work_email($db, $me);
 
 function fetch_users_list(PDO $db): array
 {
@@ -92,8 +151,11 @@ function fetch_users_list(PDO $db): array
 
 if ($method === 'GET') {
     $rows = fetch_users_list($db);
-    $crminternet_users = array_map(function ($u) {
-        $base = row_to_user($u);
+    $meUsername = (string)($me['username'] ?? '');
+    $crminternet_users = array_map(function ($u) use ($canSeeWorkEmail, $meUsername) {
+        // L'email pro n'est jamais visible par son propre titulaire : seuls les
+        // profils habilités (Administrateur / permission user.view_work_email) le voient.
+        $base = row_to_user($u, $canSeeWorkEmail);
         $handled = (int)$u['leads_handled'];
         $won = (int)$u['contracts_won'];
         $conv = $handled > 0 ? round(($won / $handled) * 100, 1) : 0.0;
@@ -153,8 +215,20 @@ if ($method === 'POST') {
         if (!$fullName) $rowErr[] = 'fullName required';
 
         $role = in_array($r['role'] ?? '', $allowedRole, true) ? $r['role'] : 'Agent';
-        $email = $strOrNull($r['email'] ?? null, 255) ?? ($username . '@protection.fr');
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $rowErr[] = 'email invalid';
+        // Email personnel (visible dans le profil, jamais utilisé pour l'OTP)
+        $email = $strOrNull($r['email'] ?? null, 255);
+        if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) $rowErr[] = 'email invalid';
+
+        // Email professionnel (destinataire OTP) — ajout/modification réservés aux administrateurs.
+        $workEmail = $strOrNull($r['workEmail'] ?? null, 160);
+        if (!$canEditWorkEmail) {
+            $workEmail = null; // ignoré silencieusement pour les non-administrateurs
+        } elseif ($workEmail !== null && !filter_var($workEmail, FILTER_VALIDATE_EMAIL)) {
+            $rowErr[] = 'workEmail invalid';
+        }
+        // Doublons d'emails (perso et pro) autorisés : aucun contrôle d'unicité.
+        // Compat : un compte doit toujours avoir une adresse pro à la création.
+        $emailFallback = $email ?? ($username . '@protection.fr');
         $team = $strOrNull($r['team'] ?? null, 60) ?? 'Lead-Actifs';
         $activeIn = $r['active'] ?? true;
         $active = filter_var($activeIn, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
@@ -297,7 +371,7 @@ if ($method === 'POST') {
         try {
             if ($existingId) {
                 $u = $db->prepare('UPDATE crminternet_users SET
-                    full_name=:fn, email=:em, role=:r, team=:t, active=:a,
+                    full_name=:fn, email=:em, work_email=COALESCE(:wem, work_email), role=:r, team=:t, active=:a,
                     job_title=:jt, birth_date=:bd, cin=:cin, company=:co,
                     contract_type=:ct, salary=:sal, salary_increase=:si,
                     contract_start=:cs, contract_end=:ce,
@@ -306,7 +380,7 @@ if ($method === 'POST') {
                     guichet_entity_id=:gei, team_id=:tid
                     WHERE id=:id');
                 $u->execute([
-                    ':fn'=>$fullName, ':em'=>$email, ':r'=>$role, ':t'=>$team, ':a'=>$active, ':id'=>$existingId,
+                    ':fn'=>$fullName, ':em'=>$email, ':wem'=>$workEmail, ':r'=>$role, ':t'=>$team, ':a'=>$active, ':id'=>$existingId,
                     ':jt'=>$hr['job_title'], ':bd'=>$hr['birth_date'], ':cin'=>$hr['cin'], ':co'=>$hr['company'],
                     ':ct'=>$hr['contract_type'], ':sal'=>$hr['salary'], ':si'=>$hr['salary_increase'],
                     ':cs'=>$hr['contract_start'], ':ce'=>$hr['contract_end'],
@@ -320,15 +394,16 @@ if ($method === 'POST') {
                 $tempPwd = $r['password'] ?? bin2hex(random_bytes(6));
                 $hash = password_hash($tempPwd, PASSWORD_BCRYPT);
                 $i = $db->prepare('INSERT INTO crminternet_users
-                    (id,username,full_name,email,password_hash,role,team,active,
+                    (id,username,full_name,email,work_email,password_hash,role,team,active,
                      job_title,birth_date,cin,company,contract_type,salary,salary_increase,
                      contract_start,contract_end,renewal_start,renewal_end,
                      observations,phone,rib,hire_date,guichet_entity_id,team_id)
                     VALUES
-                    (:id,:u,:fn,:em,:p,:r,:t,:a,
+                    (:id,:u,:fn,:em,:wem,:p,:r,:t,:a,
                      :jt,:bd,:cin,:co,:ct,:sal,:si,:cs,:ce,:rs,:re,:obs,:ph,:rib,:hd,:gei,:tid)');
                 $i->execute([
                     ':id'=>$id, ':u'=>$username, ':fn'=>$fullName, ':em'=>$email,
+                    ':wem'=>$workEmail ?? $emailFallback,
                     ':p'=>$hash, ':r'=>$role, ':t'=>$team, ':a'=>$active,
                     ':jt'=>$hr['job_title'], ':bd'=>$hr['birth_date'], ':cin'=>$hr['cin'], ':co'=>$hr['company'],
                     ':ct'=>$hr['contract_type'], ':sal'=>$hr['salary'], ':si'=>$hr['salary_increase'],
@@ -344,21 +419,24 @@ if ($method === 'POST') {
             $msg      = $e->getMessage();
             $isDup    = ($sqlState === '23000');
             $dupCin   = $isDup && stripos($msg, 'cin')   !== false;
-            $dupMail  = $isDup && stripos($msg, 'email') !== false;
+            $dupWork  = $isDup && stripos($msg, 'work_email') !== false;
+            $dupMail  = $isDup && !$dupWork && stripos($msg, 'email') !== false;
             $dupUser  = $isDup && stripos($msg, 'username') !== false;
             $code     = $dupCin ? 'DUPLICATE_CIN'
+                      : ($dupWork ? 'DUPLICATE_WORK_EMAIL'
                       : ($dupMail ? 'DUPLICATE_EMAIL'
                       : ($dupUser ? 'DUPLICATE_USERNAME'
-                      : ($isDup ? 'DUPLICATE' : 'DB_ERROR')));
+                      : ($isDup ? 'DUPLICATE' : 'DB_ERROR'))));
             $skipped++;
             $errors[] = [
                 'row'      => $idx,
                 'username' => $username,
                 'code'     => $code,
                 'errors'   => [$dupCin ? "CIN déjà utilisé ($cin)"
+                              : ($dupWork ? "Email professionnel déjà utilisé ($workEmail)"
                               : ($dupMail ? "Email déjà utilisé ($email)"
                               : ($dupUser ? "Username déjà utilisé ($username)"
-                              : 'Erreur base de données'))],
+                              : 'Erreur base de données')))],
             ];
         }
     }

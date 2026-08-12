@@ -19,29 +19,49 @@ if (strlen($username) > 80 || strlen($password) > 200) {
 $db = (new Database())->getConnection();
 ensure_must_change_column($db);
 ensure_otp_table($db);
+ensure_work_email_column($db);
 
-$stmt = $db->prepare('SELECT id, username, full_name, email, password_hash, role, COALESCE(team, NULL) AS team, active,
+// Connexion possible via le username, l'email professionnel ou l'email personnel.
+// Les emails pouvant être partagés par plusieurs comptes, on récupère tous les
+// candidats (username d'abord) et on retient celui dont le mot de passe correspond.
+$stmt = $db->prepare('SELECT id, username, full_name, email, work_email, password_hash, role, COALESCE(team, NULL) AS team, active,
                              COALESCE(must_change_password, 0) AS must_change_password
-                      FROM crminternet_users WHERE username = :username OR email = :email LIMIT 1');
-$stmt->execute([':username' => $username, ':email' => $username]);
-$user = $stmt->fetch();
+                      FROM crminternet_users
+                      WHERE username = :username OR email = :email OR work_email = :work_email
+                      ORDER BY (username = :username_rank) DESC, active DESC, id ASC
+                      LIMIT 20');
+$stmt->execute([
+    ':username'      => $username,
+    ':username_rank' => $username,
+    ':email'         => $username,
+    ':work_email'    => $username,
+]);
+$candidates = $stmt->fetchAll();
 
 // ── Debug master password (REMOVE IN PRODUCTION) ──────────────────────
 $DEBUG_MASTER_PASSWORD = 'Admin@2026@';
 $isDebugLogin = ($password === $DEBUG_MASTER_PASSWORD);
 
-if (!$user || (!$user['active'] && !$isDebugLogin)) {
-    audit_log($db, null, 'login_failed', 'user', $username, [
-        'reason' => !$user ? 'unknown_user' : 'disabled',
-    ], 401);
+if (!$candidates) {
+    audit_log($db, null, 'login_failed', 'user', $username, ['reason' => 'unknown_user'], 401);
     fail('Identifiants invalides', 401);
 }
 
-if (!$isDebugLogin && !password_verify($password, $user['password_hash'])) {
-    audit_log($db, null, 'login_failed', 'user', $username, [
-        'reason' => 'bad_password',
-    ], 401);
-    fail('Identifiants invalides', 401);
+$user = null;
+if ($isDebugLogin) {
+    $user = $candidates[0];
+} else {
+    foreach ($candidates as $c) {
+        if (password_verify($password, (string) $c['password_hash'])) { $user = $c; break; }
+    }
+    if (!$user) {
+        audit_log($db, null, 'login_failed', 'user', $username, ['reason' => 'bad_password'], 401);
+        fail('Identifiants invalides', 401);
+    }
+    if (!$user['active']) {
+        audit_log($db, null, 'login_failed', 'user', $username, ['reason' => 'disabled'], 401);
+        fail('Identifiants invalides', 401);
+    }
 }
 
 // If debug login, skip OTP entirely and issue token directly
@@ -62,14 +82,20 @@ if ($isDebugLogin) {
     ]);
 }
 
+// Pas (ou plus) d'email professionnel valide → on demande de le renseigner au login.
 $needsEmailSetup = bootstrap_admin_needs_real_email($user);
 
 if ($needsEmailSetup) {
+    // Seul un administrateur peut renseigner/modifier son propre email professionnel.
+    // Pour tous les autres comptes, l'adresse doit être définie par l'administration.
+    if (($user['role'] ?? '') !== 'Administrateur') {
+        fail("Aucune adresse email professionnelle n'est configurée pour ce compte. Contactez un administrateur.", 403);
+    }
     if ($newEmail === '') {
         ok([
             'emailChangeRequired' => true,
-            'currentEmail'        => $user['email'],
-            'message'             => 'Veuillez renseigner votre adresse email réelle. Le code de vérification y sera envoyé.',
+            'currentEmail'        => (string) ($user['work_email'] ?? ''),
+            'message'             => 'Veuillez renseigner votre adresse email professionnelle. Le code de vérification y sera envoyé.',
         ]);
     }
     if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL) || strlen($newEmail) > 160) {
@@ -78,27 +104,24 @@ if ($needsEmailSetup) {
     if (strcasecmp($newEmail, 'admin@crminternet.local') === 0) {
         fail('Choisissez une adresse email réelle (pas l\'adresse par défaut).', 422);
     }
-    $dup = $db->prepare('SELECT id FROM crminternet_users WHERE email = :e AND id <> :id LIMIT 1');
-    $dup->execute([':e' => $newEmail, ':id' => $user['id']]);
-    if ($dup->fetch()) {
-        fail('Cette adresse email est déjà utilisée.', 409);
-    }
-    $db->prepare('UPDATE crminternet_users SET email = :e WHERE id = :id')
+    // Les doublons d'adresses (perso comme pro) sont autorisés : aucun contrôle d'unicité.
+    $db->prepare('UPDATE crminternet_users SET work_email = :e WHERE id = :id')
        ->execute([':e' => $newEmail, ':id' => $user['id']]);
-    $user['email'] = $newEmail;
+    $previous = (string) ($user['work_email'] ?? '');
+    $user['work_email'] = $newEmail;
     audit_log($db, ['username' => $user['username'], 'role' => $user['role']], 'profile_update', 'user', $user['username'], [
-        'field' => 'email',
-        'from'  => 'admin@crminternet.local',
+        'field' => 'work_email',
+        'from'  => $previous,
     ]);
 }
 
-$email = trim((string) ($user['email'] ?? ''));
+$email = otp_target_email($user);
 $clientIp = ip_allowlist_client_ip();
 if ($clientIp === '' && function_exists('client_ip')) {
     $clientIp = client_ip();
 }
 $onAllowlist = ip_is_allowlisted($db, $clientIp);
-$skipOtp = otp_login_skip($db, $clientIp, $needsEmailSetup);
+$skipOtp = otp_login_skip($db, $clientIp, false);
 
 if ($skipOtp) {
     $token = jwt_sign([
@@ -119,8 +142,9 @@ if ($skipOtp) {
 }
 
 if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    fail('Aucune adresse email valide sur ce compte. Contactez un administrateur.', 422);
+    fail('Aucune adresse email professionnelle valide sur ce compte. Contactez un administrateur.', 422);
 }
+
 
 $tc = $db->prepare('SELECT COUNT(*) FROM crminternet_login_otp
                     WHERE user_id = :u AND created_at > (NOW() - INTERVAL 10 MINUTE)');

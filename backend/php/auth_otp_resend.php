@@ -12,7 +12,7 @@ $db = (new Database())->getConnection();
 ensure_otp_table($db);
 
 $s = $db->prepare("SELECT o.challenge, o.user_id, o.created_at, o.used,
-                          u.email, u.full_name, u.username, u.active
+                          u.email, u.work_email, u.full_name, u.username, u.active
                    FROM crminternet_login_otp o
                    JOIN crminternet_users u ON u.id = o.user_id
                    WHERE o.challenge = :c LIMIT 1");
@@ -22,10 +22,11 @@ if (!$row) fail('Session expirée, veuillez vous reconnecter', 401);
 if ((int)$row['used'] === 1) fail('Code déjà utilisé, reconnectez-vous', 401);
 if (!$row['active']) fail('Compte désactivé', 403);
 
-$email = trim((string)($row['email'] ?? ''));
+$email = otp_target_email($row);
 if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    fail('Aucune adresse email associée', 422);
+    fail('Aucune adresse email professionnelle associée', 422);
 }
+
 
 if (time() - strtotime($row['created_at']) < 30) {
     fail('Veuillez patienter avant de redemander un code.', 429);

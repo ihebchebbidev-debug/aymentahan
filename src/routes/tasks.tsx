@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { CheckSquare, Plus, Trash2, RefreshCw, Eye } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -17,6 +18,7 @@ import { api, API_ENABLED } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Can } from "@/components/Can";
 import { useErp } from "@/lib/erpStore";
+import { ROLE_LABEL, roleLabel } from "@/lib/roleLabels";
 import { toast } from "sonner";
 import { confirmDialog } from "@/components/ConfirmDialogProvider";
 
@@ -32,6 +34,7 @@ export const Route = createFileRoute("/tasks")({
 
 type Task = {
   id: string; title: string; description: string | null; assignedTo: string;
+  visibleRoles: string[];
   relatedEntity: string | null; relatedId: string | null; dueDate: string | null;
   priority: "low" | "normal" | "high"; status: "todo" | "in_progress" | "done" | "cancelled";
   createdBy: string; createdAt: string; completedAt: string | null;
@@ -56,6 +59,7 @@ function TasksPage() {
   const [assignee, setAssignee] = useState(auth.user?.username ?? "");
   const [due, setDue] = useState("");
   const [priority, setPriority] = useState<Task["priority"]>("normal");
+  const [visibleRoles, setVisibleRoles] = useState<string[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [descriptionNote, setDescriptionNote] = useState("");
   const [taskSaving, setTaskSaving] = useState(false);
@@ -71,6 +75,7 @@ function TasksPage() {
     try {
       const r = await api<{ tasks: Task[] }>("/tasks.php");
       setTasks(r.tasks);
+      setVisibleRoles([]);
     } catch (e: any) { toast.error("Erreur", { description: e?.message }); }
     finally { setLoading(false); }
   };
@@ -116,6 +121,7 @@ function TasksPage() {
         id: selectedTask.id,
         title: selectedTask.title.trim(),
         assignedTo: selectedTask.assignedTo,
+        visibleRoles: selectedTask.visibleRoles,
         dueDate: selectedTask.dueDate || null,
         priority: selectedTask.priority,
         status: selectedTask.status,
@@ -140,10 +146,12 @@ function TasksPage() {
     try {
       await api("/tasks.php", { method: "POST", body: {
         title: title.trim(), description: desc.trim() || null,
-        assignedTo: assignee || auth.user?.username, dueDate: due || null, priority,
+        assignedTo: assignee || auth.user?.username,
+        visibleRoles,
+        dueDate: due || null, priority,
       }});
       toast.success("Tâche créée");
-      setTitle(""); setDesc(""); setDue("");
+      setTitle(""); setDesc(""); setVisibleRoles([]); setDue("");
       await load();
     } catch (e: any) { toast.error(e?.message); }
   };
@@ -182,6 +190,19 @@ function TasksPage() {
                   {users.map((u) => <SelectItem key={u.username} value={u.username}>{u.fullName} ({u.username})</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Visibilité par rôle</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                  <label key={value} className="inline-flex items-center gap-2 text-sm">
+                    <Checkbox checked={visibleRoles.includes(value)} onCheckedChange={(checked) => {
+                      setVisibleRoles((prev) => checked ? Array.from(new Set([...prev, value])) : prev.filter((r) => r !== value));
+                    }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Échéance</Label>
@@ -260,6 +281,7 @@ function TasksPage() {
                 </div>
                 <div className="text-xs text-muted-foreground truncate">
                   {t.assignedTo} · créé par {t.createdBy} {t.description ? `· ${t.description}` : ""}
+                  {t.visibleRoles.length > 0 ? ` · visible à ${t.visibleRoles.map(roleLabel).join(', ')}` : ''}
                 </div>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setSelectedTask(t)} className="text-primary hover:bg-primary/10">
@@ -317,6 +339,20 @@ function TasksPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1"><Label>Échéance</Label><DatePicker value={selectedTask.dueDate ?? ""} onChange={(value) => setSelectedTask({ ...selectedTask, dueDate: value || null })} /></div>
                   <div className="space-y-1"><Label>Créée par</Label><Input value={selectedTask.createdBy} disabled /></div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Visibilité par rôle</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(ROLE_LABEL).map(([value, label]) => (
+                      <label key={value} className="inline-flex items-center gap-2 text-sm">
+                        <Checkbox checked={selectedTask.visibleRoles.includes(value)} onCheckedChange={(checked) => {
+                          const next = checked ? Array.from(new Set([...selectedTask.visibleRoles, value])) : selectedTask.visibleRoles.filter((r) => r !== value);
+                          setSelectedTask({ ...selectedTask, visibleRoles: next });
+                        }} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label>Commentaires</Label>

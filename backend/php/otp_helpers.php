@@ -9,12 +9,31 @@ function ensure_otp_table(PDO $db): void {
     ensure_login_otp_schema($db);
 }
 
-/** Default setup admin still on placeholder email — must set a real address before OTP. */
+/**
+ * Email professionnel : destinataire unique des codes OTP.
+ * L'email personnel (`email`) n'est JAMAIS utilisé pour l'authentification.
+ */
+function otp_target_email(array $user): string
+{
+    return trim((string) ($user['work_email'] ?? ''));
+}
+
+function otp_has_valid_work_email(array $user): bool
+{
+    $e = otp_target_email($user);
+    return $e !== '' && (bool) filter_var($e, FILTER_VALIDATE_EMAIL);
+}
+
+/** Compte sans email professionnel valide → doit le renseigner avant de recevoir un OTP. */
 function bootstrap_admin_needs_real_email(array $user): bool
 {
-    return strcasecmp(trim((string) ($user['username'] ?? '')), 'AymenAdmin') === 0
-        && strcasecmp(trim((string) ($user['email'] ?? '')), 'admin@crminternet.local') === 0;
+    if (!otp_has_valid_work_email($user)) {
+        return true;
+    }
+    // Adresse par défaut du compte de setup : on force une adresse réelle.
+    return strcasecmp(otp_target_email($user), 'admin@crminternet.local') === 0;
 }
+
 
 /**
  * Skip OTP on login when:
@@ -94,10 +113,11 @@ function otp_mask_email(string $email): string {
 }
 
 function otp_send_to_user(PDO $db, array $user, string $code, string $clientIp): void {
-    $email = trim((string)($user['email'] ?? ''));
+    $email = otp_target_email($user);
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new RuntimeException('Adresse email invalide sur ce compte');
+        throw new RuntimeException('Aucune adresse email professionnelle valide sur ce compte');
     }
+
     $name = $user['full_name'] ?? $user['username'] ?? 'Utilisateur';
     [$subject, $html, $text] = build_otp_email($code, $name);
     crm_mail_send($email, $name, $subject, $html, $text);
@@ -121,9 +141,12 @@ function otp_user_response(array $user): array {
         'username'           => $user['username'],
         'fullName'           => $user['full_name'] ?? $user['fullName'] ?? '',
         'email'              => $user['email'],
+        // Le titulaire voit sa propre adresse professionnelle.
+        'workEmail'          => $user['work_email'] ?? $user['workEmail'] ?? null,
         'role'               => $user['role'],
         'team'               => $user['team'] ?? null,
         'active'             => (bool)($user['active'] ?? true),
         'mustChangePassword' => (bool)($user['must_change_password'] ?? $user['mustChangePassword'] ?? false),
     ];
 }
+

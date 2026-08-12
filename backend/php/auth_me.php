@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/schema_repair.php';
 require_method('GET');
 $payload = require_auth();
 
@@ -8,7 +9,8 @@ ensure_must_change_column($db);
 // Garantit la colonne d'affectation guichet (rétro-compat avec d'anciens déploiements)
 try { $db->exec("ALTER TABLE crminternet_users ADD COLUMN IF NOT EXISTS guichet_entity_id VARCHAR(40) NULL"); } catch (Throwable $e) {}
 try { $db->exec("ALTER TABLE crminternet_users ADD COLUMN IF NOT EXISTS team_id VARCHAR(40) NULL"); } catch (Throwable $e) {}
-$stmt = $db->prepare('SELECT id, username, full_name, email, role, team, active,
+ensure_work_email_column($db);
+$stmt = $db->prepare('SELECT id, username, full_name, email, work_email, role, team, active,
                              COALESCE(must_change_password, 0) AS must_change_password,
                              job_title, birth_date, cin, company, contract_type,
                              salary, salary_increase,
@@ -36,11 +38,19 @@ if ($teamId !== '') {
 $grants = active_grants_for($db, $u['username']);
 $overrides = user_overrides_for($db, $u['username']);
 
+// L'email professionnel n'est pas exposé à l'utilisateur lui-même : seule
+// l'administration peut le consulter (via l'API de gestion des utilisateurs).
+$canSeeWorkEmail = ($u['role'] === 'Administrateur')
+    || in_array('user.view_work_email', $grants['permissions'] ?? [], true)
+    || in_array('user.view_work_email', $overrides['allow'] ?? [], true);
+if (in_array('user.view_work_email', $overrides['deny'] ?? [], true)) $canSeeWorkEmail = false;
+
 ok(['user' => [
     'id'       => $u['id'],
     'username' => $u['username'],
     'fullName' => $u['full_name'],
     'email'    => $u['email'],
+    'workEmail'=> $canSeeWorkEmail ? ($u['work_email'] ?? null) : null,
     'role'     => $u['role'],
     'team'     => $u['team'],
     'active'   => (bool)$u['active'],

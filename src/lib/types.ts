@@ -313,7 +313,14 @@ export type AppUser = {
   id: string;
   username: string;
   fullName: string;
+  /** Email personnel — affiché dans le profil, modifiable par l'utilisateur. */
   email: string;
+  /** Email professionnel — destinataire des codes OTP. Null si non habilité à le voir. */
+  workEmail?: string | null;
+  /** true si un email pro est défini (même masqué). */
+  workEmailSet?: boolean;
+  /** true si un email pro existe mais est masqué pour l'utilisateur courant. */
+  workEmailHidden?: boolean;
   role: string;
   team: string;
   active: boolean;

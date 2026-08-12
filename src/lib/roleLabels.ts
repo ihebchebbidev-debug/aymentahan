@@ -5,9 +5,12 @@ export const ROLE_LABEL: Record<string, string> = {
   Agent: "Commercial",
   Backoffice: "Backoffice",
   AgentSuivi: "Agent Suivi",
-  AgentActivation: "Agent Activation",
+  AgentCreation: "Agent Creation",
   AgentVente: "Agent Vente",
   AgentGuichet: "Agent Guichet",
+  AgentTechnicoCommercial: "Agent Technico-Commercial",
+  RessourceHumaine: "Ressource Humaine",
+  AgentActivation: "Agent Activation",
 };
 
 export function roleLabel(role?: string | null): string {

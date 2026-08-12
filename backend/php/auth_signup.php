@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/schema_repair.php';
 require_method('POST');
 
 // Hidden signup. Frontend route: /signup-internal-x7k2
@@ -30,12 +31,14 @@ if (strlen($fullName) > 120) {
 }
 
 $db = (new Database())->getConnection();
+ensure_work_email_column($db);
+ensure_emails_not_unique($db);
 
 // Uniqueness check
-$stmt = $db->prepare('SELECT id FROM crminternet_users WHERE username = :u OR email = :e LIMIT 1');
-$stmt->execute([':u' => $username, ':e' => $email]);
+$stmt = $db->prepare('SELECT id FROM crminternet_users WHERE username = :u LIMIT 1');
+$stmt->execute([':u' => $username]);
 if ($stmt->fetch()) {
-    fail('Identifiant ou email déjà utilisé', 409);
+    fail('Identifiant déjà utilisé', 409);
 }
 
 $id   = 'U-' . substr(bin2hex(random_bytes(6)), 0, 10);
@@ -43,12 +46,12 @@ $hash = password_hash($password, PASSWORD_BCRYPT);
 $role = 'Agent'; // forced — never trust the client for role
 
 $ins = $db->prepare(
-    'INSERT INTO crminternet_users (id, username, full_name, email, password_hash, role, team, active)
-     VALUES (:id, :u, :fn, :e, :h, :r, :t, 1)'
+    'INSERT INTO crminternet_users (id, username, full_name, email, work_email, password_hash, role, team, active)
+     VALUES (:id, :u, :fn, :e, :we, :h, :r, :t, 1)'
 );
 $ins->execute([
     ':id' => $id, ':u' => $username, ':fn' => $fullName,
-    ':e'  => $email, ':h' => $hash, ':r' => $role, ':t' => $team,
+    ':e'  => $email, ':we' => $email, ':h' => $hash, ':r' => $role, ':t' => $team,
 ]);
 
 $token = jwt_sign(['sub' => $id, 'username' => $username, 'role' => $role]);

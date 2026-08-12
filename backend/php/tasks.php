@@ -9,11 +9,13 @@ ensure_tasks_schema($db);
 
 function task_to_arr(array $r): array
 {
+    $visible = trim((string)($r['visible_roles'] ?? ''));
     return [
         'id'            => $r['id'],
         'title'         => $r['title'],
         'description'   => $r['description'] ?? null,
         'assignedTo'    => $r['assigned_to'] ?? '',
+        'visibleRoles'  => $visible === '' ? [] : array_values(array_filter(array_map('trim', explode(',', $visible)), fn($v) => $v !== '')),
         'relatedEntity' => $r['related_entity'] ?? $r['entity_type'] ?? null,
         'relatedId'     => $r['related_id'] ?? $r['entity_id'] ?? null,
         'dueDate'       => $r['due_date'] ?? null,
@@ -23,6 +25,46 @@ function task_to_arr(array $r): array
         'createdAt'     => $r['created_at'] ?? null,
         'completedAt'   => $r['completed_at'] ?? null,
     ];
+}
+
+function task_normalize_visible_roles(mixed $roles): string
+{
+    if (is_array($roles)) {
+        return implode(",", array_values(array_filter(array_map('trim', array_map('strval', $roles)), fn($v) => $v !== '')));
+    }
+    if ($roles === null) {
+        return '';
+    }
+    if (is_string($roles)) {
+        return implode(",", array_values(array_filter(array_map('trim', explode(',', $roles)), fn($v) => $v !== '')));
+    }
+    return trim((string)$roles);
+}
+
+function load_current_user_roles(PDO $db, array $me): array
+{
+    $roles = [];
+    if (!empty($me['role'])) {
+        $roles[] = $me['role'];
+    }
+    try {
+        $stmt = $db->prepare('SELECT team_id FROM crminternet_users WHERE username = :u LIMIT 1');
+        $stmt->execute([':u' => $me['username']]);
+        $teamId = $stmt->fetchColumn();
+        if ($teamId) {
+            $rs = $db->prepare('SELECT role FROM crminternet_team_roles WHERE team_id = :t');
+            $rs->execute([':t' => $teamId]);
+            foreach ($rs->fetchAll(PDO::FETCH_COLUMN) as $role) {
+                $role = trim((string)$role);
+                if ($role !== '') {
+                    $roles[] = $role;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        // best-effort
+    }
+    return array_values(array_unique($roles));
 }
 
 function task_normalize_priority(mixed $p): string
@@ -60,9 +102,16 @@ if ($method === 'GET') {
     $sql = 'SELECT * FROM crminternet_tasks WHERE 1=1';
     $params = [];
     if ($mine || !$isAdmin) {
-        $sql .= ' AND (assigned_to = :u_assigned OR created_by = :u_created)';
+        $roles = load_current_user_roles($db, $me);
+        $clauses = ['assigned_to = :u_assigned', 'created_by = :u_created'];
         $params[':u_assigned'] = $me['username'];
         $params[':u_created']  = $me['username'];
+        foreach ($roles as $idx => $role) {
+            $param = ':role_' . $idx;
+            $clauses[] = "FIND_IN_SET({$param}, visible_roles)";
+            $params[$param] = $role;
+        }
+        $sql .= ' AND (' . implode(' OR ', $clauses) . ')';
     }
     if ($status) {
         $sql .= ' AND status = :s';
@@ -83,18 +132,20 @@ if ($method === 'POST') {
     }
     $id = 'T-' . substr(bin2hex(random_bytes(6)), 0, 10);
     $assigned = $in['assignedTo'] ?? $me['username'];
+    $visibleRoles = task_normalize_visible_roles($in['visibleRoles'] ?? []);
     $priority = task_normalize_priority($in['priority'] ?? 'normal');
     $status = task_normalize_status($in['status'] ?? 'todo');
     $now = date('Y-m-d H:i:s');
     $s = $db->prepare(
-        'INSERT INTO crminternet_tasks (id,title,description,assigned_to,related_entity,related_id,due_date,priority,status,created_by,created_at)
-         VALUES (:id,:t,:d,:a,:re,:ri,:du,:p,:st,:cb,:ca)'
+        'INSERT INTO crminternet_tasks (id,title,description,assigned_to,visible_roles,related_entity,related_id,due_date,priority,status,created_by,created_at)
+         VALUES (:id,:t,:d,:a,:vr,:re,:ri,:du,:p,:st,:cb,:ca)'
     );
     $s->execute([
         ':id' => $id,
         ':t' => $title,
         ':d' => $in['description'] ?? null,
         ':a' => $assigned,
+        ':vr' => $visibleRoles,
         ':re' => $in['relatedEntity'] ?? null,
         ':ri' => $in['relatedId'] ?? null,
         ':du' => $in['dueDate'] ?? null,
@@ -140,6 +191,7 @@ if ($method === 'PATCH' || $method === 'PUT') {
         'title' => 'title',
         'description' => 'description',
         'assignedTo' => 'assigned_to',
+        'visibleRoles' => 'visible_roles',
         'relatedEntity' => 'related_entity',
         'relatedId' => 'related_id',
         'dueDate' => 'due_date',
@@ -156,6 +208,9 @@ if ($method === 'PATCH' || $method === 'PUT') {
         }
         if ($k === 'status') {
             $v = task_normalize_status($v);
+        }
+        if ($k === 'visibleRoles') {
+            $v = task_normalize_visible_roles($v);
         }
         if ($k === 'assignedTo' && !$isAdmin && $v !== $me['username']) {
             continue;

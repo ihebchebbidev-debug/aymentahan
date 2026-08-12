@@ -1,11 +1,18 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/schema_repair.php';
 require_method('POST');
 $payload = require_auth();
 $db = (new Database())->getConnection();
+ensure_work_email_column($db);
 
 $in = json_input();
 if (!is_array($in)) fail('Invalid JSON', 422);
+
+// L'email professionnel (work_email) n'est JAMAIS modifiable par l'utilisateur lui-même :
+// il sert de destinataire aux codes OTP. Seule l'administration peut le changer (users.php).
+unset($in['workEmail'], $in['work_email']);
+
 
 // ---- Validation helpers (same rules as users.php POST) -------------------
 $strOrNull = function ($v, int $max = 255) {
@@ -127,7 +134,7 @@ try {
 audit_log($db, $payload, 'user.profile_update', 'user', $uid);
 
 // Return updated user (mirror auth_me.php shape)
-$stmt = $db->prepare('SELECT id, username, full_name, email, role, team, active,
+$stmt = $db->prepare('SELECT id, username, full_name, email, work_email, role, team, active,
                              job_title, birth_date, cin, company, contract_type,
                              salary, salary_increase,
                              contract_start, contract_end, renewal_start, renewal_end,
@@ -137,7 +144,8 @@ $stmt->execute([':id' => $uid]);
 $u = $stmt->fetch();
 ok(['user' => [
     'id'=>$u['id'], 'username'=>$u['username'], 'fullName'=>$u['full_name'],
-    'email'=>$u['email'], 'role'=>$u['role'], 'team'=>$u['team'], 'active'=>(bool)$u['active'],
+    // workEmail volontairement non exposé : visible uniquement par l'administration.
+    'email'=>$u['email'], 'workEmail'=>null, 'role'=>$u['role'], 'team'=>$u['team'], 'active'=>(bool)$u['active'],
     'jobTitle'=>$u['job_title'], 'birthDate'=>$u['birth_date'], 'cin'=>$u['cin'],
     'company'=>$u['company'], 'contractType'=>$u['contract_type'],
     'salary'=>$u['salary']!==null?(float)$u['salary']:null,

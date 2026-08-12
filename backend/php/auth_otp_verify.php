@@ -14,7 +14,7 @@ if ($codeLen < 4 || $codeLen > 8) fail('Code invalide', 422);
 $db = (new Database())->getConnection();
 ensure_otp_table($db);
 
-$s = $db->prepare("SELECT o.*, u.id AS uid, u.username, u.full_name, u.email, u.role, u.team, u.active,
+$s = $db->prepare("SELECT o.*, u.id AS uid, u.username, u.full_name, u.email, u.work_email, u.role, u.team, u.active,
                           COALESCE(u.must_change_password, 0) AS must_change_password
                    FROM crminternet_login_otp o
                    JOIN crminternet_users u ON u.id = o.user_id

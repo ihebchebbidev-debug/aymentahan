@@ -1536,6 +1536,7 @@ try {
             entity_type VARCHAR(50),
             entity_id VARCHAR(40),
             assigned_to VARCHAR(80),
+            visible_roles TEXT NOT NULL DEFAULT '',
             status VARCHAR(50) DEFAULT 'pending',
             priority INT DEFAULT 0,
             due_date DATE,

@@ -5,7 +5,10 @@ export type AuthUser = {
   id: string;
   username: string;
   fullName: string;
+  /** Email personnel (profil). */
   email: string;
+  /** Email professionnel (destinataire OTP) — visible par le titulaire et l'administration. */
+  workEmail?: string | null;
   role: "Administrateur" | "Manager" | "Agent" | "Backoffice" | "AgentSuivi" | "AgentActivation" | "AgentVente" | string;
   team: string;
   active: boolean;

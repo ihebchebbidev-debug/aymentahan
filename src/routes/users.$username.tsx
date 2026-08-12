@@ -73,7 +73,12 @@ function UserDetailPage() {
               <CardDescription>Identité et permissions</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-              <Info icon={<Mail className="h-3.5 w-3.5" />} label="Email" value={u.email || "—"} />
+              <Info icon={<Mail className="h-3.5 w-3.5" />} label="Email personnel" value={u.email || "—"} />
+              <Info
+                icon={<Mail className="h-3.5 w-3.5" />}
+                label="Email professionnel (OTP)"
+                value={u.workEmail || (u.workEmailHidden ? "•••••• (masqué)" : "—")}
+              />
               <Info icon={<Shield className="h-3.5 w-3.5" />} label="Rôle" value={u.role} />
               <Info icon={<UsersIcon className="h-3.5 w-3.5" />} label="Équipe" value={u.team} />
               <Info icon={<Activity className="h-3.5 w-3.5" />} label="Statut" value={u.active ? "Actif" : "Inactif"} />

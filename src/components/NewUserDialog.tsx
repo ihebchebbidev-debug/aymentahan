@@ -19,14 +19,18 @@ import { UserHrFields, EMPTY_HR, hrValuesToPayload, type UserHrValues } from "./
 import { MVP_ROLE_OPTIONS, roleLabel } from "@/lib/roleLabels";
 import { DEFAULT_USER_AGENCY_TEAM } from "@/lib/userAgencyTeams";
 import { useTeams } from "@/hooks/use-teams";
+import { useAuth } from "@/lib/auth";
 
 export function NewUserDialog() {
   const { saveUser, roles } = useErp();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "Administrateur";
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [workEmail, setWorkEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("Agent");
   const [team, setTeam] = useState(DEFAULT_USER_AGENCY_TEAM);
@@ -43,7 +47,9 @@ export function NewUserDialog() {
     try {
       await saveUser({
         username: username.trim(), fullName: fullName.trim(),
-        email: email.trim(), role, team, active, password,
+        email: email.trim(),
+        ...(isAdmin && workEmail.trim() ? { workEmail: workEmail.trim() } : {}),
+        role, team, active, password,
         ...hrValuesToPayload(hr),
       });
       // Persist custom field values for the new user (keyed by username).
@@ -78,7 +84,17 @@ export function NewUserDialog() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
           <div className="space-y-1.5"><Label>Nom d'utilisateur *</Label><Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="marie.dupont" /></div>
           <div className="space-y-1.5"><Label>Nom complet *</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Marie Dupont" /></div>
-          <div className="space-y-1.5 col-span-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="marie@example.com" /></div>
+          <div className="space-y-1.5 col-span-2">
+            <Label>Email personnel</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="marie@example.com" />
+          </div>
+          {isAdmin && (
+            <div className="space-y-1.5 col-span-2">
+              <Label>Email professionnel (codes OTP)</Label>
+              <Input type="email" value={workEmail} onChange={(e) => setWorkEmail(e.target.value)} placeholder="marie.dupont@societe.com" />
+              <p className="text-xs text-muted-foreground">Destinataire des codes de vérification. Ajouté et modifié uniquement par un administrateur.</p>
+            </div>
+          )}
           <div className="space-y-1.5 col-span-2"><Label>Mot de passe *</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Au moins 6 caractères" /></div>
           <div className="space-y-1.5"><Label>Rôle</Label>
             <Select value={role} onValueChange={(v) => setRole(v)}><SelectTrigger><SelectValue /></SelectTrigger>

@@ -151,6 +151,7 @@ function ensure_tasks_schema(PDO $db): void
         title           VARCHAR(200) NOT NULL,
         description     TEXT         NULL,
         assigned_to     VARCHAR(80)  NOT NULL DEFAULT '',
+        visible_roles   TEXT         NOT NULL DEFAULT '',
         related_entity  VARCHAR(20)  NULL,
         related_id      VARCHAR(40)  NULL,
         due_date        DATE         NULL,
@@ -185,6 +186,7 @@ function ensure_tasks_schema(PDO $db): void
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks ADD COLUMN related_entity VARCHAR(20) NULL');
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks ADD COLUMN related_id VARCHAR(40) NULL');
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks ADD COLUMN created_by VARCHAR(80) NOT NULL DEFAULT \'\'');
+    crm_try_alter($db, 'ALTER TABLE crminternet_tasks ADD COLUMN visible_roles TEXT NOT NULL DEFAULT \'\'');
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT \'normal\'');
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks CHANGE COLUMN entity_type related_entity VARCHAR(20) NULL');
     crm_try_alter($db, 'ALTER TABLE crminternet_tasks CHANGE COLUMN entity_id related_id VARCHAR(40) NULL');
@@ -424,5 +426,65 @@ function ensure_custom_fields_schema(PDO $db): void
             $db->exec("UPDATE crminternet_custom_field_values SET updated_at = NOW()
                 WHERE updated_at IS NULL OR updated_at = '0000-00-00 00:00:00'");
         } catch (Throwable $e) { /* best-effort */ }
+    }
+}
+
+/**
+ * crminternet_users.work_email — email professionnel (destinataire OTP).
+ * Idempotent : sûr à appeler à chaque requête.
+ */
+function ensure_work_email_column(PDO $db): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+
+    $cols = [];
+    try {
+        foreach ($db->query('SHOW COLUMNS FROM crminternet_users') as $r) {
+            $cols[$r['Field']] = true;
+        }
+    } catch (Throwable $e) {
+        return;
+    }
+    if (isset($cols['work_email'])) { ensure_emails_not_unique($db); return; }
+
+    crm_try_alter($db, 'ALTER TABLE crminternet_users ADD COLUMN work_email VARCHAR(160) NULL');
+    // Backfill : l'email actuel servait de fait à la connexion/OTP → devient le pro.
+    try {
+        $db->exec("UPDATE crminternet_users
+                      SET work_email = email
+                    WHERE (work_email IS NULL OR work_email = '')
+                      AND email IS NOT NULL AND email <> ''
+                      AND email <> 'admin@crminternet.local'");
+    } catch (Throwable $e) { /* best-effort */ }
+    ensure_emails_not_unique($db);
+    // Index NON unique : les doublons d'emails (perso comme pro) sont autorisés.
+    crm_try_alter($db, 'CREATE INDEX idx_users_work_email ON crminternet_users (work_email)');
+}
+
+/**
+ * Supprime les contraintes d'unicité sur les emails : plusieurs utilisateurs
+ * peuvent partager la même adresse personnelle et/ou professionnelle.
+ * Idempotent.
+ */
+function ensure_emails_not_unique(PDO $db): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $rows = $db->query('SHOW INDEX FROM crminternet_users')->fetchAll();
+    } catch (Throwable $e) {
+        return;
+    }
+    $unique = [];
+    foreach ($rows as $r) {
+        $name = $r['Key_name'] ?? '';
+        $col  = $r['Column_name'] ?? '';
+        if ($name === 'PRIMARY' || (int)($r['Non_unique'] ?? 1) === 1) continue;
+        if (in_array($col, ['email', 'work_email'], true)) $unique[$name] = $col;
+    }
+    foreach ($unique as $name => $col) {
+        crm_try_alter($db, 'ALTER TABLE crminternet_users DROP INDEX `' . $name . '`');
+        crm_try_alter($db, 'CREATE INDEX `idx_users_' . $col . '` ON crminternet_users (`' . $col . '`)');
     }
 }

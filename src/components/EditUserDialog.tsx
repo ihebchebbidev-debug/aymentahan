@@ -16,16 +16,20 @@ import type { AppUser } from "@/lib/types";
 import { toast } from "sonner";
 import { UserHrFields, hrValuesFromUser, hrValuesToPayload, type UserHrValues } from "./UserHrFields";
 import { useTeams } from "@/hooks/use-teams";
+import { useAuth } from "@/lib/auth";
 
 
 
 export function EditUserDialog({ user }: { user: AppUser }) {
   const { saveUser, roles } = useErp();
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "Administrateur";
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [username, setUsername] = useState(user.username);
   const [fullName, setFullName] = useState(user.fullName);
   const [email, setEmail] = useState(user.email);
+  const [workEmail, setWorkEmail] = useState(user.workEmail ?? "");
   const [role, setRole] = useState<string>(user.role);
   const [team, setTeam] = useState(user.team);
   const [active, setActive] = useState(user.active);
@@ -38,6 +42,10 @@ export function EditUserDialog({ user }: { user: AppUser }) {
       toast.error("Nom d'utilisateur invalide (lettres, chiffres, . _ - ; 2 à 64 caractères)");
       return;
     }
+    const we = workEmail.trim();
+    if (we && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(we)) {
+      toast.error("Email professionnel invalide"); return;
+    }
     setSaving(true);
     try {
       await saveUser({
@@ -47,6 +55,7 @@ export function EditUserDialog({ user }: { user: AppUser }) {
         // sur assigned_to dans prospects / opportunités / contrats).
         ...(newUsername !== user.username ? { previousUsername: user.username } : {}),
         fullName: fullName.trim(), email: email.trim(),
+        ...(isAdmin && we ? { workEmail: we } : {}),
         role, team, active,
         ...hrValuesToPayload(hr),
       } as any);
@@ -74,7 +83,25 @@ export function EditUserDialog({ user }: { user: AppUser }) {
             <p className="text-xs text-muted-foreground">Lettres, chiffres et . _ - autorisés (2 à 64 caractères).</p>
           </div>
           <div className="space-y-1.5 col-span-2"><Label>Nom complet *</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-          <div className="space-y-1.5 col-span-2"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div className="space-y-1.5 col-span-2">
+            <Label>Email personnel</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <p className="text-xs text-muted-foreground">Visible dans le profil. Jamais utilisé pour les codes OTP.</p>
+          </div>
+          {isAdmin && (
+            <div className="space-y-1.5 col-span-2">
+              <Label>Email professionnel (codes OTP)</Label>
+              <Input
+                type="email"
+                value={workEmail}
+                onChange={(e) => setWorkEmail(e.target.value)}
+                placeholder={user.workEmailHidden ? "•••••• (masqué)" : "prenom.nom@societe.com"}
+              />
+              <p className="text-xs text-muted-foreground">
+                Destinataire des codes de vérification. Ajouté et modifié uniquement par un administrateur.
+              </p>
+            </div>
+          )}
           <div className="space-y-1.5"><Label>Rôle</Label>
             <Select value={role} onValueChange={(v) => setRole(v)}><SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>

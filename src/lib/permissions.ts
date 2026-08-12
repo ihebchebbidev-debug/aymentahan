@@ -151,6 +151,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "user.add", label: "Créer utilisateur" },
       { key: "user.edit", label: "Éditer utilisateur" },
       { key: "user.delete", label: "Supprimer utilisateur" },
+      { key: "user.view_work_email", label: "Voir / modifier l'email professionnel" },
       { key: "user.export", label: "Exporter utilisateurs" },
       { key: "user.reset_password", label: "Réinitialiser mot de passe" },
       { key: "user.toggle_active", label: "Activer/désactiver utilisateur" },

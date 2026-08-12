@@ -471,6 +471,7 @@ function crm_create_tables_sql(): array {
             title VARCHAR(200) NOT NULL,
             description TEXT,
             assigned_to VARCHAR(80) NOT NULL,
+            visible_roles TEXT NOT NULL DEFAULT '',
             related_entity VARCHAR(20) DEFAULT NULL,
             related_id VARCHAR(40) DEFAULT NULL,
             due_date DATE DEFAULT NULL,
