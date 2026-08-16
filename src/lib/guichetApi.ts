@@ -94,7 +94,16 @@ export type GuichetDashboard = {
   };
   contracts: { today: number; month: number };
   activation: { rate: number; min: number; meets: boolean; validated: number; totalEntries: number };
-  leaderboard: { agentId: string; sim: number; port: number; fancy: number }[];
+  leaderboard: {
+    agentId: string;
+    sim: number;
+    port: number;
+    swp: number;
+    divers: number;
+    facture_tt: number;
+    facture_topnet: number;
+    fancy?: number;
+  }[];
   perAgent?: { agentId: string; counts: Record<string, number>; amounts: Record<string, number>; revenue: number }[];
   bonusDt: number | null;
   todayRecap?: {

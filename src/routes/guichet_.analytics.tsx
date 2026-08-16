@@ -394,12 +394,15 @@ function GuichetAnalyticsPage() {
 
           {/* Per agent leaderboard */}
           {effectiveConfig.sections.leaderboard && canReadAll && !agentId && perAgent.length > 0 && (
-            <Card>
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50/80 via-white to-rose-50/70 shadow-sm">
               <CardContent className="p-0">
-                <div className="px-4 py-3 border-b text-sm font-semibold">Classement des agents</div>
+                <div className="px-4 py-3 border-b text-sm font-semibold text-amber-800 flex items-center justify-between gap-2">
+                  <span>Classement des agents</span>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-200">Tous types</Badge>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="text-[11px] uppercase text-muted-foreground bg-muted/40">
+                    <thead className="text-[11px] uppercase text-amber-900 bg-amber-50/80">
                       <tr>
                         <th className="text-left px-4 py-2 font-medium w-10">#</th>
                         <th className="text-left px-4 py-2 font-medium">Agent</th>
@@ -411,9 +414,9 @@ function GuichetAnalyticsPage() {
                     </thead>
                     <tbody>
                       {perAgent.map((r, i) => (
-                        <tr key={r.agentId} className="border-t">
-                          <td className="px-4 py-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
-                          <td className="px-4 py-2.5">{agentName(r.agentId)}</td>
+                        <tr key={r.agentId} className={i % 2 === 0 ? "border-t bg-white/60" : "border-t bg-amber-50/30"}>
+                          <td className="px-4 py-2.5 text-amber-700 tabular-nums font-bold">{i + 1}</td>
+                          <td className="px-4 py-2.5 font-medium">{agentName(r.agentId)}</td>
                           <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
                             {fmtDT(visibleTypes.reduce((s, t) => s + (r.amounts[t] || 0), 0))}
                           </td>

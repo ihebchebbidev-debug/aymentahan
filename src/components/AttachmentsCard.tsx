@@ -72,7 +72,7 @@ function FileTypeIcon({ mime }: { mime: string }) {
 }
 
 export type AttachmentSource = {
-  entity: "prospect" | "opportunity" | "contract" | "migration" | "reclamation";
+  entity: "prospect" | "opportunity" | "contract" | "migration" | "reclamation" | "task";
   entityId: string;
   label?: string; // optional badge label (e.g. "Prospect", "Opportunité")
 };
@@ -84,7 +84,7 @@ export function AttachmentsCard({
   onAdded,
   onRemoved,
 }: {
-  entity: "prospect" | "opportunity" | "contract" | "migration" | "reclamation";
+  entity: "prospect" | "opportunity" | "contract" | "migration" | "reclamation" | "task";
   entityId: string;
   /** Additional read-only sources whose attachments are merged into the list (e.g. parent prospect on a contract page). */
   extraSources?: AttachmentSource[];

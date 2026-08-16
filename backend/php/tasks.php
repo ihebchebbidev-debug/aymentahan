@@ -212,8 +212,10 @@ if ($method === 'PATCH' || $method === 'PUT') {
         if ($k === 'visibleRoles') {
             $v = task_normalize_visible_roles($v);
         }
-        if ($k === 'assignedTo' && !$isAdmin && $v !== $me['username']) {
-            continue;
+        if ($k === 'assignedTo') {
+            // Allow task creator or current assignee to reassign the task.
+            // Authorization is already enforced above by checking creator/assignee or admin.
+            $v = trim((string)$v);
         }
         if ($k === 'description') {
             $note = trim((string)$v);

@@ -4,14 +4,15 @@ import { PageHeader } from "@/components/PageHeader";
 import { CheckSquare, Plus, Trash2, RefreshCw, Eye } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { CommentThread } from "@/components/CommentThread";
+import { AttachmentsCard } from "@/components/AttachmentsCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api, API_ENABLED } from "@/lib/api";
@@ -45,6 +46,22 @@ const PRIO_BADGE: Record<string, string> = {
   normal: "bg-info/15 text-info",
   high: "bg-destructive/15 text-destructive",
 };
+
+function parseDescriptionEntries(description: string | null): Array<{ id: string; author: string | null; date: string | null; body: string }> {
+  if (!description) return [];
+  return String(description)
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block, index) => {
+      const timestampMatch = block.match(/^\[([^\]]+)\]\s+/);
+      const authorMatch = block.match(/^\[[^\]]+\]\s+([^:]+):\s*/);
+      const date = timestampMatch ? timestampMatch[1] : null;
+      const author = authorMatch ? authorMatch[1] : "Description";
+      const body = authorMatch ? block.replace(/^\[[^\]]+\]\s+[^:]+:\s*/, "").trim() : block;
+      return { id: `task-description-${index}`, author, date, body };
+    });
+}
 
 function TasksPage() {
   const auth = useAuth();
@@ -183,6 +200,16 @@ function TasksPage() {
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="ex: Rappeler M. Dupont" />
             </div>
             <div className="space-y-1">
+              <Label>Visibilité par rôle</Label>
+              <MultiSelect
+                options={Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))}
+                values={visibleRoles}
+                onChange={setVisibleRoles}
+                placeholder="Choisir des rôles visibles"
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1">
               <Label>Assigné à</Label>
               <Select value={assignee} onValueChange={setAssignee} disabled={!auth.hasPermission("task.edit")}>
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
@@ -190,19 +217,6 @@ function TasksPage() {
                   {users.map((u) => <SelectItem key={u.username} value={u.username}>{u.fullName} ({u.username})</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Visibilité par rôle</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(ROLE_LABEL).map(([value, label]) => (
-                  <label key={value} className="inline-flex items-center gap-2 text-sm">
-                    <Checkbox checked={visibleRoles.includes(value)} onCheckedChange={(checked) => {
-                      setVisibleRoles((prev) => checked ? Array.from(new Set([...prev, value])) : prev.filter((r) => r !== value));
-                    }} />
-                    {label}
-                  </label>
-                ))}
-              </div>
             </div>
             <div className="space-y-1">
               <Label>Échéance</Label>
@@ -321,7 +335,7 @@ function TasksPage() {
         </div>
       </Card>
 
-      <Dialog open={!!selectedTask} onOpenChange={(o) => { if (!o) { setSelectedTask(null); setDescriptionNote(""); } }}>
+      <Dialog open={!!selectedTask} onOpenChange={(o) => { if (!o) { setSelectedTask(null); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Tâche {selectedTask?.id}</DialogTitle>
@@ -332,7 +346,19 @@ function TasksPage() {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1"><Label>Titre</Label><Input value={selectedTask.title} onChange={(e) => setSelectedTask({ ...selectedTask, title: e.target.value })} /></div>
-                  <div className="space-y-1"><Label>Assigné à</Label><Input value={selectedTask.assignedTo} onChange={(e) => setSelectedTask({ ...selectedTask, assignedTo: e.target.value })} /></div>
+                  <div className="space-y-1">
+                    <Label>Assigné à</Label>
+                    <Select value={selectedTask.assignedTo} onValueChange={(v) => setSelectedTask({ ...selectedTask, assignedTo: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {users.map((u) => (
+                          <SelectItem key={u.username} value={u.username}>
+                            {u.fullName} ({u.username})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-1"><Label>Status</Label><Select value={selectedTask.status} onValueChange={(v) => setSelectedTask({ ...selectedTask, status: v as Task["status"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="todo">À faire</SelectItem><SelectItem value="in_progress">En cours</SelectItem><SelectItem value="done">Terminée</SelectItem><SelectItem value="cancelled">Annulée</SelectItem></SelectContent></Select></div>
                   <div className="space-y-1"><Label>Priorité</Label><Select value={selectedTask.priority} onValueChange={(v) => setSelectedTask({ ...selectedTask, priority: v as Task["priority"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="high">Haute</SelectItem><SelectItem value="normal">Normale</SelectItem><SelectItem value="low">Basse</SelectItem></SelectContent></Select></div>
                 </div>
@@ -342,34 +368,39 @@ function TasksPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>Visibilité par rôle</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(ROLE_LABEL).map(([value, label]) => (
-                      <label key={value} className="inline-flex items-center gap-2 text-sm">
-                        <Checkbox checked={selectedTask.visibleRoles.includes(value)} onCheckedChange={(checked) => {
-                          const next = checked ? Array.from(new Set([...selectedTask.visibleRoles, value])) : selectedTask.visibleRoles.filter((r) => r !== value);
-                          setSelectedTask({ ...selectedTask, visibleRoles: next });
-                        }} />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Commentaires</Label>
-                  <CommentThread
-                    entries={selectedTask.description ? [{ id: "task-description", author: "Description", date: null, body: selectedTask.description }] : []}
-                    emptyLabel="Aucun commentaire pour cette tâche"
+                  <MultiSelect
+                    options={Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }))}
+                    values={selectedTask.visibleRoles}
+                    onChange={(next) => setSelectedTask({ ...selectedTask, visibleRoles: next })}
+                    placeholder="Choisir des rôles visibles"
+                    className="w-full"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Ajouter une note à l'historique</Label>
-                  <Textarea rows={3} value={descriptionNote} onChange={(e) => setDescriptionNote(e.target.value)} placeholder="Ajouter une note sans écraser l'historique" />
+                  <Label>Historique</Label>
+                  <CommentThread
+                    entries={parseDescriptionEntries(selectedTask.description)}
+                    emptyLabel="Aucun historique pour cette tâche"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Pièces jointes</Label>
+                  <AttachmentsCard entity="task" entityId={selectedTask.id} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Ajouter une note</Label>
+                  <Textarea
+                    rows={3}
+                    value={descriptionNote}
+                    onChange={(e) => setDescriptionNote(e.target.value)}
+                    placeholder="Ajouter une note sans modifier l'historique existant"
+                  />
                 </div>
               </>
             ) : null}
           </div>
           <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setSelectedTask(null); setDescriptionNote(""); }}>Fermer</Button>
+            <Button variant="outline" onClick={() => { setSelectedTask(null); }}>Fermer</Button>
             <Button onClick={saveTask} disabled={!selectedTask || taskSaving}>
               {taskSaving ? "Enregistrement…" : "Enregistrer"}
             </Button>

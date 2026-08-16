@@ -4,6 +4,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
+type MultiSelectOption = string | { value: string; label: string };
+
 export function MultiSelect({
   options,
   values,
@@ -11,14 +13,20 @@ export function MultiSelect({
   placeholder = "Choisir…",
   className,
 }: {
-  options: string[];
+  options: MultiSelectOption[];
   values: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
   className?: string;
 }) {
-  const toggle = (o: string) =>
-    onChange(values.includes(o) ? values.filter((v) => v !== o) : [...values, o]);
+  const normalize = (option: MultiSelectOption) =>
+    typeof option === "string" ? option : option.value;
+  const labelOf = (option: MultiSelectOption) =>
+    typeof option === "string" ? option : option.label;
+  const toggle = (o: MultiSelectOption) => {
+    const value = normalize(o);
+    onChange(values.includes(value) ? values.filter((v) => v !== value) : [...values, value]);
+  };
 
   return (
     <Popover>
@@ -48,11 +56,12 @@ export function MultiSelect({
           {options.length === 0 ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">Aucune option</div>
           ) : options.map((o) => {
-            const checked = values.includes(o);
+            const value = normalize(o);
+            const checked = values.includes(value);
             return (
               <button
                 type="button"
-                key={o}
+                key={value}
                 onClick={() => toggle(o)}
                 className="flex items-center w-full gap-2 px-2 py-1.5 text-sm rounded hover:bg-accent"
               >
@@ -62,7 +71,7 @@ export function MultiSelect({
                 )}>
                   {checked && <Check className="h-3 w-3" />}
                 </span>
-                <span className="truncate">{o}</span>
+                <span className="truncate">{labelOf(o)}</span>
               </button>
             );
           })}

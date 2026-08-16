@@ -13,7 +13,7 @@ export function CommentThread({
   emptyLabel?: string;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
       {entries.length === 0 ? (
         <div className="rounded-3xl border border-border bg-muted/40 p-5 text-sm text-muted-foreground">
           {emptyLabel}

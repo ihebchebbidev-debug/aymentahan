@@ -207,20 +207,34 @@ $totalEntries = (int)($arow['total'] ?? 0);
 $validEntries = (int)($arow['v'] ?? 0);
 $activationRate = $totalEntries > 0 ? round($validEntries * 100.0 / $totalEntries, 1) : 0.0;
 
-/* --- Leaderboard SIM (top 10 agents) -------------------------------- */
+/* --- Leaderboard global (top 10 agents, tous types confondus) ------ */
 $lbSql = "SELECT d.agent_id AS aid,
-                 SUM(CASE WHEN e.type='sim'  THEN 1 ELSE 0 END) AS sim,
+                 SUM(CASE WHEN e.type='sim' THEN 1 ELSE 0 END) AS sim,
                  SUM(CASE WHEN e.type='port' THEN 1 ELSE 0 END) AS port,
+                 SUM(CASE WHEN e.type='swp' THEN 1 ELSE 0 END) AS swp,
+                 SUM(CASE WHEN e.type='divers' THEN 1 ELSE 0 END) AS divers,
+                 SUM(CASE WHEN e.type='facture_tt' THEN 1 ELSE 0 END) AS facture_tt,
+                 SUM(CASE WHEN e.type='facture_topnet' THEN 1 ELSE 0 END) AS facture_topnet,
                  SUM(CASE WHEN e.type='sim' AND LOWER(COALESCE(e.offre,''))='fancy' THEN 1 ELSE 0 END) AS fancy
           FROM crminternet_guichet_entries e
           JOIN crminternet_guichet_dossiers d ON d.id = e.dossier_id
           WHERE $wsql
           GROUP BY d.agent_id
-          ORDER BY sim DESC, fancy DESC
+          ORDER BY (sim + port + swp + divers + facture_tt + facture_topnet) DESC,
+                   sim DESC, port DESC, swp DESC, divers DESC, facture_tt DESC, facture_topnet DESC, fancy DESC
           LIMIT 10";
 $lb = $db->prepare($lbSql); $lb->execute($params);
 $leaderboard = array_map(function($r) {
-    return ['agentId'=>(string)$r['aid'], 'sim'=>(int)$r['sim'], 'port'=>(int)$r['port'], 'fancy'=>(int)$r['fancy']];
+    return [
+        'agentId' => (string)$r['aid'],
+        'sim' => (int)$r['sim'],
+        'port' => (int)$r['port'],
+        'swp' => (int)$r['swp'],
+        'divers' => (int)$r['divers'],
+        'facture_tt' => (int)$r['facture_tt'],
+        'facture_topnet' => (int)$r['facture_topnet'],
+        'fancy' => (int)$r['fancy'],
+    ];
 }, $lb->fetchAll());
 
 /* --- Per-agent revenue (TOUS les agents avec opérations valides) ---- */

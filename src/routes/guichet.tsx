@@ -1616,31 +1616,40 @@ function DashboardTab({
 
           {/* Leaderboard (admin only when looking at all agents) */}
           {canReadAll && data.leaderboard.length > 0 && (
-            <Card>
+            <Card className="border-amber-200 bg-gradient-to-br from-amber-50/80 via-white to-rose-50/70 shadow-sm">
               <CardContent className="p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold mb-3">
-                  <Trophy className="h-4 w-4 text-amber-500" />
-                  Classement des agents — {month}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                    <Trophy className="h-4 w-4 text-amber-600" />
+                    Classement des agents — {month}
+                  </div>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-200">Tous types</Badge>
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>Agent</TableHead>
-                        <TableHead className="text-right">SIM</TableHead>
-                        <TableHead className="text-right">Portabilité</TableHead>
-                        <TableHead className="text-right">Fancy</TableHead>
+                      <TableRow className="bg-amber-50/80 hover:bg-amber-50/80">
+                        <TableHead className="w-12 text-amber-900">#</TableHead>
+                        <TableHead className="text-amber-900">Agent</TableHead>
+                        <TableHead className="text-right text-amber-900">SIM</TableHead>
+                        <TableHead className="text-right text-amber-900">Portabilité</TableHead>
+                        <TableHead className="text-right text-amber-900">SWP</TableHead>
+                        <TableHead className="text-right text-amber-900">Divers</TableHead>
+                        <TableHead className="text-right text-amber-900">Facture TT</TableHead>
+                        <TableHead className="text-right text-amber-900">Facture Topnet</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.leaderboard.map((row, i) => (
-                        <TableRow key={row.agentId}>
-                          <TableCell className="font-bold">{i + 1}</TableCell>
-                          <TableCell>{agentName(row.agentId)}</TableCell>
+                        <TableRow key={row.agentId} className={i % 2 === 0 ? "bg-white/60" : "bg-amber-50/30"}>
+                          <TableCell className="font-bold text-amber-700">{i + 1}</TableCell>
+                          <TableCell className="font-medium">{agentName(row.agentId)}</TableCell>
                           <TableCell className="text-right tabular-nums">{row.sim}</TableCell>
                           <TableCell className="text-right tabular-nums">{row.port}</TableCell>
-                          <TableCell className="text-right tabular-nums">{row.fancy}</TableCell>
+                          <TableCell className="text-right tabular-nums">{row.swp}</TableCell>
+                          <TableCell className="text-right tabular-nums">{row.divers}</TableCell>
+                          <TableCell className="text-right tabular-nums">{row.facture_tt}</TableCell>
+                          <TableCell className="text-right tabular-nums">{row.facture_topnet}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

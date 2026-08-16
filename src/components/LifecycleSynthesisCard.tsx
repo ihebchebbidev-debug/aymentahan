@@ -139,10 +139,70 @@ export function LifecycleSynthesisCard(props: Props) {
         typeLabel = t?.types?.find((x) => String(x.id) === String(prospect!.typeId))?.name ?? null;
       }
 
-      // Dernières modifications.
+      // Dernières modifications. If the opportunity row was removed during a
+      // revert, try to recover its last actor from the prospect's audit log
+      // (revert event contains the original opportunity id).
+      let pmPromise = prospect ? fetchLastModified("prospect", prospect.id) : Promise.resolve({ at: null, by: null });
+      let omPromise: Promise<{ at: string | null; by: string | null }>;
+      let auditDiscoveredOppId: string | null = null;
+      let auditDiscoveredOppCreatedAt: string | null = null;
+      let auditDiscoveredOppCreatedBy: string | null = null;
+      if (opp) {
+        omPromise = fetchLastModified("opportunity", opp.id);
+      } else {
+        // No opportunity row — attempt to discover the original id from
+        // prospect audit entries (revert_lead events include opportunityId).
+        omPromise = (async (): Promise<{ at: string | null; by: string | null }> => {
+          if (!prospect?.id) return { at: null, by: null };
+          try {
+            const logs = await get<{ logs: Array<{ action?: string; createdAt?: string; user?: string; details?: string }> }>(
+              `/audit_log.php?entity=prospect&entity_id=${encodeURIComponent(prospect.id)}&limit=20&sort=desc&action=revert_lead`
+            );
+            const entries = logs?.logs ?? [];
+            for (const e of entries) {
+              if (!e.details) continue;
+              try {
+                const d = JSON.parse(e.details as string);
+                if (d?.opportunityId) {
+                  auditDiscoveredOppId = String(d.opportunityId);
+                  // Try to recover the opportunity creation audit entry which
+                  // was recorded on the prospect during conversion. This lets
+                  // us show "Créé le / Créé par" even after the opportunity
+                  // row was deleted by the revert flow.
+                  try {
+                    const cLogs = await get<{ logs: Array<{ createdAt?: string; user?: string; details?: string }> }>(
+                      `/audit_log.php?entity=prospect&entity_id=${encodeURIComponent(prospect.id)}&action=prospect.convert_to_opportunity&limit=50&sort=asc`
+                    );
+                    const cEntries = cLogs?.logs ?? [];
+                    for (const ce of cEntries) {
+                      if (!ce.details) continue;
+                      try {
+                        const cd = JSON.parse(ce.details as string);
+                        if (String(cd?.opportunityId) === String(d.opportunityId)) {
+                          auditDiscoveredOppCreatedAt = ce.createdAt ?? null;
+                          auditDiscoveredOppCreatedBy = ce.user ?? null;
+                          break;
+                        }
+                      } catch (_) { continue; }
+                    }
+                  } catch (_) { /* ignore */ }
+
+                  // Use the audit entry timestamp/user if available; prefer
+                  // the detailed audit for recency but also fetch last modified
+                  // for the (deleted) opportunity to keep parity with normal flow.
+                  const om = await fetchLastModified("opportunity", String(d.opportunityId));
+                  return om;
+                }
+              } catch (_) { continue; }
+            }
+          } catch (_) { /* ignore */ }
+          return { at: null, by: null };
+        })();
+      }
+
       const [pm, om, cm, mm] = await Promise.all([
-        prospect ? fetchLastModified("prospect", prospect.id) : Promise.resolve({ at: null, by: null }),
-        opp ? fetchLastModified("opportunity", opp.id) : Promise.resolve({ at: null, by: null }),
+        pmPromise,
+        omPromise,
         contract ? fetchLastModified("contract", contract.id) : Promise.resolve({ at: null, by: null }),
         migration ? fetchLastModified("migration", migration.id) : Promise.resolve({ at: null, by: null }),
       ]);
@@ -158,10 +218,10 @@ export function LifecycleSynthesisCard(props: Props) {
           updatedBy: pm.by ?? prospect?.updatedBy ?? null,
         },
         {
-          key: "opportunity", label: "Opportunité", id: opp?.id ?? null,
+          key: "opportunity", label: "Opportunité", id: opp?.id ?? auditDiscoveredOppId ?? null,
           status: opp?.stage ?? null,
-          createdAt: opp?.createdAt ?? null,
-          createdBy: opp?.createdBy ?? null,
+          createdAt: opp?.createdAt ?? auditDiscoveredOppCreatedAt ?? null,
+          createdBy: opp?.createdBy ?? auditDiscoveredOppCreatedBy ?? null,
           updatedAt: om.at ?? opp?.updatedAt ?? null,
           updatedBy: om.by ?? opp?.updatedBy ?? null,
         },

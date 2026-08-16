@@ -20,7 +20,7 @@ try {
 } catch (\Throwable $e) { /* best effort */ }
 
 $method = $_SERVER['REQUEST_METHOD'];
-$ENTITIES = ['prospect', 'opportunity', 'contract', 'migration'];
+$ENTITIES = ['prospect', 'opportunity', 'contract', 'migration', 'task'];
 // Limite max par fichier. Augmentée pour permettre partage de vidéos/audio
 // et documents via l'interface (les images continuent d'être compressées côté
 // client quand approprié). Ces limites sont prudentes mais peuvent être
