@@ -118,3 +118,33 @@ function pipeline_pick_revert_lead_status(PDO $db): string {
     // Fallback: first stage alphabetically, or hardcoded default
     return $stages['list'][0]['name'] ?? 'Nouveau';
 }
+
+/**
+ * Returns the name of the "lost" lead stage to use when an opportunity is
+ * reverted back to a lead — a revert means the deal fell through, so the
+ * resulting lead must land on the lost stage, not the initial/"Nouveau" one.
+ * Falls back to 'Refus' if no stage is flagged is_lost.
+ */
+function pipeline_pick_lost_lead_status(PDO $db): string {
+    $stages = pipeline_load_stages($db, 'lead');
+    foreach ($stages['list'] as $s) {
+        if (!empty($s['is_lost'])) return $s['name'];
+    }
+    return 'Refus';
+}
+
+/**
+ * Returns the name of the "won" lead stage — used to mark the ORIGINATING
+ * prospect as won when the deal closes further down the pipeline (opportunity
+ * converted to contract/migration), since only the direct prospect→contract
+ * shortcut (mark_won) used to do this, leaving the prospect stuck on its old
+ * status/outcome even though a contract existed for it.
+ * Falls back to 'Vendu' if no stage is flagged is_won.
+ */
+function pipeline_pick_won_lead_status(PDO $db): string {
+    $stages = pipeline_load_stages($db, 'lead');
+    foreach ($stages['list'] as $s) {
+        if (!empty($s['is_won'])) return $s['name'];
+    }
+    return 'Vendu';
+}

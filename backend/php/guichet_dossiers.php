@@ -366,9 +366,30 @@ if ($method === 'DELETE') {
         $chk->execute([':id' => $id]);
         if ((string)$chk->fetchColumn() !== auth_user_id($me)) fail('Accès refusé', 403);
     }
-    $db->prepare('DELETE FROM crminternet_guichet_dossiers WHERE id = :id')->execute([':id' => $id]);
-    audit_log($db, $me, 'guichet_dossier.delete', 'guichet_dossier', $id);
-    ok(['deleted' => 1]);
+    // By default, revert the dossier back to 'draft' so the agent can correct it
+    // Use ?hard=1 to perform an actual deletion (restricted to Administrateur)
+    $hard = !empty($_GET['hard']) && in_array((string)$_GET['hard'], ['1','true'], true);
+    if ($hard) {
+        if (!$isAdmin) fail('Suppression définitive réservée aux Administrateurs', 403);
+        $db->prepare('DELETE FROM crminternet_guichet_dossiers WHERE id = :id')->execute([':id' => $id]);
+        audit_log($db, $me, 'guichet_dossier.delete', 'guichet_dossier', $id);
+        ok(['deleted' => 1]);
+    }
+
+    $db->beginTransaction();
+    try {
+        $db->prepare("UPDATE crminternet_guichet_dossiers
+                      SET status='draft', validated_at = NULL, validated_by = NULL, updated_at = NOW()
+                      WHERE id = :id")->execute([':id' => $id]);
+        $db->prepare('UPDATE crminternet_guichet_entries SET status = \"draft\" WHERE dossier_id = :id')
+           ->execute([':id' => $id]);
+        $db->commit();
+        audit_log($db, $me, 'guichet_dossier.revert_to_draft', 'guichet_dossier', $id);
+        ok(['reverted' => 1]);
+    } catch (Throwable $e) {
+        $db->rollBack();
+        fail('Erreur: ' . $e->getMessage(), 500);
+    }
 }
 
 fail('Method not allowed', 405);

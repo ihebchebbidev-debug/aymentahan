@@ -67,6 +67,7 @@ export const PERMISSION_SECTIONS: PermissionSection[] = [
       { key: "prospect.edit", label: "Éditer prospect" },
       { key: "prospect.type", label: "Modifier le type du prospect" },
       { key: "prospect.delete", label: "Supprimer prospect" },
+      { key: "prospect.bulkActions", label: "Actions groupées prospects (bulk)" },
       { key: "prospect.assign", label: "Réassigner prospect" },
       { key: "prospect.source", label: "Modifier source" },
       { key: "prospect.status", label: "Modifier statut d'appel" },

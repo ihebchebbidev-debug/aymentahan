@@ -564,6 +564,7 @@ function conversion_prospect_to_opportunity(PDO $db, string $pid, array $me, arr
  */
 function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, array $opts = []): array
 {
+    require_once __DIR__ . '/pipeline_helpers.php';
     require_once __DIR__ . '/attachment_helpers.php';
     require_once __DIR__ . '/custom_field_helpers.php';
     require_once __DIR__ . '/contract_info_helpers.php';
@@ -638,6 +639,16 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
             'UPDATE crminternet_opportunities SET converted_to_contract = 1, contract_id = :cid, converted_at = NOW() WHERE id = :id'
         )->execute([':cid' => $cid, ':id' => $oid]);
 
+        // The opportunity→contract path used to leave the originating prospect
+        // stuck on its old status/outcome forever — a signed contract existed
+        // but the lead never got marked 'won', so it never counted in reports.
+        if (!empty($o['prospect_id'])) {
+            $wonStatus = pipeline_pick_won_lead_status($db);
+            $db->prepare(
+                "UPDATE crminternet_prospects SET outcome='won', status=:st, updated_by=:ub WHERE id = :pid"
+            )->execute([':st' => $wonStatus, ':ub' => $username, ':pid' => (string) $o['prospect_id']]);
+        }
+
         conv_tx_commit($db);
     } catch (Throwable $e) {
         conv_tx_rollback($db);
@@ -668,6 +679,9 @@ function conversion_opportunity_to_contract(PDO $db, string $oid, array $me, arr
         ['converted_to_contract' => 1, 'contract_id' => $cid, 'via' => $source],
         $username
     );
+    if ($prospectId) {
+        log_field_changes($db, 'prospect', $prospectId, ['outcome' => 'pending'], ['outcome' => 'won', 'via' => 'opportunity_to_contract', 'contract_id' => $cid], $username);
+    }
     audit_log($db, $me, 'opportunity.convert_to_contract', 'opportunity', $oid, ['contractId' => $cid, 'source' => $source]);
 
     return [
@@ -719,8 +733,8 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
         $existingId = $existing->fetchColumn();
         if ($existingId) {
             if (($p['outcome'] ?? '') !== 'won') {
-                $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu' WHERE id = :id")
-                   ->execute([':id' => $pid]);
+                $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu', updated_by=:u WHERE id = :id")
+                   ->execute([':u' => $username, ':id' => $pid]);
             }
             conv_tx_commit($db);
             return [
@@ -735,8 +749,8 @@ function conversion_mark_won_to_contract(PDO $db, string $pid, array $me, array 
         $premium = (float) ($opts['premium'] ?? 950);
         $cid = (string) ($opts['contractId'] ?? ('C-' . substr(bin2hex(random_bytes(6)), 0, 10)));
 
-        $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu' WHERE id = :id")
-           ->execute([':id' => $pid]);
+        $db->prepare("UPDATE crminternet_prospects SET outcome='won', status='Vendu', updated_by=:u WHERE id = :id")
+           ->execute([':u' => $username, ':id' => $pid]);
 
         conversion_insert_contract_from_prospect($db, $cid, $p, [
             'partner'        => $partner,
@@ -830,7 +844,10 @@ function conversion_update_prospect_on_revert(
     string $pid,
     array $src,
     string $revertStatus,
-    string $revertedFrom
+    string $revertedFrom,
+    string $outcome = 'pending',
+    ?string $lostReason = null,
+    ?string $updatedBy = null
 ): void {
     $s = conversion_prospect_snapshot_from_row($src);
     $sql = "UPDATE crminternet_prospects SET
@@ -840,9 +857,9 @@ function conversion_update_prospect_on_revert(
         city = :ci, zone = :zn, gouvernorat = :gv, delegation = :dl,
         address = :ad, localisation_xy = :gps, code_postal = :cp,
         comment = :c1, comment2 = :c2, type_id = :tid,
-        converted = 0, opportunity_id = NULL, status = :st, outcome = 'pending',
-        lost_reason = NULL, assigned_to = NULL, check_valeur = 'pending',
-        converted_at = NULL, created_at = NOW(),
+        converted = 0, opportunity_id = NULL, status = :st, outcome = :oc,
+        lost_reason = :lr, assigned_to = NULL, check_valeur = 'pending',
+        converted_at = NULL, created_at = NOW(), updated_by = :ub,
         reverted_at = NOW(), reverted_from = :rf
         WHERE id = :pid";
     $db->prepare($sql)->execute([
@@ -868,6 +885,9 @@ function conversion_update_prospect_on_revert(
         ':c2'   => $s['comment2'],
         ':tid'  => $s['type_id'],
         ':st'   => $revertStatus,
+        ':oc'   => $outcome,
+        ':lr'   => $lostReason,
+        ':ub'   => $updatedBy,
         ':rf'   => $revertedFrom,
         ':pid'  => $pid,
     ]);
@@ -879,18 +899,21 @@ function conversion_insert_prospect_on_revert(
     string $pid,
     array $src,
     string $revertStatus,
-    string $revertedFrom
+    string $revertedFrom,
+    string $outcome = 'pending',
+    ?string $lostReason = null,
+    ?string $updatedBy = null
 ): void {
     $s = conversion_prospect_snapshot_from_row($src);
     $sql = "INSERT INTO crminternet_prospects
         (id, civility, last_name, first_name, phone, phone2, animateur, ancien_ligne,
          cin, birth_date, email, source, status, assigned_to, created_at,
          city, zone, gouvernorat, delegation, address, localisation_xy, code_postal,
-         comment, comment2, outcome, lost_reason, check_valeur,
+         comment, comment2, outcome, lost_reason, check_valeur, updated_by,
          converted, converted_at, opportunity_id, type_id, reverted_at, reverted_from)
         VALUES
         (:id,:civ,:ln,:fn,:ph,:ph2,:anim,:anc,:cin,:bd,:em,:src,:st,NULL,NOW(),
-         :ci,:zn,:gv,:dl,:ad,:gps,:cp,:c1,:c2,'pending',NULL,'pending',
+         :ci,:zn,:gv,:dl,:ad,:gps,:cp,:c1,:c2,:oc,:lr,'pending',:ub,
          0,NULL,NULL,:tid,NOW(),:rf)";
     $db->prepare($sql)->execute([
         ':id'   => $pid,
@@ -916,6 +939,9 @@ function conversion_insert_prospect_on_revert(
         ':c1'   => $s['comment'],
         ':c2'   => $s['comment2'],
         ':tid'  => $s['type_id'],
+        ':oc'   => $outcome,
+        ':lr'   => $lostReason,
+        ':ub'   => $updatedBy,
         ':rf'   => $revertedFrom,
     ]);
 }
@@ -969,6 +995,7 @@ function conversion_restore_opportunity_from_contract(PDO $db, string $oid, arra
  */
 function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, array $opts = []): array
 {
+    require_once __DIR__ . '/pipeline_helpers.php';
     require_once __DIR__ . '/attachment_helpers.php';
     require_once __DIR__ . '/custom_field_helpers.php';
     require_once __DIR__ . '/contract_info_helpers.php';
@@ -1041,6 +1068,16 @@ function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, ar
              WHERE id = :id'
         )->execute([':mid' => $mid, ':id' => $oid]);
 
+        // Same fix as opportunity→contract: a migration is a closed/won deal
+        // too, so the originating prospect must be marked won, not left
+        // hanging on its pre-conversion status/outcome.
+        if ($prospectId) {
+            $wonStatus = pipeline_pick_won_lead_status($db);
+            $db->prepare(
+                "UPDATE crminternet_prospects SET outcome='won', status=:st, updated_by=:ub WHERE id = :pid"
+            )->execute([':st' => $wonStatus, ':ub' => $username, ':pid' => $prospectId]);
+        }
+
         conv_tx_commit($db);
     } catch (Throwable $e) {
         conv_tx_rollback($db);
@@ -1072,6 +1109,9 @@ function conversion_opportunity_to_migration(PDO $db, string $oid, array $me, ar
         ['converted_to_migration' => 1, 'migration_id' => $mid, 'via' => $source],
         $username
     );
+    if ($prospectId) {
+        log_field_changes($db, 'prospect', $prospectId, ['outcome' => 'pending'], ['outcome' => 'won', 'via' => 'opportunity_to_migration', 'migration_id' => $mid], $username);
+    }
     audit_log($db, $me, 'convert_migration', 'opportunity', $oid, ['migrationId' => $mid, 'source' => $source]);
 
     return [
@@ -1110,7 +1150,12 @@ function conversion_revert_opportunity_to_prospect(PDO $db, string $oid, array $
     $revertedProspectId = $o['prospect_id']
         ? (string) $o['prospect_id']
         : ('P-' . substr(bin2hex(random_bytes(6)), 0, 10));
-    $revertStatus = pipeline_pick_revert_lead_status($db);
+    // An opportunity going back to the lead pipeline means the deal fell
+    // through: land it on the "lost" lead stage (not "Nouveau") and mark
+    // outcome='lost' so the reports count it as a lost lead, attributed to
+    // whoever performed the revert.
+    $revertStatus = pipeline_pick_lost_lead_status($db);
+    $revertReason = (string) ($opts['reason'] ?? 'Opportunité retournée en prospect');
     $existingProspect = null;
 
     $db->beginTransaction();
@@ -1121,9 +1166,9 @@ function conversion_revert_opportunity_to_prospect(PDO $db, string $oid, array $
             $existingProspect = $cur->fetchColumn();
         }
         if ($existingProspect) {
-            conversion_update_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity');
+            conversion_update_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity', 'lost', $revertReason, $username);
         } else {
-            conversion_insert_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity');
+            conversion_insert_prospect_on_revert($db, $revertedProspectId, $o, $revertStatus, 'opportunity', 'lost', $revertReason, $username);
         }
         try { attachment_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId); } catch (Throwable $e) {}
         try { contract_info_clone_entity($db, 'opportunity', $oid, 'prospect', $revertedProspectId, $username); } catch (Throwable $e) {}
@@ -1136,9 +1181,9 @@ function conversion_revert_opportunity_to_prospect(PDO $db, string $oid, array $
     }
 
     $source = (string) ($opts['source'] ?? 'manual');
-    log_field_changes($db, 'prospect', $revertedProspectId, ['converted' => 1], ['converted' => 0, 'via' => $source], $username);
+    log_field_changes($db, 'prospect', $revertedProspectId, ['converted' => 1, 'outcome' => 'pending'], ['converted' => 0, 'outcome' => 'lost', 'via' => $source], $username);
     log_field_changes($db, 'opportunity', $oid, ['exists' => 1], ['exists' => 0, 'reverted_to_prospect' => $revertedProspectId], $username);
-    audit_log($db, $me, 'revert_lead', 'prospect', $revertedProspectId, ['opportunityId' => $oid, 'source' => $source]);
+    audit_log($db, $me, 'revert_lead', 'prospect', $revertedProspectId, ['opportunityId' => $oid, 'source' => $source, 'outcome' => 'lost']);
     audit_log($db, $me, 'revert_lead', 'opportunity', $oid, ['prospectId' => $revertedProspectId]);
 
     return [

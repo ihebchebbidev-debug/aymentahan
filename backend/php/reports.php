@@ -51,6 +51,11 @@ if ($agentId !== '') {
 // Règles d'attribution demandées par le client :
 //  - Prospects (leads / gagnés / perdus) : attribués à `updated_by` (Modifié par),
 //    car la création des prospects est faite par l'admin/import, pas par l'agent.
+//    La période (:from/:to) filtre sur la DATE DE DERNIÈRE MODIFICATION
+//    (`updated_at`), pas sur la date de création — un lead créé en janvier
+//    et gagné/perdu en août doit apparaître dans le rapport d'août, sous le
+//    nom de l'agent qui a fait cette dernière modification (pas celui qui a
+//    créé/importé la fiche à l'origine).
 //  - Opportunités : attribuées à `created_by` (Créé par).
 //  - Contrats & migrations : attribués à l'agent du prospect d'origine (updated_by),
 //    afin que la victoire revienne à celui qui a réellement travaillé le prospect.
@@ -64,14 +69,32 @@ $mOpp      = sprintf($MATCH, 'o.created_by', 'o.created_by');
 $WON_SQL  = "(p.outcome = 'won'  OR LOWER(TRIM(p.status)) IN ('vendu','ok'))";
 $LOST_SQL = "(p.outcome = 'lost' OR LOWER(TRIM(p.status)) LIKE 'refus%')";
 
+// "Gagné"/"Perdu" sont TOUJOURS comptés pour l'agent qui a fait la DERNIÈRE
+// modification du lead (updated_by) et sur la date de cette dernière
+// modification (updated_at) — jamais sur la date de création ni sur qui l'a
+// créé/importé à l'origine. Ça vaut pour tous les signaux : le statut classique
+// (outcome/status), un contrat/migration rattaché au lead (direct ou via son
+// opportunité — même lien fiable que les colonnes Contrats/Migrations), et le
+// retour d'une opportunité en prospect (reverted_from='opportunity' = perdu).
 $agentSql = "
   SELECT u.username, u.full_name, COALESCE(t.name, '') AS team_name,
     (SELECT COUNT(*) FROM crminternet_prospects p
        WHERE p.created_at BETWEEN :from1 AND :to1 AND $mProspect) AS handled,
     (SELECT COUNT(*) FROM crminternet_prospects p
-       WHERE p.created_at BETWEEN :from1b AND :to1b AND $mProspect AND $WON_SQL) AS won,
+       WHERE $mProspect AND DATE(p.updated_at) BETWEEN :from1b AND :to1b AND (
+         $WON_SQL
+         OR EXISTS (SELECT 1 FROM crminternet_contracts wc WHERE wc.prospect_id = p.id)
+         OR (p.opportunity_id IS NOT NULL AND p.opportunity_id <> '' AND EXISTS (
+               SELECT 1 FROM crminternet_contracts wc2 WHERE wc2.opportunity_id = p.opportunity_id
+             ))
+         OR (p.opportunity_id IS NOT NULL AND p.opportunity_id <> '' AND EXISTS (
+               SELECT 1 FROM crminternet_migrations wm WHERE wm.opportunity_id = p.opportunity_id AND wm.deleted_at IS NULL
+             ))
+       )) AS won,
     (SELECT COUNT(*) FROM crminternet_prospects p
-       WHERE p.created_at BETWEEN :from1c AND :to1c AND $mProspect AND $LOST_SQL) AS lost,
+       WHERE $mProspect AND DATE(p.updated_at) BETWEEN :from1c AND :to1c AND (
+         $LOST_SQL OR p.reverted_from = 'opportunity'
+       )) AS lost,
     (SELECT COUNT(*) FROM crminternet_opportunities o
        WHERE o.created_at BETWEEN :from5 AND :to5 AND $mOpp) AS opportunities_count,
     (SELECT COUNT(*) FROM crminternet_contracts c
@@ -96,7 +119,9 @@ $agentSql = "
 ";
 $s = $db->prepare($agentSql);
 $params = [
-    ':from1'=>$from, ':to1'=>$to, ':from1b'=>$from, ':to1b'=>$to, ':from1c'=>$from, ':to1c'=>$to,
+    ':from1'=>$from, ':to1'=>$to,
+    ':from1b'=>$from, ':to1b'=>$to,
+    ':from1c'=>$from, ':to1c'=>$to,
     ':from2'=>$from, ':to2'=>$to, ':from3'=>$from, ':to3'=>$to,
     ':from4'=>$from, ':to4'=>$to, ':from5'=>$from, ':to5'=>$to,
 ];
@@ -169,19 +194,42 @@ if ($agentId !== '') {
     $funnelExtraParams[':agentId'] = $agentId;
 }
 
+// Pending/total reflect leads that EXIST in the period (created_at, a volume
+// metric). Won/lost are ALWAYS gated by the lead's last-modification date
+// (updated_at) — same rule as the per-agent table above, applied uniformly
+// to every signal (status, linked contract/migration, or an opportunity
+// reverted back to a lead), not just the outcome field. EMULATE_PREPARES is
+// off, so each :param can only be bound once per query — hence the f1/f2/f3/f4
+// suffixes even though they all carry the same $from/$to values.
 $funnel = $db->prepare("
   SELECT
-    SUM(CASE WHEN p.outcome='pending' THEN 1 ELSE 0 END) pending,
-    SUM(CASE WHEN p.outcome='won'     THEN 1 ELSE 0 END) won,
-    SUM(CASE WHEN p.outcome='lost'    THEN 1 ELSE 0 END) lost,
-    COUNT(*) total
+    SUM(CASE WHEN p.outcome='pending' AND p.created_at BETWEEN :f1 AND :t1 THEN 1 ELSE 0 END) pending,
+    SUM(CASE WHEN DATE(p.updated_at) BETWEEN :f2 AND :t2 AND (
+          p.outcome='won'
+          OR EXISTS (SELECT 1 FROM crminternet_contracts wc WHERE wc.prospect_id = p.id)
+          OR (p.opportunity_id IS NOT NULL AND p.opportunity_id <> '' AND EXISTS (
+                SELECT 1 FROM crminternet_contracts wc2 WHERE wc2.opportunity_id = p.opportunity_id
+              ))
+          OR (p.opportunity_id IS NOT NULL AND p.opportunity_id <> '' AND EXISTS (
+                SELECT 1 FROM crminternet_migrations wm WHERE wm.opportunity_id = p.opportunity_id AND wm.deleted_at IS NULL
+              ))
+        ) THEN 1 ELSE 0 END) won,
+    SUM(CASE WHEN DATE(p.updated_at) BETWEEN :f3 AND :t3 AND (
+          p.outcome='lost' OR p.reverted_from = 'opportunity'
+        ) THEN 1 ELSE 0 END) lost,
+    SUM(CASE WHEN p.created_at BETWEEN :f4 AND :t4 THEN 1 ELSE 0 END) total
   FROM crminternet_prospects p
   $funnelJoin
-  WHERE p.created_at BETWEEN :f AND :t
+  WHERE 1=1
   $funnelWhereTeam
   $funnelWhereExtra
 ");
-$fp = [':f'=>$from, ':t'=>$to];
+$fp = [
+    ':f1'=>$from, ':t1'=>$to,
+    ':f2'=>$from, ':t2'=>$to,
+    ':f3'=>$from, ':t3'=>$to,
+    ':f4'=>$from, ':t4'=>$to,
+];
 if ($team !== '' && !$teamIsNone) $fp[':team'] = $team;
 $fp = array_merge($fp, $funnelExtraParams);
 $funnel->execute($fp);

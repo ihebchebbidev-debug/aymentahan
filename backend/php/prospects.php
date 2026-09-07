@@ -240,9 +240,9 @@ if ($method === 'POST') {
         if (!$pid) fail('id requis', 422);
         // Allow claiming when nobody owns the lead (NULL or empty string).
         $s = $db->prepare("UPDATE crminternet_prospects
-                           SET assigned_to = :a, status = 'En cours'
+                           SET assigned_to = :a, status = 'En cours', updated_by = :u
                            WHERE id = :id AND (assigned_to IS NULL OR assigned_to = '')");
-        $s->execute([':a' => $me['username'], ':id' => $pid]);
+        $s->execute([':a' => $me['username'], ':u' => $me['username'], ':id' => $pid]);
         if ($s->rowCount() === 0) fail('Lead déjà attribué ou introuvable', 409);
         log_field_changes($db, 'prospect', $pid, ['assigned_to' => '', 'status' => ''], ['assigned_to' => $me['username'], 'status' => 'En cours'], $me['username']);
         notify_user($db, $me['username'], 'Lead attribué', "Vous avez réclamé le lead $pid", "/prospects/$pid");
@@ -301,9 +301,9 @@ if ($method === 'POST') {
         $cur->execute([':id' => $pid]);
         $bef = $cur->fetch() ?: [];
         $s = $db->prepare("UPDATE crminternet_prospects
-                           SET outcome='lost', status='Refus', lost_reason=:r
+                           SET outcome='lost', status='Refus', lost_reason=:r, updated_by=:u
                            WHERE id = :id");
-        $s->execute([':r' => $reason, ':id' => $pid]);
+        $s->execute([':r' => $reason, ':u' => $me['username'], ':id' => $pid]);
         if ($s->rowCount() === 0) fail('Prospect introuvable', 404);
         log_field_changes($db, 'prospect', $pid, $bef, ['outcome' => 'lost', 'status' => 'Refus', 'lost_reason' => $reason], $me['username']);
         audit_log($db, $me, 'prospect.mark_lost', 'prospect', $pid, ['reason' => $reason]);
@@ -311,6 +311,9 @@ if ($method === 'POST') {
     }
 
     if ($action === 'bulk') {
+        if (($me['role'] ?? '') !== 'Administrateur' && !user_has_permission($db, $me, 'prospect.bulkActions')) {
+            fail('Forbidden', 403);
+        }
         $ids = $in['ids'] ?? [];
         $op  = $in['op']  ?? '';
         if (!is_array($ids) || !$ids) fail('ids requis', 422);

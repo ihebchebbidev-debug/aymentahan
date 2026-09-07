@@ -171,6 +171,13 @@ function require_method(string ...$methods): void {
 const JWT_SECRET = 'change-me-to-a-long-random-string-min-32-chars-9f7c1';
 const JWT_TTL_SECONDS = 60 * 60 * 12; // 12h
 
+// ---------- Lead intake (server-to-server, no JWT) ---------------------
+// Shared secret checked by lead_intake.php against the X-Intake-Key header.
+// Must match CRM_INTAKE_SECRET in the landing site's backend/php/config.php.
+// Rotate by changing both sides together (a mismatch just makes the landing
+// page's best-effort push fail silently — leads still save locally there).
+const LEAD_INTAKE_SECRET = '54eef6b630ff381a4d5d5dfd11a0d44cb7886357c1cf7b448ebf30df6f9fddf8';
+
 function b64url_encode(string $s): string {
     return rtrim(strtr(base64_encode($s), '+/', '-_'), '=');
 }

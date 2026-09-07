@@ -1109,6 +1109,7 @@ function crm_seed_permissions_sql(): array {
             ('Backoffice','page.backoffice',1)",
         "INSERT IGNORE INTO crminternet_role_permissions (role, permission, enabled) VALUES
             ('Manager','prospect.view',1),('Manager','prospect.edit',1),('Manager','prospect.type',1),('Manager','prospect.export',1),
+            ('Administrateur','prospect.bulkActions',1),
             ('Manager','opportunity.view',1),('Manager','opportunity.convert_migration',1),
             ('Manager','contract.view',1),('Manager','migration.view',1),('Manager','migration.edit',1),
             ('Manager','migration.export',1),

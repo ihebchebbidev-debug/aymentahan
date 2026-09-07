@@ -107,14 +107,15 @@ function ProspectsPage() {
   const navigate = useNavigate();
   const { typeId: filterTypeId } = Route.useSearch();
   const canDelete = hasPermission("prospect.delete");
+  const canBulkActions = user?.role === "Administrateur" || hasPermission("prospect.bulkActions");
   const canExport = hasPermission("prospect.export");
   const canImport = hasPermission("prospect.import");
   const canAdd = hasPermission("prospect.add");
   const canEdit = hasPermission("prospect.edit");
   const canType = canEdit || hasPermission("prospect.type");
-  const canAssign = hasPermission("prospect.assign");
-  const canChangeStatus = canEdit || hasPermission("prospect.status");
-  const canChangeSource = canEdit || hasPermission("prospect.source");
+  const canAssign = canBulkActions && (hasPermission("prospect.assign") || hasPermission("prospect.bulkActions"));
+  const canChangeStatus = canBulkActions && (canEdit || hasPermission("prospect.status") || hasPermission("prospect.bulkActions"));
+  const canChangeSource = canBulkActions && (canEdit || hasPermission("prospect.source") || hasPermission("prospect.bulkActions"));
   const myUsername = user?.username ?? "";
 
   const { defs: customDefs, valuesById: customValuesById } = useCustomFieldsTable("prospect");
@@ -774,7 +775,7 @@ function ProspectsPage() {
         </div>
 
         {/* Bulk action bar (mirrors contracts) */}
-        {selected.size > 0 && (canEdit || canAssign || canDelete || canChangeStatus || canChangeSource || canExport) && (
+        {selected.size > 0 && canBulkActions && (canEdit || canAssign || canDelete || canChangeStatus || canChangeSource || canExport) && (
           <Card className="p-3 shadow-elegant bg-primary/5 border-primary/20 flex items-center justify-between gap-2 flex-wrap">
             <div className="text-sm font-medium">{selected.size} prospect(s) sélectionné(s)</div>
             <div className="flex gap-2 items-center flex-wrap">

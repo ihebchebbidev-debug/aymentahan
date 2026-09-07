@@ -373,7 +373,17 @@ function GuichetPage() {
   const onValidate = async (id: string) => { try { await validateDossier(id); toast.success("Validé"); reload(); } catch (e: any) { toast.error(e?.message ?? "Erreur"); } };
   const performDelete = async () => {
     const id = confirmDeleteId; setConfirmDeleteId(null); if (!id) return;
-    try { await deleteDossier(id); toast.success("Supprimé"); reload(); } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
+    try {
+      const res: any = await deleteDossier(id);
+      if (res && res.reverted) {
+        toast.success("Remis en brouillon");
+      } else if (res && res.deleted) {
+        toast.success("Supprimé");
+      } else {
+        toast.success("Opération effectuée");
+      }
+      reload();
+    } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
   };
 
   if (!canRead) {
