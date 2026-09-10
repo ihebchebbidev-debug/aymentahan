@@ -86,6 +86,7 @@ function GuichetAnalyticsPage() {
     canReadAll ? "" : (assignedEntity ? "" : (user?.id ?? ""))
   );
   const [data, setData] = useState<GuichetDashboard | null>(null);
+  const [dailyData, setDailyData] = useState<GuichetDashboard | null>(null);
   const [perAgent, setPerAgent] = useState<{ agentId: string; revenue: number; counts: Record<string, number>; amounts: Record<string, number> }[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -142,6 +143,21 @@ function GuichetAnalyticsPage() {
     return () => { alive = false; };
   }, [month, range, entityId, agentId]);
 
+  // Separate daily fetch for top KPIs: keep the KPIs showing today's data
+  // while the rest of the page (charts / tables) follow the selected month/range.
+  useEffect(() => {
+    let alive = true;
+    const q: Parameters<typeof getDashboard>[0] = {
+      day: todayIso,
+      entityId: entityId || undefined,
+      agentId: agentId || undefined,
+    };
+    getDashboard(q)
+      .then((d) => { if (alive) setDailyData(d); })
+      .catch(() => { /* ignore daily fetch errors */ });
+    return () => { alive = false; };
+  }, [todayIso, entityId, agentId]);
+
   // Per-agent breakdown: rely on the backend's `perAgent` field (already
   // scoped to the same WHERE), no N+1 daily refetches.
   useEffect(() => {
@@ -160,10 +176,18 @@ function GuichetAnalyticsPage() {
     return u?.fullName || u?.username || id;
   };
 
-  const revenue = useMemo(() => {
+  // Monthly revenue (used for charts / breakdowns)
+  const monthRevenue = useMemo(() => {
     if (!data) return 0;
     return visibleTypes.reduce((s, t) => s + (data.amounts[t] || 0), 0);
   }, [data, visibleTypes]);
+
+  // Daily revenue for top KPIs (prefer `dailyData` when available)
+  const dailyRevenue = useMemo(() => {
+    const src = dailyData ?? data;
+    if (!src) return 0;
+    return visibleTypes.reduce((s, t) => s + (src.amounts[t] || 0), 0);
+  }, [dailyData, data, visibleTypes]);
 
   const typeBreakdown = useMemo(() => {
     if (!data) return [];
@@ -312,11 +336,12 @@ function GuichetAnalyticsPage() {
         <>
           {/* KPIs — minimal, monochrome */}
           {effectiveConfig.sections.kpis && (() => {
+            const src = dailyData ?? data; // prefer daily snapshot for top KPIs
             const kpis = [
-              effectiveConfig.kpis.revenue    && <Kpi key="r" label="Chiffre d'affaires" value={fmtDT(revenue)} hint={`${data.contracts.month} contrats`} />,
-              effectiveConfig.kpis.contracts  && <Kpi key="c" label="Contrats" value={fmtInt(data.contracts.month)} hint={`Objectif ${data.targets.contractsMonthly}`} />,
-              effectiveConfig.kpis.activation && <Kpi key="a" label="Taux d'activation" value={`${data.activation.rate}%`} hint={`Min. ${data.activation.min}%`} />,
-              effectiveConfig.kpis.budget     && <Kpi key="b" label="Budget mensuel" value={data.targets.budgetMonthlyDt != null ? fmtDT(data.targets.budgetMonthlyDt) : "—"} hint={data.targets.budgetDailyDt != null ? `${fmtDT(data.targets.budgetDailyDt)} / jour` : ""} />,
+              effectiveConfig.kpis.revenue    && <Kpi key="r" label="Chiffre d'affaires" value={fmtDT(dailyRevenue)} hint={`${src.contracts.today ?? src.contracts.month} contrats`} />,
+              effectiveConfig.kpis.contracts  && <Kpi key="c" label="Contrats" value={fmtInt(src.contracts.today ?? src.contracts.month)} hint={`Objectif ${data.targets.contractsMonthly}`} />,
+              effectiveConfig.kpis.activation && <Kpi key="a" label="Taux d'activation" value={`${src.activation.rate}%`} hint={`Min. ${src.activation.min}%`} />,
+              effectiveConfig.kpis.budget     && <Kpi key="b" label="Budget" value={src.targets.budgetDailyDt != null ? fmtDT(src.targets.budgetDailyDt) : (data.targets.budgetMonthlyDt != null ? fmtDT(data.targets.budgetMonthlyDt) : "—")} hint={data.targets.budgetDailyDt != null ? `${fmtDT(data.targets.budgetDailyDt)} / jour` : ""} />,
             ].filter(Boolean);
             return kpis.length > 0 ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">{kpis}</div> : null;
           })()}
@@ -367,7 +392,7 @@ function GuichetAnalyticsPage() {
                   </thead>
                   <tbody>
                     {typeBreakdown.map((r) => {
-                      const share = revenue > 0 ? (r.amount * 100) / revenue : 0;
+                      const share = monthRevenue > 0 ? (r.amount * 100) / monthRevenue : 0;
                       return (
                         <tr key={r.type} className="border-t">
                           <td className="px-4 py-2.5">{r.label}</td>
@@ -382,7 +407,7 @@ function GuichetAnalyticsPage() {
                     <tr className="border-t bg-muted/30 font-semibold">
                       <td className="px-4 py-2.5">Total</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{fmtInt(typeBreakdown.reduce((s, r) => s + r.count, 0))}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtDT(revenue)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtDT(monthRevenue)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">100%</td>
                     </tr>
                   </tfoot>
