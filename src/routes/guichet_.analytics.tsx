@@ -77,6 +77,7 @@ function GuichetAnalyticsPage() {
   const [month, setMonth] = useState(todayIso.slice(0, 7));
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+  const [period, setPeriod] = useState<'month' | 'week' | 'day'>('day');
   const [entityId, setEntityId] = useState(assignedEntity);
   // Default scope:
   // - Admin/Manager: no agent filter (all agents)
@@ -112,16 +113,31 @@ function GuichetAnalyticsPage() {
   }, [user, assignedEntity, canReadAll]);
 
   const range = useMemo(() => {
+    // Explicit from/to wins.
     if (from && to) return from <= to
       ? { from, to, isRange: true }
       : { from: to, to: from, isRange: true };
     if (from && !to) return { from, to: from, isRange: true };
     if (!from && to) return { from: to, to, isRange: true };
+
+    // Weekly mode: compute current ISO week (Mon..Sun) around today.
+    if (period === 'week') {
+      const d = new Date(todayIso + "T00:00:00Z");
+      const day = d.getUTCDay(); // 0 (Sun) .. 6 (Sat)
+      const daysSinceMonday = (day + 6) % 7; // 0 for Mon, 6 for Sun
+      const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - daysSinceMonday));
+      const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6));
+      const fromStr = monday.toISOString().slice(0, 10);
+      const toStr = sunday.toISOString().slice(0, 10);
+      return { from: fromStr, to: toStr, isRange: true };
+    }
+
+    // Default: whole month
     const start = `${month}-01`;
     const [y, m] = month.split("-").map(Number);
     const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
     return { from: start, to: `${month}-${String(last).padStart(2, "0")}`, isRange: false };
-  }, [from, to, month]);
+  }, [from, to, month, period, todayIso]);
 
   // Single-call fetch: when a date range is set we now hit the backend
   // ONCE with from/to. Previously the page looped one request per day and
@@ -148,6 +164,7 @@ function GuichetAnalyticsPage() {
   useEffect(() => {
     let alive = true;
     const q: Parameters<typeof getDashboard>[0] = {
+      month: todayIso.slice(0,7),
       day: todayIso,
       entityId: entityId || undefined,
       agentId: agentId || undefined,
@@ -244,6 +261,16 @@ function GuichetAnalyticsPage() {
             <div className="flex items-center gap-1.5 px-2 border-l border-r">
               <CalendarDays className="h-4 w-4 text-muted-foreground" />
               <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-36 border-0 shadow-none focus-visible:ring-0 px-1" />
+            </div>
+            <div className="ml-2">
+              <Select value={period} onValueChange={(v) => setPeriod(v === 'week' ? 'week' : (v === 'day' ? 'day' : 'month'))}>
+                <SelectTrigger className="h-9 w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">Jour</SelectItem>
+                  <SelectItem value="week">Semaine</SelectItem>
+                  <SelectItem value="month">Mois</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <Button type="button" size="sm" variant="ghost" className="h-9 px-2 rounded-l-none" onClick={() => shiftMonth(1)}>›</Button>
           </div>

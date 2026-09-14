@@ -220,6 +220,64 @@ if ($method === 'POST') {
         } catch (Throwable $e) { $db->rollBack(); fail('Erreur: ' . $e->getMessage(), 500); }
     }
 
+    // -- BULK STATUS UPDATE -----------------------------------------
+    if ($action === 'bulk_status') {
+        // body: { ids: [id], status: 'valide'|'draft'|'prevalide' }
+        $in = json_input();
+        $ids = is_array($in['ids'] ?? null) ? $in['ids'] : [];
+        $status = trim((string)($in['status'] ?? ''));
+        if (!$ids || !count($ids)) fail('ids requis', 422);
+        if (!in_array($status, ['valide','draft','prevalide'], true)) fail('status inconnu', 422);
+
+        // Permission: validate requires guichet.validate; others require guichet.edit
+        if ($status === 'valide') require_permission($db, $me, 'guichet.validate');
+        else require_permission($db, $me, 'guichet.edit');
+
+        $db->beginTransaction();
+        try {
+            foreach ($ids as $iid) {
+                $id = (string)$iid;
+                if ($id === '') continue;
+                // scope checks
+                if ($assignedEntity) {
+                    $chk = $db->prepare("SELECT entity_id FROM crminternet_guichet_dossiers WHERE id = :id");
+                    $chk->execute([':id' => $id]);
+                    $entOf = $chk->fetchColumn();
+                    if ($entOf && $entOf !== $assignedEntity) continue;
+                } elseif (!$isAdmin && !can_view_all($db, $me)) {
+                    $chk = $db->prepare("SELECT agent_id FROM crminternet_guichet_dossiers WHERE id = :id");
+                    $chk->execute([':id' => $id]);
+                    if ((string)$chk->fetchColumn() !== auth_user_id($me)) continue;
+                }
+
+                if ($status === 'valide') {
+                    $db->prepare("UPDATE crminternet_guichet_dossiers
+                                  SET status='valide', validated_at=NOW(), validated_by=:u, updated_at=NOW()
+                                  WHERE id=:id")
+                       ->execute([':u' => auth_user_id($me) ?: ($me['username'] ?? ''), ':id' => $id]);
+                    $db->prepare("UPDATE crminternet_guichet_entries SET status='valide' WHERE dossier_id=:id")
+                       ->execute([':id' => $id]);
+                    audit_log($db, $me, 'guichet_dossier.validate', 'guichet_dossier', $id);
+                } elseif ($status === 'draft') {
+                    $db->prepare("UPDATE crminternet_guichet_dossiers
+                                  SET status='draft', validated_at = NULL, validated_by = NULL, updated_at = NOW()
+                                  WHERE id = :id")->execute([':id' => $id]);
+                    $db->prepare('UPDATE crminternet_guichet_entries SET status = "draft" WHERE dossier_id = :id')
+                       ->execute([':id' => $id]);
+                    audit_log($db, $me, 'guichet_dossier.revert_to_draft', 'guichet_dossier', $id);
+                } else { // prevalide
+                    $db->prepare("UPDATE crminternet_guichet_dossiers SET status='prevalide', updated_at=NOW() WHERE id=:id")
+                       ->execute([':id' => $id]);
+                    $db->prepare("UPDATE crminternet_guichet_entries SET status='prevalide' WHERE dossier_id=:id")
+                       ->execute([':id' => $id]);
+                    audit_log($db, $me, 'guichet_dossier.prevalidate', 'guichet_dossier', $id);
+                }
+            }
+            $db->commit();
+            ok(['updated' => 1]);
+        } catch (Throwable $e) { $db->rollBack(); fail('Erreur bulk: ' . $e->getMessage(), 500); }
+    }
+
     // -- CREATE -------------------------------------------------------
     require_permission($db, $me, 'guichet.create');
     $in       = json_input();

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,6 +31,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 import { Can } from "@/components/Can";
 import { exportCSV, exportXLSX, pickColumns } from "@/lib/exportUtils";
 import { useColumnPrefs } from "@/lib/useColumnPrefs";
@@ -119,6 +121,7 @@ function GuichetPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [month, setMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
   const status = "";
   const type = "";
 
@@ -141,6 +144,7 @@ function GuichetPage() {
   const [editOpen, setEditOpen] = useState<GuichetDossier | null>(null);
   const [editDossier, setEditDossier] = useState<GuichetDossier | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const guichetFormBusy = createOpen || !!editOpen;
 
   const entityName = (id: string) => entities.find((e) => e.id === id)?.name ?? id;
   const findAgent = (id: string) => users.find((u) => u.id === id || u.username === id);
@@ -173,18 +177,22 @@ function GuichetPage() {
     void reload();
   }, [authLoading, permissionsLoading, user, canRead, entityId]);
 
-  // Auto-refresh : polling toutes les 20s + au retour de focus / online,
-  // pour que les dossiers créés par d'autres agents apparaissent sans
-  // devoir créer un nouveau dossier pour déclencher un reload manuel.
+  // Auto-refresh : polling toutes les 60s + au retour de focus / online,
+  // mais on le suspend pendant la création / édition d'un dossier pour éviter
+  // que le formulaire ou le modal ne soit interrompu par un reload concurrent.
   useEffect(() => {
-    if (!canRead) return;
+    if (!canRead || guichetFormBusy) return;
     const tick = () => {
       if (typeof document !== "undefined" && document.hidden) return;
-      reload();
+      void reload();
     };
-    const interval = window.setInterval(tick, 20000);
-    const onFocus = () => reload();
-    const onVisible = () => { if (!document.hidden) reload(); };
+    const interval = window.setInterval(tick, 60000);
+    const onFocus = () => {
+      if (!guichetFormBusy) void reload();
+    };
+    const onVisible = () => {
+      if (!document.hidden && !guichetFormBusy) void reload();
+    };
     window.addEventListener("focus", onFocus);
     window.addEventListener("online", onFocus);
     document.addEventListener("visibilitychange", onVisible);
@@ -195,7 +203,7 @@ function GuichetPage() {
       document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canRead, entityId, q, status, month, type]);
+  }, [canRead, entityId, q, status, month, type, guichetFormBusy]);
 
   const filtered = useMemo(() => {
     let base = rows;
@@ -214,6 +222,33 @@ function GuichetPage() {
       (d.entries ?? []).some((e) => (e.numero || "").toLowerCase().includes(s) || (e.cin || "").toLowerCase().includes(s))
     );
   }, [rows, q, entityId, status, type, month, agentFilter, dateFrom, dateTo]);
+
+  const allVisibleSelected = useMemo(() => {
+    if (!filtered || filtered.length === 0) return false;
+    return filtered.every((d) => !!selectedIds[d.id]);
+  }, [filtered, selectedIds]);
+
+  const toggleSelect = (id: string) => setSelectedIds((s) => ({ ...s, [id]: !s[id] }));
+  const setSelectAllVisible = (v: boolean) => {
+    if (!filtered) return;
+    const next = { ...selectedIds };
+    for (const d of filtered) next[d.id] = v;
+    setSelectedIds(next);
+  };
+
+  const selectedCount = useMemo(() => Object.values(selectedIds).filter(Boolean).length, [selectedIds]);
+
+  const performBulkStatus = async (status: 'valide' | 'draft' | 'prevalide') => {
+    const ids = Object.keys(selectedIds).filter((k) => selectedIds[k]);
+    if (!ids.length) return toast.error('Aucune sélection');
+    if (status === 'valide' && !confirm(`Valider ${ids.length} dossier(s) ?`)) return;
+    try {
+      await api('/guichet_dossiers.php?action=bulk_status', { method: 'POST', body: { ids, status } });
+      toast.success('Opération effectuée');
+      setSelectedIds({});
+      await reload();
+    } catch (e: any) { toast.error(e?.message ?? 'Erreur'); }
+  };
 
   /* ---------- KPI sidebar (current view) ----------
    * Aligned with the backend dashboard semantics:
@@ -535,6 +570,18 @@ function GuichetPage() {
                 </Button>
               )}
               <div className="ml-auto">
+              {selectedCount > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="outline">Actions ({selectedCount})</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => performBulkStatus('prevalide')}>Prévalider</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => performBulkStatus('draft')}>Mettre en brouillon</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => performBulkStatus('valide')}>Valider</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -572,6 +619,9 @@ function GuichetPage() {
               <Table className="[&_th]:h-9 [&_th]:py-1 [&_th]:text-[11px] [&_th]:font-bold [&_th]:text-rose-700 [&_thead_tr]:bg-rose-50 [&_thead_tr]:hover:bg-rose-50">
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-6">
+                      <Checkbox checked={allVisibleSelected} onCheckedChange={(v) => setSelectAllVisible(!!v)} />
+                    </TableHead>
                     <TableHead>Dossier Réf./N°</TableHead>
                     <TableHead>Type Opération</TableHead>
                     <TableHead>Client / CIN</TableHead>
@@ -586,6 +636,7 @@ function GuichetPage() {
                 <TableBody>
                   {loading && Array.from({ length: 8 }).map((_, i) => (
                     <TableRow key={`sk-${i}`} className="[&>td]:py-2">
+                      <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /><Skeleton className="h-3 w-16 mt-1" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-20 mt-1" /></TableCell>
@@ -597,7 +648,7 @@ function GuichetPage() {
                       <TableCell className="text-right"><Skeleton className="h-7 w-16 ml-auto" /></TableCell>
                     </TableRow>
                   ))}
-                  {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Aucun dossier.</TableCell></TableRow>}
+                  {!loading && filtered.length === 0 && <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Aucun dossier.</TableCell></TableRow>}
                    {filtered.map((d) => {
                      const e0 = d.entries?.[0];
                      const total = (d.entries ?? []).reduce((s, e) => s + (e.amount ?? 0), 0);
@@ -617,6 +668,9 @@ function GuichetPage() {
                      if (overflow) lines[1] = (lines[1] + "…").slice(0, MAX);
                      return (
                        <TableRow key={d.id} className={`[&>td]:py-1.5 ${e0 ? ROW_TINT[e0.type] ?? "" : ""}`}>
+                         <TableCell className="py-1.5">
+                           <Checkbox checked={!!selectedIds[d.id]} onCheckedChange={() => toggleSelect(d.id)} />
+                         </TableCell>
                          <TableCell className="font-mono text-xs py-1.5">
                            <div>{d.ref}</div>
                            <div className="text-[10px] text-muted-foreground font-sans">{entityName(d.entityId)}</div>
@@ -939,6 +993,10 @@ function CreateDialog({
           <Button variant="outline" onClick={onClose}>Fermer</Button>
           <Button variant="outline" onClick={saveDraftLocal} disabled={saving}>
             <Save className="h-4 w-4 mr-1" /> Brouillon (local)
+          </Button>
+          {/* Prévalider: temporary no-op for now, shows a toast only */}
+          <Button variant="secondary" onClick={() => toast.info("Prévalidation (no-op)")} disabled={saving}>
+            Prévalider
           </Button>
           <Can perm="guichet.validate">
             <Button onClick={() => save("valide")} disabled={saving}><CheckCircle2 className="h-4 w-4 mr-1" /> Valider &amp; envoyer
