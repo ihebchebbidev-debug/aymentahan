@@ -120,6 +120,11 @@ function GuichetAnalyticsPage() {
     if (from && !to) return { from, to: from, isRange: true };
     if (!from && to) return { from: to, to, isRange: true };
 
+    // Daily mode: single day (today)
+    if (period === 'day') {
+      return { from: todayIso, to: todayIso, isRange: true };
+    }
+
     // Weekly mode: compute current ISO week (Mon..Sun) around today.
     if (period === 'week') {
       const d = new Date(todayIso + "T00:00:00Z");
@@ -146,12 +151,17 @@ function GuichetAnalyticsPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    const q: Parameters<typeof getDashboard>[0] = {
-      month,
-      entityId: entityId || undefined,
-      agentId: agentId || undefined,
-    };
-    if (range.isRange) { q.from = range.from; q.to = range.to; }
+    // Build query depending on selected period / range. Prefer explicit day/from-to
+    // over `month` to avoid the backend returning whole-month aggregates.
+    let q: Parameters<typeof getDashboard>[0];
+    const dashboardMonth = month || todayIso.slice(0, 7);
+    if (period === 'day') {
+      q = { month: dashboardMonth, day: todayIso, entityId: entityId || undefined, agentId: agentId || undefined };
+    } else if (range.isRange) {
+      q = { month: dashboardMonth, from: range.from, to: range.to, entityId: entityId || undefined, agentId: agentId || undefined };
+    } else {
+      q = { month: dashboardMonth, entityId: entityId || undefined, agentId: agentId || undefined };
+    }
     getDashboard(q)
       .then((d) => { if (alive) setData(d); })
       .catch((e: any) => toast.error(e?.message ?? "Erreur"))
@@ -363,12 +373,15 @@ function GuichetAnalyticsPage() {
         <>
           {/* KPIs — minimal, monochrome */}
           {effectiveConfig.sections.kpis && (() => {
-            const src = dailyData ?? data; // prefer daily snapshot for top KPIs
+            // Choose KPI source depending on selected period: daily uses today's snapshot,
+            // week/month use the fetched `data` for the range.
+            const srcForKpis = period === 'day' ? (dailyData ?? data) : data;
+            const revenueForKpis = srcForKpis ? visibleTypes.reduce((s, t) => s + (srcForKpis.amounts[t] || 0), 0) : 0;
             const kpis = [
-              effectiveConfig.kpis.revenue    && <Kpi key="r" label="Chiffre d'affaires" value={fmtDT(dailyRevenue)} hint={`${src.contracts.today ?? src.contracts.month} contrats`} />,
-              effectiveConfig.kpis.contracts  && <Kpi key="c" label="Contrats" value={fmtInt(src.contracts.today ?? src.contracts.month)} hint={`Objectif ${data.targets.contractsMonthly}`} />,
-              effectiveConfig.kpis.activation && <Kpi key="a" label="Taux d'activation" value={`${src.activation.rate}%`} hint={`Min. ${src.activation.min}%`} />,
-              effectiveConfig.kpis.budget     && <Kpi key="b" label="Budget" value={src.targets.budgetDailyDt != null ? fmtDT(src.targets.budgetDailyDt) : (data.targets.budgetMonthlyDt != null ? fmtDT(data.targets.budgetMonthlyDt) : "—")} hint={data.targets.budgetDailyDt != null ? `${fmtDT(data.targets.budgetDailyDt)} / jour` : ""} />,
+              effectiveConfig.kpis.revenue    && <Kpi key="r" label="Chiffre d'affaires" value={fmtDT(revenueForKpis)} hint={`${srcForKpis?.contracts?.today ?? srcForKpis?.contracts?.month} contrats`} />,
+              effectiveConfig.kpis.contracts  && <Kpi key="c" label="Contrats" value={fmtInt(srcForKpis?.contracts?.today ?? srcForKpis?.contracts?.month)} hint={`Objectif ${data?.targets?.contractsMonthly}`} />,
+              effectiveConfig.kpis.activation && <Kpi key="a" label="Taux d'activation" value={`${srcForKpis?.activation?.rate ?? 0}%`} hint={`Min. ${srcForKpis?.activation?.min ?? 0}%`} />,
+              effectiveConfig.kpis.budget     && <Kpi key="b" label="Budget" value={srcForKpis?.targets?.budgetDailyDt != null ? fmtDT(srcForKpis.targets.budgetDailyDt) : (data?.targets?.budgetMonthlyDt != null ? fmtDT(data.targets.budgetMonthlyDt) : "—")} hint={data?.targets?.budgetDailyDt != null ? `${fmtDT(data.targets.budgetDailyDt)} / jour` : ""} />,
             ].filter(Boolean);
             return kpis.length > 0 ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">{kpis}</div> : null;
           })()}

@@ -108,6 +108,8 @@ function GuichetPage() {
   const isAdminLike = canReadAll;
   const assignedEntity = isAdminLike ? "" : (user?.guichetEntityId || "");
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const urlEntityId = assignedEntity || (search.entityId ?? "");
@@ -117,8 +119,8 @@ function GuichetPage() {
   const [q, setQ] = useState("");
   const [entityId, setEntityIdState] = useState(urlEntityId);
   const [agentFilter, setAgentFilter] = useState<string>(canReadAll ? "all" : (assignedEntity ? "entity" : "all"));
-  const [dateFrom, setDateFrom] = useState<string>("");
-  const [dateTo, setDateTo] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>(today);
+  const [dateTo, setDateTo] = useState<string>(today);
   const [month, setMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Record<string, boolean>>({});
@@ -180,29 +182,10 @@ function GuichetPage() {
   // Auto-refresh : polling toutes les 60s + au retour de focus / online,
   // mais on le suspend pendant la création / édition d'un dossier pour éviter
   // que le formulaire ou le modal ne soit interrompu par un reload concurrent.
+  // Auto-refresh disabled: dossier list will not poll automatically.
+  // Manual refresh via the Réinitialiser button or actions still calls `reload()`.
   useEffect(() => {
-    if (!canRead || guichetFormBusy) return;
-    const tick = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      void reload();
-    };
-    const interval = window.setInterval(tick, 60000);
-    const onFocus = () => {
-      if (!guichetFormBusy) void reload();
-    };
-    const onVisible = () => {
-      if (!document.hidden && !guichetFormBusy) void reload();
-    };
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("online", onFocus);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("online", onFocus);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // no-op
   }, [canRead, entityId, q, status, month, type, guichetFormBusy]);
 
   const filtered = useMemo(() => {
@@ -486,97 +469,86 @@ function GuichetPage() {
 
         <TabsContent value="dossiers" className="mt-0">
       <div className="space-y-3">
-        {/* Top KPI row — moved from right sidebar */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
-          <KpiCard title="Total Factures Topnet" value={`${fmt(summary.facture_topnet.amount)} DT`} sub={`${summary.facture_topnet.count} opération(s)`} />
-          <KpiCard title="Total Factures Telecom" value={`${fmt(summary.facture_tt.amount)} DT`} sub={`${summary.facture_tt.count} opération(s)`} />
-          <KpiCard title="Divers (Prix)" value={`${fmt(summary.divers.amount)} DT`} sub={`${summary.divers.count} opération(s)`} />
-          <KpiCard title="Total général" value={`${fmt(summary.facture_topnet.amount + summary.facture_tt.amount + summary.divers.amount)} DT`} sub={`${summary.dossierCount} dossier(s) validé(s)`} highlight />
-          <KpiCard title="SIM Activées" value={`${summary.sim.count} opération(s)`} />
-          <KpiCard title="Portabilités" value={`${summary.port.count} opération(s)`} />
-          <KpiCard title="SWP Traités" value={`${summary.swp.count} opération(s)`} />
-        </div>
-      <div className="grid grid-cols-1 gap-3 items-start">
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            {/* Action principale : un seul bouton "Nouveau" — le type d'opération est choisi dans le modal */}
-            <Can perm="guichet.create">
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={() => openCreate(null)}>
-                  <Plus className="h-4 w-4 mr-1" /> Nouveau dossier
-                </Button>
-              </div>
-            </Can>
+        {/* Filters above KPIs */}
+        <div className="grid grid-cols-1 gap-3 items-start">
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <Can perm="guichet.create">
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => openCreate(null)}>
+                    <Plus className="h-4 w-4 mr-1" /> Nouveau dossier
+                  </Button>
+                </div>
+              </Can>
 
-            {/* Simple search + filters + actions */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                placeholder="Rechercher client, CIN, n°…"
-                value={q} onChange={(e) => setQ(e.target.value)}
-                className="h-9 w-full sm:w-64"
-              />
-              <div className="flex items-center gap-1">
-                <Label className="text-[11px] text-muted-foreground">Du</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-36" />
-                <Label className="text-[11px] text-muted-foreground">Au</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-36" />
-              </div>
-              <div className="flex items-center gap-1">
-                <Label className="text-[11px] text-muted-foreground">Mois</Label>
-                <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-40" />
-              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  placeholder="Rechercher client, CIN, n°…"
+                  value={q} onChange={(e) => setQ(e.target.value)}
+                  className="h-9 w-full sm:w-64"
+                />
+                <div className="flex items-center gap-1">
+                  <Label className="text-[11px] text-muted-foreground">Du</Label>
+                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-36" />
+                  <Label className="text-[11px] text-muted-foreground">Au</Label>
+                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-36" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Label className="text-[11px] text-muted-foreground">Mois</Label>
+                  <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 w-40" />
+                </div>
 
-              {canReadAll && !assignedEntity && (
-                <Select value={entityId || "all"} onValueChange={(v) => setEntityId(v === "all" ? "" : v)}>
-                  <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Entité" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toutes les entités</SelectItem>
-                    {entities.map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                {canReadAll && !assignedEntity && (
+                  <Select value={entityId || "all"} onValueChange={(v) => setEntityId(v === "all" ? "" : v)}>
+                    <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Entité" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les entités</SelectItem>
+                      {entities.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
-              {(canReadAll || (assignedEntity && user?.id)) && (
-                <Select value={agentFilter} onValueChange={setAgentFilter}>
-                  <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Agent" /></SelectTrigger>
-                  <SelectContent>
-                    {canReadAll ? (
-                      <>
-                        <SelectItem value="all">Tous les agents</SelectItem>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        <SelectItem value="entity">Toute mon entité</SelectItem>
-                        <SelectItem value={user?.id ?? ""}>{user?.fullName || user?.username}</SelectItem>
-                        {users
-                          .filter((u) => u.id !== user?.id && u.guichetEntityId === assignedEntity)
-                          .map((u) => (
+                {(canReadAll || (assignedEntity && user?.id)) && (
+                  <Select value={agentFilter} onValueChange={setAgentFilter}>
+                    <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Agent" /></SelectTrigger>
+                    <SelectContent>
+                      {canReadAll ? (
+                        <>
+                          <SelectItem value="all">Tous les agents</SelectItem>
+                          {users.map((u) => (
                             <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
                           ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
+                        </>
+                      ) : (
+                        <>
+                          <SelectItem value="entity">Toute mon entité</SelectItem>
+                          <SelectItem value={user?.id ?? ""}>{user?.fullName || user?.username}</SelectItem>
+                          {users
+                            .filter((u) => u.id !== user?.id && u.guichetEntityId === assignedEntity)
+                            .map((u) => (
+                              <SelectItem key={u.id} value={u.id}>{u.fullName || u.username}</SelectItem>
+                            ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
 
-              {(q || (agentFilter && agentFilter !== "all" && agentFilter !== "entity") || dateFrom || dateTo || month) && (
-                <Button size="sm" variant="ghost" onClick={() => { setQ(""); setAgentFilter(canReadAll ? "all" : "entity"); setDateFrom(""); setDateTo(""); setMonth(""); }}>
-                  Réinitialiser
-                </Button>
-              )}
-              <div className="ml-auto">
-              {selectedCount > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">Actions ({selectedCount})</Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => performBulkStatus('prevalide')}>Prévalider</DropdownMenuItem>
+                {(q || (agentFilter && agentFilter !== "all" && agentFilter !== "entity") || dateFrom || dateTo || month) && (
+                  <Button size="sm" variant="ghost" onClick={() => { setQ(""); setAgentFilter(canReadAll ? "all" : "entity"); setDateFrom(today); setDateTo(today); setMonth(""); }}>
+                    Réinitialiser
+                  </Button>
+                )}
+                <div className="ml-auto">
+                {selectedCount > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline">Actions ({selectedCount})</Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => performBulkStatus('prevalide')}>Prévalider</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => performBulkStatus('draft')}>Mettre en brouillon</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => performBulkStatus('valide')}>Valider</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -613,7 +585,25 @@ function GuichetPage() {
               </DropdownMenu>
               </div>
             </div>
+            </CardContent>
+          </Card>
+        </div>
 
+        {/* Top KPI row — moved from right sidebar */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+          <KpiCard title="Total Factures Topnet" value={`${fmt(summary.facture_topnet.amount)} DT`} sub={`${summary.facture_topnet.count} opération(s)`} />
+          <KpiCard title="Total Factures Telecom" value={`${fmt(summary.facture_tt.amount)} DT`} sub={`${summary.facture_tt.count} opération(s)`} />
+          <KpiCard title="Divers (Prix)" value={`${fmt(summary.divers.amount)} DT`} sub={`${summary.divers.count} opération(s)`} />
+          <KpiCard title="Total général" value={`${fmt(summary.facture_topnet.amount + summary.facture_tt.amount + summary.divers.amount)} DT`} sub={`${summary.dossierCount} dossier(s) validé(s)`} highlight />
+          <KpiCard title="SIM Activées" value={`${summary.sim.count} opération(s)`} />
+          <KpiCard title="Portabilités" value={`${summary.port.count} opération(s)`} />
+          <KpiCard title="SWP Traités" value={`${summary.swp.count} opération(s)`} />
+        </div>
+
+        {/* Table card */}
+        <div className="grid grid-cols-1 gap-3 items-start">
+        <Card>
+          <CardContent className="p-4 space-y-3">
             {/* Table */}
             <div className="border rounded-md overflow-x-auto">
               <Table className="[&_th]:h-9 [&_th]:py-1 [&_th]:text-[11px] [&_th]:font-bold [&_th]:text-rose-700 [&_thead_tr]:bg-rose-50 [&_thead_tr]:hover:bg-rose-50">
@@ -697,9 +687,7 @@ function GuichetPage() {
                               : agentName(d.agentId)}
                           </TableCell>
                          <TableCell className="py-1.5">
-                           {d.status === "valide"
-                             ? <Badge className="bg-success/15 text-success border-success/20 text-[11px]">Validé</Badge>
-                             : <Badge variant="outline" className="text-[11px]">Brouillon</Badge>}
+                           {dossierStatusBadge(d.status)}
                          </TableCell>
                          <TableCell className="text-[11px] text-muted-foreground py-1.5 whitespace-nowrap">{d.createdAt?.slice(0,10) ?? ""}</TableCell>
                          <TableCell className="text-right py-1.5">
@@ -783,6 +771,22 @@ function KpiCard({ title, value, sub, highlight }: { title: string; value: strin
     </div>
   );
 }
+
+const dossierStatusLabel = (status?: string) => {
+  if (status === "valide") return "Validé";
+  if (status === "prevalide") return "Prévalidé";
+  return "Brouillon";
+};
+
+const dossierStatusBadge = (status?: string) => {
+  if (status === "valide") {
+    return <Badge className="bg-success/15 text-success border-success/20 text-[11px]">Validé</Badge>;
+  }
+  if (status === "prevalide") {
+    return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-[11px]">Prévalidé</Badge>;
+  }
+  return <Badge variant="outline" className="text-[11px]">Brouillon</Badge>;
+};
 
 /* ============================== CREATE DIALOG ============================== */
 function CreateDialog({
@@ -875,7 +879,7 @@ function CreateDialog({
     toast.success("Brouillon local vidé");
   };
 
-  const save = async (status: "draft" | "valide") => {
+  const save = async (status: "draft" | "prevalide" | "valide") => {
     if (!entityId) return toast.error("Choisir une entité");
     if (entries.length === 0) return toast.error("Ajouter au moins une opération");
     setSaving(true);
@@ -884,7 +888,8 @@ function CreateDialog({
         entityId, agentId: canAssignAgent ? agentId : undefined,
         clientName, clientCin, notes, status, entries,
       });
-      toast.success(status === "valide" ? "Validé" : "Brouillon enregistré");
+      const label = status === "valide" ? "Validé" : status === "prevalide" ? "Prévalidé" : "Brouillon enregistré";
+      toast.success(label);
       clearDraft();
       onSaved();
     } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
@@ -994,8 +999,7 @@ function CreateDialog({
           <Button variant="outline" onClick={saveDraftLocal} disabled={saving}>
             <Save className="h-4 w-4 mr-1" /> Brouillon (local)
           </Button>
-          {/* Prévalider: temporary no-op for now, shows a toast only */}
-          <Button variant="secondary" onClick={() => toast.info("Prévalidation (no-op)")} disabled={saving}>
+          <Button variant="secondary" onClick={() => save("prevalide")} disabled={saving}>
             Prévalider
           </Button>
           <Can perm="guichet.validate">
@@ -1033,7 +1037,7 @@ function ViewDossierDialog({ dossier, entities, onClose }: { dossier: GuichetDos
             <div className="grid grid-cols-2 gap-2">
               <div><span className="text-muted-foreground">Client :</span> {dossier.clientName || "—"}</div>
               <div><span className="text-muted-foreground">CIN :</span> {dossier.clientCin || "—"}</div>
-              <div><span className="text-muted-foreground">Statut :</span> {dossier.status === "valide" ? "Validé" : "Brouillon"}</div>
+              <div><span className="text-muted-foreground">Statut :</span> {dossierStatusLabel(dossier.status)}</div>
               <div><span className="text-muted-foreground">Créé le :</span> {dossier.createdAt?.slice(0,10) ?? "—"}</div>
             </div>
             {dossier.notes && <div><span className="text-muted-foreground">Notes :</span> {dossier.notes}</div>}
@@ -1249,6 +1253,7 @@ function DashboardTab({
   const [month, setMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
+  const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
   // canReadAll: pas de filtre par défaut. Agent affecté à une entité : voit toute l'entité par défaut
   // (toggle "Mes données" possible). Sinon (legacy) : limité à soi.
   const [agentId, setAgentId] = useState<string>(canReadAll ? "" : (assignedEntity ? "" : (user?.id ?? "")));
@@ -1282,21 +1287,46 @@ function DashboardTab({
     if (!assignedEntity) setEntityId("");
   };
 
+  // Sync period -> set appropriate from/to/month values
+  useEffect(() => {
+    const today = new Date();
+    const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+    if (period === 'day') {
+      const t = isoDate(today);
+      setFrom(t); setTo(t);
+    } else if (period === 'week') {
+      // compute Monday..Sunday for current date
+      const d = new Date(today);
+      const weekday = d.getDay(); // 0..6 Sun..Sat
+      const monday = new Date(d);
+      const diffToMonday = (weekday + 6) % 7; // days since Monday
+      monday.setDate(d.getDate() - diffToMonday);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      setFrom(isoDate(monday)); setTo(isoDate(sunday));
+    } else {
+      // month
+      setFrom(""); setTo("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, month]);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    getDashboard({
-      month,
-      from: from || undefined,
-      to: to || undefined,
-      entityId: entityId || undefined,
-      agentId: agentId || undefined,
-    })
+    const q: any = { entityId: entityId || undefined, agentId: agentId || undefined };
+    if (period === 'month') {
+      q.month = month;
+    } else {
+      if (from) q.from = from;
+      if (to) q.to = to;
+    }
+    getDashboard(q)
       .then((d) => { if (alive) setData(d); })
       .catch((e: any) => toast.error(e?.message ?? "Erreur dashboard"))
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [month, from, to, entityId, agentId]);
+  }, [period, month, from, to, entityId, agentId]);
 
   // Per-agent revenue (admin viewing all agents) — sourced from backend (all agents, not just top-10 SIM).
   useEffect(() => {
@@ -1355,6 +1385,15 @@ function DashboardTab({
             <Label className="text-[11px] text-muted-foreground">Au</Label>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-36" />
           </div>
+
+          <Select value={period} onValueChange={(v) => setPeriod(v as 'day' | 'week' | 'month')}>
+            <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Période" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Jour (aujourd'hui)</SelectItem>
+              <SelectItem value="week">Semaine</SelectItem>
+              <SelectItem value="month">Mois</SelectItem>
+            </SelectContent>
+          </Select>
 
           {canReadAll && !assignedEntity && (
             <Select value={entityId || "all"} onValueChange={(v) => setEntityId(v === "all" ? "" : v)}>

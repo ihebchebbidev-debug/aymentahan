@@ -310,7 +310,7 @@ if ($method === 'POST') {
     try {
         $ref = next_dossier_ref($db);
         $id  = 'GD-' . substr(bin2hex(random_bytes(6)), 0, 10);
-        $st  = in_array(($in['status'] ?? 'draft'), ['draft','valide'], true) ? $in['status'] : 'draft';
+        $st  = in_array(($in['status'] ?? 'draft'), ['draft','prevalide','valide'], true) ? $in['status'] : 'draft';
 
         $db->prepare('INSERT INTO crminternet_guichet_dossiers
             (id, ref, entity_id, agent_id, client_name, client_cin, status, notes, validated_at, validated_by)

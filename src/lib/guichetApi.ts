@@ -37,7 +37,7 @@ export type GuichetEntry = {
   operatorSource: string;
   label: string;
   opDate: string | null;
-  status: "draft" | "valide";
+  status: "draft" | "prevalide" | "valide";
   createdAt?: string | null;
 };
 
@@ -48,7 +48,7 @@ export type GuichetDossier = {
   agentId: string;
   clientName: string;
   clientCin: string;
-  status: "draft" | "valide";
+  status: "draft" | "prevalide" | "valide";
   validatedAt: string | null;
   validatedBy: string | null;
   notes: string;
@@ -163,7 +163,7 @@ export const createDossier = (body: {
   clientName?: string;
   clientCin?: string;
   notes?: string;
-  status?: "draft" | "valide";
+  status?: "draft" | "prevalide" | "valide";
   entries: Partial<GuichetEntry>[];
 }) => api<{ dossier: GuichetDossier; entries: GuichetEntry[] }>("/guichet_dossiers.php", { method: "POST", body });
 
