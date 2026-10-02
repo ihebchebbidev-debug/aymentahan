@@ -86,6 +86,7 @@ function ReportsPage() {
   const [team, setTeam] = useState<string>("");
   const [entityId, setEntityId] = useState(assignedEntity);
   const [agentId, setAgentId] = useState<string>(canReadAll ? "all" : "entity");
+  const [role, setRole] = useState<string>("");
   const [data, setData] = useState<Report | null>(null);
   const [prev, setPrev] = useState<Report | null>(null);
   const [compare, setCompare] = useState(true);
@@ -97,14 +98,19 @@ function ReportsPage() {
     return Array.from(set).sort();
   }, [users]);
 
+  const roleOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const u of users) if (u.role) set.add(u.role);
+    return Array.from(set).sort();
+  }, [users]);
+
   useEffect(() => {
     setEntityId(assignedEntity);
     setAgentId(canReadAll ? "all" : "entity");
   }, [assignedEntity, canReadAll]);
 
   const agentOptions = useMemo(() => {
-    const sameEntity = !assignedEntity ? users : users.filter((u) => (u.guichetEntityId || "") === assignedEntity);
-    return sameEntity.filter((u) => ["Agent", "Manager", "AgentSuivi", "AgentActivation", "AgentVente", "AgentGuichet", "AgentTechnicoCommercial", "Administrateur"].includes(u.role));
+    return !assignedEntity ? users : users.filter((u) => (u.guichetEntityId || "") === assignedEntity);
   }, [users, assignedEntity]);
 
   const agentLabel = (id: string) => {
@@ -114,13 +120,14 @@ function ReportsPage() {
     return u?.fullName || u?.username || id;
   };
 
-  const load = async (range?: { from: string; to: string; team?: string; entityId?: string; agentId?: string }) => {
+  const load = async (range?: { from: string; to: string; team?: string; entityId?: string; agentId?: string; role?: string }) => {
     if (!API_ENABLED) { toast.error("API désactivée"); return; }
     const f = range?.from ?? from;
     const t = range?.to ?? to;
     const tm = range?.team ?? team;
     const effectiveEntity = range?.entityId ?? (entityId || assignedEntity || undefined);
     const effectiveAgent = range?.agentId ?? agentId;
+    const effectiveRole = range?.role ?? role;
     const agentQuery = effectiveAgent && effectiveAgent !== "all" && effectiveAgent !== "entity" ? effectiveAgent : undefined;
     setLoading(true);
     try {
@@ -130,12 +137,13 @@ function ReportsPage() {
         team: tm || undefined,
         entityId: effectiveEntity,
         agentId: agentQuery,
+        role: effectiveRole || undefined,
       } });
       setData(r);
       if (compare) {
         const pp = previousPeriod(f, t);
         try {
-          const r2 = await api<Report>("/reports.php", { query: { from: pp.from, to: pp.to, team: tm || undefined, entityId: effectiveEntity, agentId: agentQuery } });
+          const r2 = await api<Report>("/reports.php", { query: { from: pp.from, to: pp.to, team: tm || undefined, entityId: effectiveEntity, agentId: agentQuery, role: effectiveRole || undefined } });
           setPrev(r2);
         } catch { setPrev(null); }
       } else setPrev(null);
@@ -149,7 +157,7 @@ function ReportsPage() {
   const applyPreset = (p: Preset) => {
     const r = p.compute();
     setFrom(r.from); setTo(r.to);
-    void load({ ...r, team, entityId, agentId });
+    void load({ ...r, team, entityId, agentId, role });
   };
 
   // CSV export removed — Excel (.xlsx) is the only supported format.
@@ -230,7 +238,7 @@ function ReportsPage() {
 
           <div className="space-y-1">
             <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Agence</Label>
-            <Select value={team || "__all__"} onValueChange={(v) => { const nv = v === "__all__" ? "" : v; setTeam(nv); void load({ from, to, team: nv, entityId, agentId }); }}>
+            <Select value={team || "__all__"} onValueChange={(v) => { const nv = v === "__all__" ? "" : v; setTeam(nv); void load({ from, to, team: nv, entityId, agentId, role }); }}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Toutes" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">Toutes les agences</SelectItem>
@@ -245,7 +253,7 @@ function ReportsPage() {
           {canReadAll && (
             <div className="space-y-1">
               <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Entité</Label>
-              <Select value={entityId || "all"} onValueChange={(v) => { const nv = v === "all" ? "" : v; setEntityId(nv); void load({ from, to, team, entityId: nv, agentId }); }}>
+              <Select value={entityId || "all"} onValueChange={(v) => { const nv = v === "all" ? "" : v; setEntityId(nv); void load({ from, to, team, entityId: nv, agentId, role }); }}>
                 <SelectTrigger className="w-[180px]"><SelectValue placeholder="Toutes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Toutes les entités</SelectItem>
@@ -258,8 +266,21 @@ function ReportsPage() {
           )}
 
           <div className="space-y-1">
+            <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Rôle</Label>
+            <Select value={role || "__all__"} onValueChange={(v) => { const nv = v === "__all__" ? "" : v; setRole(nv); void load({ from, to, team, entityId, agentId, role: nv }); }}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="Tous" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Tous les rôles</SelectItem>
+                {roleOptions.map((r) => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
             <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">Par agent</Label>
-            <Select value={agentId} onValueChange={(v) => { setAgentId(v); void load({ from, to, team, entityId, agentId: v }); }}>
+            <Select value={agentId} onValueChange={(v) => { setAgentId(v); void load({ from, to, team, entityId, agentId: v, role }); }}>
               <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {canReadAll ? <SelectItem value="all">Tous les agents</SelectItem> : <SelectItem value="entity">Toute mon entité</SelectItem>}

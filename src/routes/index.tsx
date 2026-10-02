@@ -28,6 +28,8 @@ import { fetchAllPaginated } from "@/lib/paginatedFetch";
 import { Search, ArrowUpDown, IdCard, Save, RotateCcw, Check, Bookmark, Plus, Trash2, Loader2, CloudOff } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -162,11 +164,15 @@ function Dashboard() {
   }, [cinSearch]);
 
   // Vues sauvegardées (multi-presets) par utilisateur
-  type SavedView = { id: string; name: string; filters: { zone: string; agency: string; search: string; cin: string; sortBy: string } };
+  type SavedView = { id: string; name: string; filters: { zone: string; agency: string; search: string; cin: string; sortBy: string }; visibleCards?: string[] };
+  const ALL_CARDS = ["hero_kpis", "kpis", "leads_attente", "untouched_leads", "charts", "tasks"];
+  const [visibleCards, setVisibleCards] = useState<string[]>(ALL_CARDS);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState<string>("");
   const [showSaveDialog, setShowSaveDialog] = useState<boolean>(false);
   const [newViewName, setNewViewName] = useState<string>("");
+  const [dialogFilters, setDialogFilters] = useState({ zone: "__all__", agency: "__all__", search: "", cin: "", sortBy: "recent" });
+  const [dialogCards, setDialogCards] = useState<string[]>(ALL_CARDS);
 
   // Charge les vues sauvegardées
   useEffect(() => {
@@ -193,6 +199,7 @@ function Dashboard() {
     setSearch(v.filters.search);
     setCinSearch(v.filters.cin);
     setSortBy(v.filters.sortBy);
+    setVisibleCards(v.visibleCards ?? ALL_CARDS);
     setActiveViewId(v.id);
   };
 
@@ -202,12 +209,26 @@ function Dashboard() {
     const v: SavedView = {
       id: `v_${Date.now().toString(36)}`,
       name: name.slice(0, 60),
-      filters: { zone: zoneFilter, agency: agencyFilter, search, cin: cinSearch, sortBy },
+      filters: dialogFilters,
+      visibleCards: dialogCards,
     };
     persistViews([...savedViews, v]);
+    setZoneFilter(dialogFilters.zone);
+    setAgencyFilter(dialogFilters.agency);
+    setSearch(dialogFilters.search);
+    setCinSearch(dialogFilters.cin);
+    setSortBy(dialogFilters.sortBy);
+    setVisibleCards(dialogCards);
     setActiveViewId(v.id);
     setNewViewName("");
     setShowSaveDialog(false);
+  };
+
+  const openSaveDialog = () => {
+    setNewViewName("");
+    setDialogFilters({ zone: zoneFilter, agency: agencyFilter, search, cin: cinSearch, sortBy });
+    setDialogCards(visibleCards);
+    setShowSaveDialog(true);
   };
 
   const deleteView = (id: string) => {
@@ -227,6 +248,7 @@ function Dashboard() {
           if (typeof v.search === "string") setSearch(v.search);
           if (typeof v.cin === "string") setCinSearch(v.cin);
           if (typeof v.sortBy === "string") setSortBy(v.sortBy);
+          if (Array.isArray(v.visibleCards)) setVisibleCards(v.visibleCards);
         }
       })
       .catch(() => {})
@@ -242,6 +264,7 @@ function Dashboard() {
     const value = {
       zone: zoneFilter, agency: agencyFilter,
       search: searchDebounced, cin: cinDebounced, sortBy,
+      visibleCards
     };
     const payload = JSON.stringify(value);
     if (payload === lastSavedRef.current) return;
@@ -257,11 +280,12 @@ function Dashboard() {
         .catch(() => setSaveState("error"));
     }, 400);
     return () => clearTimeout(t);
-  }, [prefsLoaded, myUsername, zoneFilter, agencyFilter, searchDebounced, cinDebounced, sortBy]);
+  }, [prefsLoaded, myUsername, zoneFilter, agencyFilter, searchDebounced, cinDebounced, sortBy, visibleCards]);
 
   const resetFilters = () => {
     setZoneFilter("__all__"); setAgencyFilter("__all__");
     setSearch(""); setCinSearch(""); setSortBy("recent");
+    setVisibleCards(ALL_CARDS);
     setActiveViewId("");
   };
 
@@ -471,60 +495,62 @@ function Dashboard() {
         </div>
 
         {/* Hero KPI cards */}
-        <div className={`grid gap-3 ${heroKpiCols}`}>
-          <HeroKpi
-            label="Prospects gagnés aujourd'hui"
-            value={prospectsWonToday}
-            icon={<Trophy className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.55 0.16 152), oklch(0.70 0.15 155))"
-          />
-          <HeroKpi
-            label="Prospects gagnés ce mois"
-            value={prospectsWonMonth}
-            icon={<Trophy className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.50 0.18 145), oklch(0.62 0.17 160))"
-          />
-          <HeroKpi
-            label="Opportunités aujourd'hui"
-            value={oppsToday}
-            icon={<Target className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.55 0.20 255), oklch(0.68 0.16 245))"
-          />
-          <HeroKpi
-            label="Opportunités ce mois"
-            value={oppsMonth}
-            icon={<Target className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.50 0.20 270), oklch(0.62 0.18 250))"
-          />
-          <HeroKpi
-            label="Contrats aujourd'hui"
-            value={contractsToday}
-            icon={<ClipboardList className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.58 0.18 25), oklch(0.72 0.16 40))"
-          />
-          <HeroKpi
-            label="Contrats ce mois"
-            value={contractsMonth}
-            icon={<ClipboardList className="h-5 w-5" />}
-            gradient="linear-gradient(135deg, oklch(0.55 0.18 35), oklch(0.70 0.16 50))"
-          />
-          {canViewMigrations && (
-            <>
-              <HeroKpi
-                label="Migrations aujourd'hui"
-                value={migrationsToday}
-                icon={<ArrowRightLeft className="h-5 w-5" />}
-                gradient="linear-gradient(135deg, oklch(0.52 0.17 300), oklch(0.65 0.15 285))"
-              />
-              <HeroKpi
-                label="Migrations ce mois"
-                value={migrationsMonth}
-                icon={<ArrowRightLeft className="h-5 w-5" />}
-                gradient="linear-gradient(135deg, oklch(0.48 0.19 310), oklch(0.60 0.17 295))"
-              />
-            </>
-          )}
-        </div>
+        {visibleCards.includes("hero_kpis") && (
+          <div className={`grid gap-3 ${heroKpiCols}`}>
+            <HeroKpi
+              label="Prospects gagnés aujourd'hui"
+              value={prospectsWonToday}
+              icon={<Trophy className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.55 0.16 152), oklch(0.70 0.15 155))"
+            />
+            <HeroKpi
+              label="Prospects gagnés ce mois"
+              value={prospectsWonMonth}
+              icon={<Trophy className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.50 0.18 145), oklch(0.62 0.17 160))"
+            />
+            <HeroKpi
+              label="Opportunités aujourd'hui"
+              value={oppsToday}
+              icon={<Target className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.55 0.20 255), oklch(0.68 0.16 245))"
+            />
+            <HeroKpi
+              label="Opportunités ce mois"
+              value={oppsMonth}
+              icon={<Target className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.50 0.20 270), oklch(0.62 0.18 250))"
+            />
+            <HeroKpi
+              label="Contrats aujourd'hui"
+              value={contractsToday}
+              icon={<ClipboardList className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.58 0.18 25), oklch(0.72 0.16 40))"
+            />
+            <HeroKpi
+              label="Contrats ce mois"
+              value={contractsMonth}
+              icon={<ClipboardList className="h-5 w-5" />}
+              gradient="linear-gradient(135deg, oklch(0.55 0.18 35), oklch(0.70 0.16 50))"
+            />
+            {canViewMigrations && (
+              <>
+                <HeroKpi
+                  label="Migrations aujourd'hui"
+                  value={migrationsToday}
+                  icon={<ArrowRightLeft className="h-5 w-5" />}
+                  gradient="linear-gradient(135deg, oklch(0.52 0.17 300), oklch(0.65 0.15 285))"
+                />
+                <HeroKpi
+                  label="Migrations ce mois"
+                  value={migrationsMonth}
+                  icon={<ArrowRightLeft className="h-5 w-5" />}
+                  gradient="linear-gradient(135deg, oklch(0.48 0.19 310), oklch(0.60 0.17 295))"
+                />
+              </>
+            )}
+          </div>
+        )}
 
         {/* Compact filter bar */}
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/50 p-2">
@@ -642,10 +668,10 @@ function Dashboard() {
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onSelect={(e) => { e.preventDefault(); setShowSaveDialog(true); }}
+                onSelect={(e) => { e.preventDefault(); openSaveDialog(); }}
                 className="text-xs text-primary"
               >
-                <Plus className="h-3 w-3 mr-1" />Sauvegarder la vue actuelle
+                <Plus className="h-3 w-3 mr-1" />Créer / Sauvegarder une vue
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -653,21 +679,96 @@ function Dashboard() {
         </div>
 
         <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-base">Sauvegarder la vue actuelle</DialogTitle>
+              <DialogTitle className="text-base">Créer / Sauvegarder une vue</DialogTitle>
             </DialogHeader>
-            <div className="space-y-2">
-              <Input
-                value={newViewName}
-                onChange={(e) => setNewViewName(e.target.value)}
-                placeholder="Ex: CIN actifs, Zone Casablanca…"
-                maxLength={60}
-                autoFocus
-                onKeyDown={(e) => { if (e.key === "Enter") saveCurrentAsView(); }}
-              />
-              <div className="text-[11px] text-muted-foreground">
-                Filtres mémorisés : zone, agence, recherche, CIN, tri.
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label>Nom de la vue</Label>
+                <Input
+                  value={newViewName}
+                  onChange={(e) => setNewViewName(e.target.value)}
+                  placeholder="Ex: Mes leads urgents"
+                  maxLength={60}
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-3 border-t pt-3">
+                <Label className="text-muted-foreground uppercase text-[11px] tracking-wider">Filtres</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Zone</Label>
+                    <Select value={dialogFilters.zone} onValueChange={(v) => setDialogFilters(prev => ({ ...prev, zone: v }))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Toutes les zones" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Toutes les zones</SelectItem>
+                        {zoneOptions.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Équipe</Label>
+                    <Select value={dialogFilters.agency} onValueChange={(v) => setDialogFilters(prev => ({ ...prev, agency: v }))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Toutes les équipes" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__all__">Toutes les équipes</SelectItem>
+                        {agencyOptions.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Recherche</Label>
+                    <Input className="h-8 text-xs" placeholder="Lead, agent..." value={dialogFilters.search} onChange={(e) => setDialogFilters(prev => ({ ...prev, search: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CIN</Label>
+                    <Input className="h-8 text-xs" placeholder="CIN" value={dialogFilters.cin} onChange={(e) => setDialogFilters(prev => ({ ...prev, cin: e.target.value.toUpperCase() }))} />
+                  </div>
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
+                    <Label className="text-xs">Tri</Label>
+                    <Select value={dialogFilters.sortBy} onValueChange={(v) => setDialogFilters(prev => ({ ...prev, sortBy: v }))}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Trier" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="recent">Plus récents</SelectItem>
+                        <SelectItem value="name">Nom (A-Z)</SelectItem>
+                        <SelectItem value="status">Statut</SelectItem>
+                        <SelectItem value="city">Ville</SelectItem>
+                        <SelectItem value="rate">Taux conv. (agent)</SelectItem>
+                        <SelectItem value="leads">Nb leads (agent)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t pt-3">
+                <Label className="text-muted-foreground uppercase text-[11px] tracking-wider">Cartes & Sections</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {[
+                    { id: "hero_kpis", label: "Indicateurs principaux (Haut)" },
+                    { id: "kpis", label: "KPIs secondaires (Attente, Temps...)" },
+                    { id: "leads_attente", label: "Encadré Leads en attente" },
+                    { id: "untouched_leads", label: "Prospects non traités" },
+                    { id: "charts", label: "Graphiques (Répartition & Perf)" },
+                    { id: "tasks", label: "Mes tâches & relances" }
+                  ].map(card => (
+                    <div key={card.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`card-${card.id}`}
+                        checked={dialogCards.includes(card.id)}
+                        onCheckedChange={(c) => {
+                          if (c) setDialogCards(prev => [...prev, card.id]);
+                          else setDialogCards(prev => prev.filter(id => id !== card.id));
+                        }}
+                      />
+                      <label htmlFor={`card-${card.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                        {card.label}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
             <DialogFooter>
@@ -682,241 +783,251 @@ function Dashboard() {
         {isEmpty && <EmptyDashboard />}
 
         {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <Kpi label="Prospects en attente" value={pendingLeads} icon={<Hourglass className="h-4 w-4" />} tone="info" sub={`${newLeads} Nouveau · ${callbackLeads} Rappel`} />
-          <Kpi label="Non traités & non convertis" value={untouchedCount} icon={<Inbox className="h-4 w-4" />} tone="warning" sub={`${untouchedStale} >7j · ${untouchedUnassigned} sans agent`} />
-          <Kpi label="Temps moyen de traitement" value={`${avgHandlingDisplay} j`} icon={<Clock className="h-4 w-4" />} tone="warning" sub={isFiltered ? "Sur la sélection" : "Tous leads traités"} />
-        </div>
+        {visibleCards.includes("kpis") && (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <Kpi label="Prospects en attente" value={pendingLeads} icon={<Hourglass className="h-4 w-4" />} tone="info" sub={`${newLeads} Nouveau · ${callbackLeads} Rappel`} />
+            <Kpi label="Non traités & non convertis" value={untouchedCount} icon={<Inbox className="h-4 w-4" />} tone="warning" sub={`${untouchedStale} >7j · ${untouchedUnassigned} sans agent`} />
+            <Kpi label="Temps moyen de traitement" value={`${avgHandlingDisplay} j`} icon={<Clock className="h-4 w-4" />} tone="warning" sub={isFiltered ? "Sur la sélection" : "Tous leads traités"} />
+          </div>
+        )}
 
         {/* Tuile dédiée « Leads en attente » MVP §4.4 */}
-        <Card className="shadow-elegant border-info/30">
-          <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 bg-gradient-to-r from-info/5 via-card to-card">
-            <div className="flex items-center gap-3 sm:flex-1">
-              <div className="h-12 w-12 rounded-xl bg-info/15 text-info flex items-center justify-center shrink-0">
-                <Hourglass className="h-6 w-6" />
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Leads en attente</div>
-                <div className="text-3xl font-semibold tabular-nums leading-tight">{pendingLeads}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  À contacter ou à rappeler — {totalLeads > 0 ? Math.round((pendingLeads / totalLeads) * 100) : 0}% du portefeuille
+        {visibleCards.includes("leads_attente") && (
+          <Card className="shadow-elegant border-info/30">
+            <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 bg-gradient-to-r from-info/5 via-card to-card">
+              <div className="flex items-center gap-3 sm:flex-1">
+                <div className="h-12 w-12 rounded-xl bg-info/15 text-info flex items-center justify-center shrink-0">
+                  <Hourglass className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Leads en attente</div>
+                  <div className="text-3xl font-semibold tabular-nums leading-tight">{pendingLeads}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    À contacter ou à rappeler — {totalLeads > 0 ? Math.round((pendingLeads / totalLeads) * 100) : 0}% du portefeuille
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 sm:flex-1">
-              <MiniStat label="Nouveau" value={newLeads} color="var(--primary)" />
-              <MiniStat label="Rappel" value={callbackLeads} color="var(--chart-4)" />
-              <MiniStat label="En cours" value={inProgressLeads} color="var(--chart-3)" />
-            </div>
-            <Link to="/prospects" className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-medium shadow-sm hover:opacity-90 shrink-0">
-              Traiter les leads
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Prospects non traités & non convertis (statut Nouveau, jamais converti) */}
-        <Card className="shadow-elegant border-warning/30">
-          <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Inbox className="h-4 w-4 text-warning" /> Prospects non traités
-              </CardTitle>
-              <CardDescription>
-                Leads encore au statut « Nouveau » et jamais convertis — {untouchedCount} au total
-                {untouchedStale > 0 && <> · <span className="text-destructive font-medium">{untouchedStale} en retard ({'>'}7 j)</span></>}
-              </CardDescription>
-            </div>
-            <Link to="/prospects" className="text-xs text-primary hover:underline shrink-0">Voir tout →</Link>
-          </CardHeader>
-          <CardContent>
-            {untouchedCount === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                🎉 Tous les leads ont été pris en charge.
+              <div className="grid grid-cols-3 gap-3 sm:gap-4 sm:flex-1">
+                <MiniStat label="Nouveau" value={newLeads} color="var(--primary)" />
+                <MiniStat label="Rappel" value={callbackLeads} color="var(--chart-4)" />
+                <MiniStat label="En cours" value={inProgressLeads} color="var(--chart-3)" />
               </div>
-            ) : (
-              <div className="space-y-1.5">
-                {untouchedProspects.slice(0, 8).map((p) => {
-                  const tone =
-                    p.ageDays >= 14 ? "bg-destructive/15 text-destructive border-destructive/30"
-                    : p.ageDays >= 7 ? "bg-warning/15 text-warning-foreground border-warning/30"
-                    : "bg-muted text-muted-foreground border-border";
-                  return (
-                    <Link
-                      key={p.id}
-                      to="/prospects/$prospectId"
-                      params={{ prospectId: p.id }}
-                      className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0 hover:bg-accent/40 -mx-2 px-2 rounded"
-                    >
-                      <div className="h-7 w-7 rounded-full bg-warning/15 text-warning-foreground flex items-center justify-center text-[10px] font-semibold shrink-0">
-                        {p.firstName[0]}{p.lastName[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{p.lastName} {p.firstName}</div>
-                        <div className="text-[11px] text-muted-foreground truncate">
-                          {p.phone || "—"} • {p.city || "—"} • {p.assignedTo ? `Agent: ${p.assignedTo}` : "Non assigné"}
-                        </div>
-                      </div>
-                      <Badge variant="outline" className={`text-[10px] shrink-0 ${tone}`}>
-                        {p.ageDays === 0 ? "Aujourd'hui" : `${p.ageDays} j`}
-                      </Badge>
-                    </Link>
-                  );
-                })}
-                {untouchedCount > 8 && (
-                  <div className="pt-2 text-center">
-                    <Link to="/prospects" className="text-xs text-primary hover:underline">
-                      + {untouchedCount - 8} autre(s) prospect(s) non traité(s) →
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Charts: répartition + performance agents */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Card className="shadow-elegant">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Répartition par statut</CardTitle>
-              <CardDescription>{totalLeads} leads</CardDescription>
-            </CardHeader>
-            <CardContent className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusBreakdown}
-                    dataKey="count"
-                    nameKey="status"
-                    innerRadius={50}
-                    outerRadius={85}
-                    paddingAngle={2}
-                    isAnimationActive={false}
-                  >
-                    {statusBreakdown.map((s) => (
-                      <Cell key={s.status} fill={STATUS_COLORS[s.status]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <Link to="/prospects" className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground px-4 py-2 text-xs font-medium shadow-sm hover:opacity-90 shrink-0">
+                Traiter les leads
+              </Link>
             </CardContent>
           </Card>
+        )}
 
-          <Card className="lg:col-span-2 shadow-elegant">
-            <CardHeader className="flex flex-row items-center justify-between">
+        {/* Prospects non traités & non convertis (statut Nouveau, jamais converti) */}
+        {visibleCards.includes("untouched_leads") && (
+          <Card className="shadow-elegant border-warning/30">
+            <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-warning" /> Performance des commerciaux
+                  <Inbox className="h-4 w-4 text-warning" /> Prospects non traités
                 </CardTitle>
-                <CardDescription>Ventes, leads traités et taux de conversion</CardDescription>
+                <CardDescription>
+                  Leads encore au statut « Nouveau » et jamais convertis — {untouchedCount} au total
+                  {untouchedStale > 0 && <> · <span className="text-destructive font-medium">{untouchedStale} en retard ({'>'}7 j)</span></>}
+                </CardDescription>
               </div>
-              <Link to="/users" className="text-xs text-primary hover:underline">Voir tout →</Link>
+              <Link to="/prospects" className="text-xs text-primary hover:underline shrink-0">Voir tout →</Link>
             </CardHeader>
             <CardContent>
-              {agentPerf.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">Aucun commercial.</div>
+              {untouchedCount === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  🎉 Tous les leads ont été pris en charge.
+                </div>
               ) : (
-                <div className="space-y-2.5">
-                  {agentPerf.map((a, idx) => {
-                    const pct = (a.sold / maxSold) * 100;
+                <div className="space-y-1.5">
+                  {untouchedProspects.slice(0, 8).map((p) => {
+                    const tone =
+                      p.ageDays >= 14 ? "bg-destructive/15 text-destructive border-destructive/30"
+                      : p.ageDays >= 7 ? "bg-warning/15 text-warning-foreground border-warning/30"
+                      : "bg-muted text-muted-foreground border-border";
                     return (
-                      <div key={a.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-bold shrink-0">
-                          {idx + 1}
+                      <Link
+                        key={p.id}
+                        to="/prospects/$prospectId"
+                        params={{ prospectId: p.id }}
+                        className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0 hover:bg-accent/40 -mx-2 px-2 rounded"
+                      >
+                        <div className="h-7 w-7 rounded-full bg-warning/15 text-warning-foreground flex items-center justify-center text-[10px] font-semibold shrink-0">
+                          {p.firstName[0]}{p.lastName[0]}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-medium truncate">{a.fullName || a.username}</div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums shrink-0">
-                              <span className="hidden sm:inline">{a.handled} traités</span>
-                              <span className="font-semibold text-foreground">{a.sold} ventes</span>
-                              <span className="text-success font-medium">{a.rate}%</span>
-                            </div>
-                          </div>
-                          <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow" style={{ width: `${pct}%` }} />
+                          <div className="text-sm font-medium truncate">{p.lastName} {p.firstName}</div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {p.phone || "—"} • {p.city || "—"} • {p.assignedTo ? `Agent: ${p.assignedTo}` : "Non assigné"}
                           </div>
                         </div>
-                      </div>
+                        <Badge variant="outline" className={`text-[10px] shrink-0 ${tone}`}>
+                          {p.ageDays === 0 ? "Aujourd'hui" : `${p.ageDays} j`}
+                        </Badge>
+                      </Link>
                     );
                   })}
+                  {untouchedCount > 8 && (
+                    <div className="pt-2 text-center">
+                      <Link to="/prospects" className="text-xs text-primary hover:underline">
+                        + {untouchedCount - 8} autre(s) prospect(s) non traité(s) →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
-        </div>
+        )}
+
+        {/* Charts: répartition + performance agents */}
+        {visibleCards.includes("charts") && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <Card className="shadow-elegant">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Répartition par statut</CardTitle>
+                <CardDescription>{totalLeads} leads</CardDescription>
+              </CardHeader>
+              <CardContent className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusBreakdown}
+                      dataKey="count"
+                      nameKey="status"
+                      innerRadius={50}
+                      outerRadius={85}
+                      paddingAngle={2}
+                      isAnimationActive={false}
+                    >
+                      {statusBreakdown.map((s) => (
+                        <Cell key={s.status} fill={STATUS_COLORS[s.status]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--border)" }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2 shadow-elegant">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-warning" /> Performance des commerciaux
+                  </CardTitle>
+                  <CardDescription>Ventes, leads traités et taux de conversion</CardDescription>
+                </div>
+                <Link to="/users" className="text-xs text-primary hover:underline">Voir tout →</Link>
+              </CardHeader>
+              <CardContent>
+                {agentPerf.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-muted-foreground">Aucun commercial.</div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {agentPerf.map((a, idx) => {
+                      const pct = (a.sold / maxSold) * 100;
+                      return (
+                        <div key={a.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-accent/40 transition-colors">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-bold shrink-0">
+                            {idx + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm font-medium truncate">{a.fullName || a.username}</div>
+                              <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums shrink-0">
+                                <span className="hidden sm:inline">{a.handled} traités</span>
+                                <span className="font-semibold text-foreground">{a.sold} ventes</span>
+                                <span className="text-success font-medium">{a.rate}%</span>
+                              </div>
+                            </div>
+                            <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary-glow" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Tâches du jour + leads à traiter */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="shadow-elegant">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <BellRing className="h-4 w-4 text-warning" /> Mes relances du jour
-              </CardTitle>
-              <CardDescription>Tâches échues à aujourd'hui</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              {todayTasks.length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted-foreground">Aucune relance pour aujourd'hui 🎉</div>
-              ) : todayTasks.map((t) => (
-                <div key={t.id} className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0">
-                  <CheckSquare className="h-3.5 w-3.5 text-warning shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{t.title}</div>
-                    <div className="text-[11px] text-muted-foreground">Échéance {t.dueDate}</div>
+        {visibleCards.includes("tasks") && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="shadow-elegant">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BellRing className="h-4 w-4 text-warning" /> Mes relances du jour
+                </CardTitle>
+                <CardDescription>Tâches échues à aujourd'hui</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {todayTasks.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">Aucune relance pour aujourd'hui 🎉</div>
+                ) : todayTasks.map((t) => (
+                  <div key={t.id} className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0">
+                    <CheckSquare className="h-3.5 w-3.5 text-warning shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{t.title}</div>
+                      <div className="text-[11px] text-muted-foreground">Échéance {t.dueDate}</div>
+                    </div>
+                    {t.relatedEntity === "prospect" && t.relatedId && (
+                      <Link
+                        to="/prospects/$prospectId"
+                        params={{ prospectId: t.relatedId }}
+                        className="text-[11px] text-primary hover:underline shrink-0"
+                      >
+                        Ouvrir
+                      </Link>
+                    )}
                   </div>
-                  {t.relatedEntity === "prospect" && t.relatedId && (
-                    <Link
-                      to="/prospects/$prospectId"
-                      params={{ prospectId: t.relatedId }}
-                      className="text-[11px] text-primary hover:underline shrink-0"
-                    >
-                      Ouvrir
-                    </Link>
-                  )}
+                ))}
+                <div className="pt-2">
+                  <Link to="/tasks" className="text-xs text-primary hover:underline">Voir toutes les relances →</Link>
                 </div>
-              ))}
-              <div className="pt-2">
-                <Link to="/tasks" className="text-xs text-primary hover:underline">Voir toutes les relances →</Link>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="shadow-elegant">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-primary" /> Leads à traiter
-              </CardTitle>
-              <CardDescription>Statut Nouveau ou En cours</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              {leadsToProcess.length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted-foreground">Aucun lead à traiter.</div>
-              ) : leadsToProcess.map((p) => (
-                <Link
-                  key={p.id}
-                  to="/prospects/$prospectId"
-                  params={{ prospectId: p.id }}
-                  className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0 hover:bg-accent/40 -mx-2 px-2 rounded"
-                >
-                  <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
-                    {p.firstName[0]}{p.lastName[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{p.lastName} {p.firstName}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">{p.phone || "—"} • {p.city || "—"}</div>
-                  </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">{p.status}</Badge>
-                </Link>
-              ))}
-              <div className="pt-2">
-                <Link to="/prospects" className="text-xs text-primary hover:underline">Voir tous les leads →</Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="shadow-elegant">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-primary" /> Leads à traiter
+                </CardTitle>
+                <CardDescription>Statut Nouveau ou En cours</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {leadsToProcess.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">Aucun lead à traiter.</div>
+                ) : leadsToProcess.map((p) => (
+                  <Link
+                    key={p.id}
+                    to="/prospects/$prospectId"
+                    params={{ prospectId: p.id }}
+                    className="flex items-center gap-2 py-2 border-b border-border/60 last:border-0 hover:bg-accent/40 -mx-2 px-2 rounded"
+                  >
+                    <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0">
+                      {p.firstName[0]}{p.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{p.lastName} {p.firstName}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">{p.phone || "—"} • {p.city || "—"}</div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] shrink-0">{p.status}</Badge>
+                  </Link>
+                ))}
+                <div className="pt-2">
+                  <Link to="/prospects" className="text-xs text-primary hover:underline">Voir tous les leads →</Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

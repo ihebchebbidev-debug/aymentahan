@@ -12,6 +12,7 @@ $format = $_GET['format'] ?? 'json';
 $team = isset($_GET['team']) ? trim((string)$_GET['team']) : '';
 $entityId = isset($_GET['entityId']) ? trim((string)$_GET['entityId']) : '';
 $agentId = isset($_GET['agentId']) ? trim((string)$_GET['agentId']) : '';
+$role = isset($_GET['role']) ? trim((string)$_GET['role']) : '';
 $teamIsNone = ($team === '__none__');
 
 $hasGuichetEntityColumn = true;
@@ -45,6 +46,10 @@ if ($hasGuichetEntityColumn && $entityId !== '') {
 if ($agentId !== '') {
     $agentFilterSql .= ' AND u.id = :agentId ';
     $agentFilterParams[':agentId'] = $agentId;
+}
+if ($role !== '') {
+    $agentFilterSql .= ' AND u.role = :role ';
+    $agentFilterParams[':role'] = $role;
 }
 
 // Per-agent KPIs
@@ -111,7 +116,7 @@ $agentSql = "
        WHERE mg.deleted_at IS NULL AND DATE(mg.created_at) BETWEEN :from4 AND :to4 AND $mOwnerM) AS migrations_count
   FROM crminternet_users u
   LEFT JOIN crminternet_teams t ON t.id = u.team_id
-  WHERE u.role IN ('Agent','Manager','AgentSuivi','AgentActivation','AgentVente','AgentGuichet','AgentTechnicoCommercial') AND u.active = 1
+  WHERE u.active = 1
   $teamFilter
   $agentFilterSql
   GROUP BY u.id
@@ -173,11 +178,15 @@ usort($teams, fn($a,$b) => $b['revenue'] <=> $a['revenue']);
 
 
 // Funnel
+$needsUserJoin = ($team !== '' || $entityId !== '' || $agentId !== '' || $role !== '');
 if ($teamIsNone) {
-    $funnelJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $funnelJoin = " LEFT JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
     $funnelWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
     $funnelJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $funnelWhereTeam = '';
+} elseif ($needsUserJoin) {
+    $funnelJoin = ' LEFT JOIN crminternet_users u ON u.username = p.assigned_to ';
     $funnelWhereTeam = '';
 } else {
     $funnelJoin = '';
@@ -192,6 +201,10 @@ if ($hasGuichetEntityColumn && $entityId !== '') {
 if ($agentId !== '') {
     $funnelWhereExtra .= ' AND u.id = :agentId ';
     $funnelExtraParams[':agentId'] = $agentId;
+}
+if ($role !== '') {
+    $funnelWhereExtra .= ' AND u.role = :role ';
+    $funnelExtraParams[':role'] = $role;
 }
 
 // Pending/total reflect leads that EXIST in the period (created_at, a volume
@@ -237,10 +250,13 @@ $f = $funnel->fetch();
 
 // Monthly revenue (12 buckets back from `to`)
 if ($teamIsNone) {
-    $monthlyJoin = " INNER JOIN crminternet_users u ON u.username = c.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $monthlyJoin = " LEFT JOIN crminternet_users u ON u.username = c.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
     $monthlyWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
     $monthlyJoin = ' INNER JOIN crminternet_users u ON u.username = c.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $monthlyWhereTeam = '';
+} elseif ($needsUserJoin) {
+    $monthlyJoin = ' LEFT JOIN crminternet_users u ON u.username = c.assigned_to ';
     $monthlyWhereTeam = '';
 } else {
     $monthlyJoin = '';
@@ -255,6 +271,11 @@ if ($hasGuichetEntityColumn && $entityId !== '') {
 if ($agentId !== '') {
     $monthlyWhereExtra .= ' AND u.id = :agentId ';
     $monthlyExtraParams[':agentId'] = $agentId;
+}
+
+if ($role !== '') {
+    $monthlyWhereExtra .= ' AND u.role = :role ';
+    $monthlyExtraParams[':role'] = $role;
 }
 
 $monthly = $db->prepare("
@@ -274,10 +295,13 @@ $months = array_map(fn($r)=>['month'=>$r['ym'],'contracts'=>(int)$r['cnt'],'reve
 
 // Per prospect type (the values shown in the prospect-type filters, e.g. Client guichet, Swap gpon)
 if ($teamIsNone) {
-    $srcJoin = " INNER JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
+    $srcJoin = " LEFT JOIN crminternet_users u ON u.username = p.assigned_to LEFT JOIN crminternet_teams t ON t.id = u.team_id ";
     $srcWhereTeam = " AND (t.name IS NULL OR t.name = '') ";
 } elseif ($team !== '') {
     $srcJoin = ' INNER JOIN crminternet_users u ON u.username = p.assigned_to INNER JOIN crminternet_teams t ON t.id = u.team_id AND t.name = :team ';
+    $srcWhereTeam = '';
+} elseif ($needsUserJoin) {
+    $srcJoin = ' LEFT JOIN crminternet_users u ON u.username = p.assigned_to ';
     $srcWhereTeam = '';
 } else {
     $srcJoin = '';
@@ -293,6 +317,10 @@ if ($hasGuichetEntityColumn && $entityId !== '') {
 if ($agentId !== '') {
     $srcWhereExtra .= ' AND u.id = :agentId ';
     $srcExtraParams[':agentId'] = $agentId;
+}
+if ($role !== '') {
+    $srcWhereExtra .= ' AND u.role = :role ';
+    $srcExtraParams[':role'] = $role;
 }
 
 $src = $db->prepare("

@@ -524,6 +524,132 @@ function useUsers(open: boolean) {
   return { users, loading };
 }
 
+export function ForwardMessageDialog({
+  open,
+  onOpenChange,
+  messageId,
+  currentConversationId,
+  onForwarded,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  messageId: string | null;
+  currentConversationId?: string | null;
+  onForwarded?: () => void | Promise<void>;
+}) {
+  const [convs, setConvs] = useState<any[] | null>(null);
+  const [users, setUsers] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'conversations' | 'users'>('conversations');
+  const [customText, setCustomText] = useState('');
+
+  useEffect(() => {
+    if (!open || !messageId) return;
+    setCustomText('');
+    let mounted = true;
+    chatApi.conversations().then((r) => { if (mounted) setConvs(r.conversations); }).catch(() => { if (mounted) setConvs([]); });
+    chatApi.users().then((r) => { if (mounted) setUsers(r.users); }).catch(() => { if (mounted) setUsers([]); });
+    return () => { mounted = false; };
+  }, [open, messageId]);
+
+  const shareTo = async (convId: string) => {
+    if (!messageId) return;
+    if (currentConversationId && convId === currentConversationId) {
+      toast.error('Impossible de transférer dans la même conversation');
+      return;
+    }
+    setLoading(true);
+    try {
+      await chatApi.forwardMessage(messageId, convId, customText.trim());
+      toast.success('Message transféré');
+      await onForwarded?.();
+      onOpenChange(false);
+    } catch (e: any) { toast.error(e?.message ?? 'Erreur de transfert'); }
+    finally { setLoading(false); }
+  };
+
+  const shareToUser = async (username: string) => {
+    if (!messageId) return;
+    setLoading(true);
+    try {
+      await chatApi.forwardMessageToUser(messageId, username, customText.trim());
+      toast.success('Message transféré');
+      await onForwarded?.();
+      onOpenChange(false);
+    } catch (e: any) { toast.error(e?.message ?? 'Erreur de transfert'); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md w-[95vw]">
+        <DialogHeader>
+          <DialogTitle>Transférer le message</DialogTitle>
+        </DialogHeader>
+        <div className="p-4">
+          <div className="mb-3">
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Texte optionnel</label>
+            <textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              rows={3}
+              placeholder="Laisser vide pour transférer le message original"
+              className="w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-0 focus:border-primary"
+            />
+          </div>
+          <div className="flex gap-2 mb-3">
+            <Button size="sm" variant={mode === 'conversations' ? undefined : 'ghost'} onClick={() => setMode('conversations')}>Conversations</Button>
+            <Button size="sm" variant={mode === 'users' ? undefined : 'ghost'} onClick={() => setMode('users')}>Personnes</Button>
+          </div>
+          {mode === 'conversations' && (
+            <>
+              <div className="text-sm text-muted-foreground mb-3">Choisir une conversation pour transférer ce message.</div>
+              <div className="max-h-72 overflow-auto space-y-2">
+                {convs === null && <div className="text-sm text-muted-foreground">Chargement…</div>}
+                {convs !== null && convs.length === 0 && <div className="text-sm text-muted-foreground">Aucune conversation disponible</div>}
+                {convs?.filter((c) => (!currentConversationId || c.id !== currentConversationId)).map((c) => (
+                  <div key={c.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/40">
+                    <div className="min-w-0">
+                      <div className="text-sm truncate">{c.name ?? (c.type === 'dm' ? 'Message direct' : 'Conversation')}</div>
+                      <div className="text-xs text-muted-foreground">{c.members?.length ?? 0} membre(s)</div>
+                    </div>
+                    <div>
+                      <Button size="sm" onClick={() => void shareTo(c.id)} disabled={loading}>Transférer</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {mode === 'users' && (
+            <>
+              <div className="text-sm text-muted-foreground mb-3">Choisir une personne pour envoyer ce message en privé.</div>
+              <div className="max-h-72 overflow-auto space-y-2">
+                {users === null && <div className="text-sm text-muted-foreground">Chargement…</div>}
+                {users !== null && users.length === 0 && <div className="text-sm text-muted-foreground">Aucun utilisateur disponible</div>}
+                {users?.map((u) => (
+                  <div key={u.username} className="flex items-center justify-between p-2 rounded hover:bg-muted/40">
+                    <div className="min-w-0">
+                      <div className="text-sm truncate">{u.fullName ?? u.username}</div>
+                      <div className="text-xs text-muted-foreground">{u.username} • {u.role}</div>
+                    </div>
+                    <div>
+                      <Button size="sm" onClick={() => void shareToUser(u.username)} disabled={loading}>Transférer</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="mt-4 text-right">
+            <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>Annuler</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function NewDmDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (b: boolean) => void }) {
   const { users, loading } = useUsers(open);
   const { user } = useAuth();

@@ -410,17 +410,14 @@ if ($method === 'POST') {
         $targetConv = trim((string)($in['conversation_id'] ?? ''));
         $caption = trim((string)($in['body'] ?? ''));
         if ($srcAttId === '' || $targetConv === '') fail('attachment_id et conversation_id requis', 422);
-        // Ensure caller is member of target conversation
         require_member($db, $targetConv, $me['username']);
         if (!user_can_post($db, $targetConv, $me)) fail('Seuls les administrateurs peuvent poster dans cette conversation', 403);
 
-        // Load source attachment
         $s = $db->prepare('SELECT * FROM crminternet_attachments WHERE id = :id');
         $s->execute([':id' => $srcAttId]);
         $att = $s->fetch();
         if (!$att) fail('Attachment introuvable', 404);
 
-        // Insert a new attachment row referencing the same storage_path (no file copy)
         $newId = 'AT-' . substr(bin2hex(random_bytes(6)), 0, 10);
         $ins = $db->prepare('INSERT INTO crminternet_attachments (id,entity,entity_id,filename,mime_type,size_bytes,storage_path,uploaded_by,created_at)
                              VALUES (:id,:e,:ei,:fn,:mt,:sz,:sp,:ub,NOW())');
@@ -437,7 +434,6 @@ if ($method === 'POST') {
             ]);
         } catch (Throwable $e) { fail('DB: '.$e->getMessage(), 500); }
 
-        // Insert message referencing new attachment
         $msgId = chat_id('M');
         $db->prepare('INSERT INTO crminternet_chat_messages
                       (id, conversation_id, sender_username, body, attachment_id, attachment_filename, attachment_mime, attachment_size)
@@ -456,6 +452,138 @@ if ($method === 'POST') {
                            WHERE m.id = :id');
         $s->execute([':id'=>$msgId]);
         ok(['message' => row_to_message($s->fetch())], 201);
+    }
+
+    if ($action === 'forward_message') {
+        $srcMsgId = trim((string)($in['message_id'] ?? ''));
+        $targetConv = trim((string)($in['conversation_id'] ?? ''));
+        $bodyOverride = trim((string)($in['body'] ?? ''));
+        if ($srcMsgId === '' || $targetConv === '') fail('message_id et conversation_id requis', 422);
+        require_member($db, $targetConv, $me['username']);
+        if (!user_can_post($db, $targetConv, $me)) fail('Seuls les administrateurs peuvent poster dans cette conversation', 403);
+
+        $s = $db->prepare('SELECT m.*, a.id AS attachment_id, a.filename, a.mime_type, a.size_bytes, a.storage_path
+                           FROM crminternet_chat_messages m
+                           LEFT JOIN crminternet_attachments a ON a.id = m.attachment_id
+                           WHERE m.id = :id');
+        $s->execute([':id' => $srcMsgId]);
+        $src = $s->fetch();
+        if (!$src) fail('Message introuvable', 404);
+
+        $forwardBody = $bodyOverride !== '' ? $bodyOverride : ($src['body'] ?? '');
+        $newAttId = null;
+        if (!empty($src['attachment_id'])) {
+            $newAttId = 'AT-' . substr(bin2hex(random_bytes(6)), 0, 10);
+            $ins = $db->prepare('INSERT INTO crminternet_attachments (id,entity,entity_id,filename,mime_type,size_bytes,storage_path,uploaded_by,created_at)
+                                 VALUES (:id,:e,:ei,:fn,:mt,:sz,:sp,:ub,NOW())');
+            try {
+                $ins->execute([
+                    ':id' => $newAttId,
+                    ':e'  => 'chat',
+                    ':ei' => $targetConv,
+                    ':fn' => $src['filename'],
+                    ':mt' => $src['mime_type'],
+                    ':sz' => (int)$src['size_bytes'],
+                    ':sp' => $src['storage_path'],
+                    ':ub' => $me['username'],
+                ]);
+            } catch (Throwable $e) { fail('DB: '.$e->getMessage(), 500); }
+        }
+
+        $msgId = chat_id('M');
+        $db->prepare('INSERT INTO crminternet_chat_messages
+                      (id, conversation_id, sender_username, body, attachment_id, attachment_filename, attachment_mime, attachment_size)
+                      VALUES (:id,:c,:s,:b,:ai,:af,:am,:asz)')
+           ->execute([
+               ':id'=>$msgId, ':c'=>$targetConv, ':s'=>$me['username'], ':b'=>$forwardBody,
+               ':ai'=>$newAttId, ':af'=>$src['filename'] ?? null, ':am'=>$src['mime_type'] ?? null, ':asz'=>$src['size_bytes'] ?? null,
+           ]);
+        bump_conv($db, $targetConv);
+        $db->prepare('UPDATE crminternet_chat_members SET last_read_at = CURRENT_TIMESTAMP(3) WHERE conversation_id=:c AND user_username=:u')
+           ->execute([':c'=>$targetConv, ':u'=>$me['username']]);
+
+        $s2 = $db->prepare('SELECT m.*, u.full_name AS sender_full_name
+                            FROM crminternet_chat_messages m
+                            LEFT JOIN crminternet_users u ON u.username = m.sender_username
+                            WHERE m.id = :id');
+        $s2->execute([':id'=>$msgId]);
+        ok(['message' => row_to_message($s2->fetch())], 201);
+    }
+
+    if ($action === 'forward_message_to_user') {
+        $srcMsgId = trim((string)($in['message_id'] ?? ''));
+        $otherUser = trim((string)($in['user'] ?? ''));
+        $bodyOverride = trim((string)($in['body'] ?? ''));
+        if ($srcMsgId === '' || $otherUser === '') fail('message_id et user requis', 422);
+        if ($otherUser === $me['username']) fail('Impossible de transférer à soi-même', 422);
+
+        $s = $db->prepare('SELECT m.*, a.id AS attachment_id, a.filename, a.mime_type, a.size_bytes, a.storage_path
+                           FROM crminternet_chat_messages m
+                           LEFT JOIN crminternet_attachments a ON a.id = m.attachment_id
+                           WHERE m.id = :id');
+        $s->execute([':id' => $srcMsgId]);
+        $src = $s->fetch();
+        if (!$src) fail('Message introuvable', 404);
+
+        $dm = $db->prepare("SELECT c.id FROM crminternet_chat_conversations c
+            JOIN crminternet_chat_members m1 ON m1.conversation_id=c.id AND m1.user_username=:a
+            JOIN crminternet_chat_members m2 ON m2.conversation_id=c.id AND m2.user_username=:b
+            WHERE c.type = 'dm' LIMIT 1");
+        $dm->execute([':a'=>$me['username'], ':b'=>$otherUser]);
+        $convId = $dm->fetchColumn();
+        if (!$convId) {
+            $convId = chat_id('CV');
+            $db->prepare("INSERT INTO crminternet_chat_conversations (id,type,created_by) VALUES (:id,'dm',:cb)")
+               ->execute([':id'=>$convId, ':cb'=>$me['username']]);
+            $ins = $db->prepare("INSERT INTO crminternet_chat_members (conversation_id,user_username,role) VALUES (:c,:u,'member')");
+            $ins->execute([':c'=>$convId, ':u'=>$me['username']]);
+            $ins->execute([':c'=>$convId, ':u'=>$otherUser]);
+        } else {
+            $db->prepare('UPDATE crminternet_chat_members SET hidden=0 WHERE conversation_id=:c AND user_username=:u')
+               ->execute([':c'=>$convId, ':u'=>$me['username']]);
+        }
+
+        require_member($db, $convId, $me['username']);
+        if (!user_can_post($db, $convId, $me)) fail('Seuls les administrateurs peuvent poster dans cette conversation', 403);
+
+        $forwardBody = $bodyOverride !== '' ? $bodyOverride : ($src['body'] ?? '');
+        $newAttId = null;
+        if (!empty($src['attachment_id'])) {
+            $newAttId = 'AT-' . substr(bin2hex(random_bytes(6)), 0, 10);
+            $ins = $db->prepare('INSERT INTO crminternet_attachments (id,entity,entity_id,filename,mime_type,size_bytes,storage_path,uploaded_by,created_at)
+                                 VALUES (:id,:e,:ei,:fn,:mt,:sz,:sp,:ub,NOW())');
+            try {
+                $ins->execute([
+                    ':id' => $newAttId,
+                    ':e'  => 'chat',
+                    ':ei' => $convId,
+                    ':fn' => $src['filename'],
+                    ':mt' => $src['mime_type'],
+                    ':sz' => (int)$src['size_bytes'],
+                    ':sp' => $src['storage_path'],
+                    ':ub' => $me['username'],
+                ]);
+            } catch (Throwable $e) { fail('DB: '.$e->getMessage(), 500); }
+        }
+
+        $msgId = chat_id('M');
+        $db->prepare('INSERT INTO crminternet_chat_messages
+                      (id, conversation_id, sender_username, body, attachment_id, attachment_filename, attachment_mime, attachment_size)
+                      VALUES (:id,:c,:s,:b,:ai,:af,:am,:asz)')
+           ->execute([
+               ':id'=>$msgId, ':c'=>$convId, ':s'=>$me['username'], ':b'=>$forwardBody,
+               ':ai'=>$newAttId, ':af'=>$src['filename'] ?? null, ':am'=>$src['mime_type'] ?? null, ':asz'=>$src['size_bytes'] ?? null,
+           ]);
+        bump_conv($db, $convId);
+        $db->prepare('UPDATE crminternet_chat_members SET last_read_at = CURRENT_TIMESTAMP(3) WHERE conversation_id=:c AND user_username=:u')
+           ->execute([':c'=>$convId, ':u'=>$me['username']]);
+
+        $s2 = $db->prepare('SELECT m.*, u.full_name AS sender_full_name
+                            FROM crminternet_chat_messages m
+                            LEFT JOIN crminternet_users u ON u.username = m.sender_username
+                            WHERE m.id = :id');
+        $s2->execute([':id'=>$msgId]);
+        ok(['message' => row_to_message($s2->fetch())], 201);
     }
 
     if ($action === 'forward_to_user') {

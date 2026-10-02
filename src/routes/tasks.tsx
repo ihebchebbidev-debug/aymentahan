@@ -47,6 +47,15 @@ const PRIO_BADGE: Record<string, string> = {
   high: "bg-destructive/15 text-destructive",
 };
 
+function formatTaskCreatedAt(value: string | null): string {
+  if (!value) return "—";
+  try {
+    return new Date(value.replace(" ", "T")).toLocaleString("fr-FR");
+  } catch {
+    return value;
+  }
+}
+
 function parseDescriptionEntries(description: string | null): Array<{ id: string; author: string | null; date: string | null; body: string }> {
   if (!description) return [];
   return String(description)
@@ -294,7 +303,8 @@ function TasksPage() {
                   {t.dueDate && <span className="text-xs text-muted-foreground">échéance: {t.dueDate}</span>}
                 </div>
                 <div className="text-xs text-muted-foreground truncate">
-                  {t.assignedTo} · créé par {t.createdBy} {t.description ? `· ${t.description}` : ""}
+                  {t.assignedTo} · créé par {t.createdBy} · créé le {formatTaskCreatedAt(t.createdAt)}
+                  {t.description ? ` · ${t.description}` : ""}
                   {t.visibleRoles.length > 0 ? ` · visible à ${t.visibleRoles.map(roleLabel).join(', ')}` : ''}
                 </div>
               </div>
@@ -344,6 +354,16 @@ function TasksPage() {
           <div className="space-y-4 py-3">
             {selectedTask ? (
               <>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Créée le</div>
+                    <div className="text-sm font-medium">{formatTaskCreatedAt(selectedTask.createdAt)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Créée par</div>
+                    <div className="text-sm font-medium">{selectedTask.createdBy}</div>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1"><Label>Titre</Label><Input value={selectedTask.title} onChange={(e) => setSelectedTask({ ...selectedTask, title: e.target.value })} /></div>
                   <div className="space-y-1">

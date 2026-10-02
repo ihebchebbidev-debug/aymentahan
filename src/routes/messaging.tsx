@@ -21,7 +21,7 @@ import {
 import { toast } from "sonner";
 import {
   NewDmDialog, NewGroupDialog, BroadcastDialog,
-  AddMembersDialog, ManageGroupDialog,
+  AddMembersDialog, ManageGroupDialog, ForwardMessageDialog,
 } from "@/components/ChatWidget";
 import { attachmentAcceptAttribute } from "@/lib/attachmentRules";
 import {
@@ -58,6 +58,8 @@ function MessagingPage() {
   const [newDmOpen, setNewDmOpen] = useState(false);
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardMessageId, setForwardMessageId] = useState<string | null>(null);
 
   // Honor ?conv=<id> from sidebar deep links — switch active whenever it changes.
   useEffect(() => {
@@ -235,6 +237,19 @@ function MessagingPage() {
       <NewDmDialog open={newDmOpen} onOpenChange={setNewDmOpen} />
       <NewGroupDialog open={newGroupOpen} onOpenChange={setNewGroupOpen} />
       <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
+      <ForwardMessageDialog
+        open={forwardOpen}
+        messageId={forwardMessageId}
+        currentConversationId={activeId}
+        onOpenChange={(b) => {
+          setForwardOpen(b);
+          if (!b) setForwardMessageId(null);
+        }}
+        onForwarded={async () => {
+          await chat.refreshConversations();
+          if (activeId) await chat.loadMessages(activeId);
+        }}
+      />
     </AppLayout>
   );
 }
@@ -254,6 +269,8 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [forwardMessageId, setForwardMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { scrollRef, onScroll, scrollToBottom, awayFromBottom } = useChatScroll({
@@ -423,7 +440,16 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
             <div className="text-xs text-muted-foreground">Soyez le premier à écrire !</div>
           </div>
         )}
-        <MessageList conv={conv} messages={messages} meUsername={user?.username} highlightedId={highlightedId} />
+        <MessageList
+          conv={conv}
+          messages={messages}
+          meUsername={user?.username}
+          highlightedId={highlightedId}
+          onForwardMessage={(msg) => {
+            setForwardMessageId(msg.id);
+            setForwardOpen(true);
+          }}
+        />
         <ScrollToBottomButton show={awayFromBottom} onClick={scrollToBottom} unread={conv.unread} />
       </div>
 
@@ -484,6 +510,19 @@ function ConversationPane({ conv, onBack }: { conv: Conversation; onBack: () => 
 
       <AddMembersDialog open={addOpen} onOpenChange={setAddOpen} conv={conv} />
       <ManageGroupDialog open={manageOpen} onOpenChange={setManageOpen} conv={conv} />
+      <ForwardMessageDialog
+        open={forwardOpen}
+        messageId={forwardMessageId}
+        currentConversationId={conv.id}
+        onOpenChange={(b) => {
+          setForwardOpen(b);
+          if (!b) setForwardMessageId(null);
+        }}
+        onForwarded={async () => {
+          await chat.refreshConversations();
+          await chat.loadMessages(conv.id);
+        }}
+      />
     </>
   );
 }

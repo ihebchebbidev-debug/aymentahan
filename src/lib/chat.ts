@@ -119,6 +119,10 @@ export const chatApi = {
     api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_attachment", attachment_id: attachmentId, conversation_id: conversationId, body: caption } }),
   forwardToUser: (attachmentId: string, user: string, caption = "") =>
     api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_to_user", attachment_id: attachmentId, user, body: caption } }),
+  forwardMessage: (messageId: string, conversationId: string, body = "") =>
+    api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_message", message_id: messageId, conversation_id: conversationId, body } }),
+  forwardMessageToUser: (messageId: string, user: string, body = "") =>
+    api<{ message: ChatMessage }>(PATH, { method: "POST", body: { action: "forward_message_to_user", message_id: messageId, user, body } }),
   broadcast: (input: {
     body: string;
     title?: string;

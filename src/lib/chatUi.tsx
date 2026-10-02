@@ -182,8 +182,8 @@ export function DaySeparator({ iso }: { iso: string }) {
 
 // ----- Shared MessageList -----
 export function MessageList({
-  conv, messages, meUsername, highlightedId, highlightTerm,
-}: { conv: Conversation; messages: ChatMessage[]; meUsername?: string; highlightedId?: string | null; highlightTerm?: string }) {
+  conv, messages, meUsername, highlightedId, highlightTerm, onForwardMessage,
+}: { conv: Conversation; messages: ChatMessage[]; meUsername?: string; highlightedId?: string | null; highlightTerm?: string; onForwardMessage?: (message: ChatMessage) => void }) {
   // Total recipients (everyone except the sender) used to compute "Vu par X / Y" ratios.
   const recipientCount = Math.max(0, conv.members.length - 1);
   return (
@@ -233,6 +233,17 @@ export function MessageList({
                   } ${m.attachment ? "mt-1" : ""} ${isHighlighted ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-background animate-pulse" : ""}`}>
                     {highlightTerm ? <Highlighted text={m.body} term={highlightTerm} /> : m.body}
                   </div>
+                )}
+                {onForwardMessage && !m.isSystem && (
+                  <button
+                    type="button"
+                    onClick={() => onForwardMessage(m)}
+                    className={`mt-1 text-[10px] font-medium uppercase tracking-wide rounded-full border px-2 py-0.5 transition-colors ${
+                      mine ? "border-primary/40 text-primary hover:bg-primary/5" : "border-border text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    Transférer
+                  </button>
                 )}
                 {showTime && (
                   <div className="text-[10px] text-muted-foreground mt-0.5 px-1 flex items-center gap-1.5">
