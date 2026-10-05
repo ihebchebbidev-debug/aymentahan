@@ -264,8 +264,10 @@ export function ImportDialog({
         if (r === "merge") {
           row = { ...v.values, [idField]: v.duplicate.id };
         } else {
+          // "add" — force creation of a brand-new record by stripping any id
+          // so the backend generates a fresh one instead of upserting.
           const cloned = { ...v.values };
-          if (String(cloned[idField] ?? "") === v.duplicate.id) delete cloned[idField];
+          delete cloned[idField];
           row = cloned;
         }
       } else {
@@ -507,6 +509,13 @@ export function ImportDialog({
                       return n;
                     });
                   }}>Tout fusionner</Button>
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setResolutions((prev) => {
+                      const n = { ...prev };
+                      for (const v of validated) if (v.duplicate) n[v.index] = "add";
+                      return n;
+                    });
+                  }}>Tout ajouter</Button>
                   <Button size="sm" variant="outline" onClick={() => {
                     setResolutions((prev) => {
                       const n = { ...prev };

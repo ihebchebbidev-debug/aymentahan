@@ -123,12 +123,13 @@ $agentSql = "
   ORDER BY contracts_count DESC, won DESC
 ";
 $s = $db->prepare($agentSql);
+$to_dt = $to . ' 23:59:59';
 $params = [
-    ':from1'=>$from, ':to1'=>$to,
-    ':from1b'=>$from, ':to1b'=>$to,
-    ':from1c'=>$from, ':to1c'=>$to,
-    ':from2'=>$from, ':to2'=>$to, ':from3'=>$from, ':to3'=>$to,
-    ':from4'=>$from, ':to4'=>$to, ':from5'=>$from, ':to5'=>$to,
+    ':from1'=>$from, ':to1'=>$to_dt,
+    ':from1b'=>$from, ':to1b'=>$to_dt,
+    ':from1c'=>$from, ':to1c'=>$to_dt,
+    ':from2'=>$from, ':to2'=>$to_dt, ':from3'=>$from, ':to3'=>$to_dt,
+    ':from4'=>$from, ':to4'=>$to_dt, ':from5'=>$from, ':to5'=>$to_dt,
 ];
 if ($team !== '' && !$teamIsNone) $params[':team'] = $team;
 $params = array_merge($params, $agentFilterParams);
@@ -238,10 +239,10 @@ $funnel = $db->prepare("
   $funnelWhereExtra
 ");
 $fp = [
-    ':f1'=>$from, ':t1'=>$to,
-    ':f2'=>$from, ':t2'=>$to,
-    ':f3'=>$from, ':t3'=>$to,
-    ':f4'=>$from, ':t4'=>$to,
+    ':f1'=>$from, ':t1'=>$to_dt,
+    ':f2'=>$from, ':t2'=>$to_dt,
+    ':f3'=>$from, ':t3'=>$to_dt,
+    ':f4'=>$from, ':t4'=>$to_dt,
 ];
 if ($team !== '' && !$teamIsNone) $fp[':team'] = $team;
 $fp = array_merge($fp, $funnelExtraParams);
@@ -339,7 +340,7 @@ $src = $db->prepare("
   $srcWhereExtra
   GROUP BY type_label ORDER BY total DESC
 ");
-$sp = [':f'=>$from, ':t'=>$to];
+$sp = [':f'=>$from, ':t'=>$to_dt];
 if ($team !== '' && !$teamIsNone) $sp[':team'] = $team;
 $sp = array_merge($sp, $srcExtraParams);
 $src->execute($sp);
