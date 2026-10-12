@@ -66,6 +66,10 @@ type Props<T> = {
   onSelectedChange?: (next: Set<string>) => void;
   pageSize?: number;
   emptyState?: ReactNode;
+  /** Current page index (0-indexed). If provided, DataGrid acts as controlled component for pagination. */
+  page?: number;
+  /** Callback fired when page index changes. */
+  onPageChange?: (page: number) => void;
   /** Stable identifier for sort/page resets and column-width persistence. */
   storageKey?: string;
   /** Optional per-row class (e.g. highlight). */
@@ -97,6 +101,7 @@ export function DataGrid<T>(props: Props<T>) {
     rows, columns, rowKey, onSaveRow, onDeleteRow, onRowClick, rowActions = [],
     selectable = true, selected, onSelectedChange,
     pageSize = 50, emptyState, storageKey, rowClassName,
+    page: controlledPage, onPageChange,
   } = props;
 
   // Persist sort + page across navigations when storageKey is provided.
@@ -114,7 +119,23 @@ export function DataGrid<T>(props: Props<T>) {
 
   const [sortKey, setSortKey] = useState<string | null>(() => readPersist("sortKey", null as string | null));
   const [sortDir, setSortDir] = useState<"asc" | "desc">(() => readPersist("sortDir", "asc" as "asc" | "desc"));
-  const [page, setPage] = useState(() => readPersist("page", 0));
+  const [internalPage, setInternalPage] = useState<number>(() => controlledPage !== undefined ? controlledPage : readPersist("page", 0));
+  const page = controlledPage !== undefined ? controlledPage : internalPage;
+
+  useEffect(() => {
+    if (controlledPage !== undefined) {
+      setInternalPage(controlledPage);
+    }
+  }, [controlledPage]);
+
+  const setPage = useCallback((updater: number | ((p: number) => number)) => {
+    setInternalPage((curr) => {
+      const next = typeof updater === "function" ? updater(curr) : updater;
+      onPageChange?.(next);
+      return next;
+    });
+  }, [onPageChange]);
+
   const [currentPageSize, setCurrentPageSize] = useState<number>(() => readPersist("pageSize", pageSize));
   useEffect(() => { writePersist("sortKey", sortKey); }, [sortKey]);
   useEffect(() => { writePersist("sortDir", sortDir); }, [sortDir]);

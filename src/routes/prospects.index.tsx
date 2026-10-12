@@ -179,7 +179,7 @@ function ProspectsPage() {
 
   // -------- Persisted filters (mirrors contracts page) --------
   const [search, setSearch] = usePersistedState("prospects:list:search", "");
-  const [statut, setStatut] = useState<string>(ALL);
+  const [statut, setStatut] = usePersistedState("prospects:list:statut", ALL);
   const [assigne, setAssigne] = usePersistedState("prospects:list:assigne", ALL);
   const [source, setSource] = usePersistedState("prospects:list:source", ALL);
   const [typeF, setTypeF] = usePersistedState("prospects:list:type", ALL);
@@ -284,29 +284,96 @@ function ProspectsPage() {
 
   // -------- Saved views --------
   type ViewState = {
-    search: string; statut: string; source: string; assigne: string; typeF: string; dateCree: string;
+    search?: string;
+    statut?: string;
+    source?: string;
+    assigne?: string;
+    typeF?: string;
+    dateCree?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    recoveredF?: string;
+    presetExtra?: Record<string, unknown>;
+    customFilters?: Record<string, string>;
   };
-  const currentView: ViewState = { search, statut, source, assigne, typeF, dateCree };
-  const VIEW_KEYS = ["search","statut","source","assigne","typeF","dateCree"];
+  const currentView: ViewState = useMemo(() => ({
+    search,
+    statut,
+    source,
+    assigne,
+    typeF: effectiveTypeId ?? typeF,
+    dateCree,
+    dateFrom,
+    dateTo,
+    recoveredF,
+    presetExtra,
+    customFilters,
+  }), [search, statut, source, assigne, effectiveTypeId, typeF, dateCree, dateFrom, dateTo, recoveredF, presetExtra, customFilters]);
+
+  const VIEW_KEYS = ["search", "statut", "source", "assigne", "typeF", "typeId", "dateCree", "dateFrom", "dateTo", "recoveredF"];
+
   const applyView = (v: ViewState) => {
     setSearch(v.search ?? "");
     setStatut(v.statut ?? ALL);
     setSource(v.source ?? ALL);
     setAssigne(v.assigne ?? ALL);
-    setTypeF(v.typeF ?? ALL);
+    const targetType = v.typeF ?? ALL;
+    setTypeF(targetType);
     setDateCree(v.dateCree ?? "");
+    setDateFrom(v.dateFrom ?? "");
+    setDateTo(v.dateTo ?? "");
+    setRecoveredF(v.recoveredF ?? ALL);
+    setPresetExtra(v.presetExtra ?? {});
+    setCustomFilters(v.customFilters ?? {});
     setPage(0);
+    try { sessionStorage.setItem("prospects:list:page", "0"); } catch {}
+    navigate({
+      to: "/prospects",
+      search: () => ({
+        typeId: targetType !== ALL ? targetType : undefined,
+      }),
+    });
   };
-  const eqView = (a: ViewState, b: ViewState) =>
-    a.search === b.search && a.statut === b.statut && a.source === b.source &&
-    a.assigne === b.assigne && a.typeF === b.typeF && a.dateCree === b.dateCree;
+
+  const eqView = (a: ViewState, b: ViewState) => {
+    if ((a.search ?? "") !== (b.search ?? "")) return false;
+    if ((a.statut ?? ALL) !== (b.statut ?? ALL)) return false;
+    if ((a.source ?? ALL) !== (b.source ?? ALL)) return false;
+    if ((a.assigne ?? ALL) !== (b.assigne ?? ALL)) return false;
+    if ((a.typeF ?? ALL) !== (b.typeF ?? ALL)) return false;
+    if ((a.dateCree ?? "") !== (b.dateCree ?? "")) return false;
+    if ((a.dateFrom ?? "") !== (b.dateFrom ?? "")) return false;
+    if ((a.dateTo ?? "") !== (b.dateTo ?? "")) return false;
+    if ((a.recoveredF ?? ALL) !== (b.recoveredF ?? ALL)) return false;
+
+    const aExtra = a.presetExtra ?? {};
+    const bExtra = b.presetExtra ?? {};
+    const aExtraKeys = Object.keys(aExtra).filter((k) => aExtra[k] != null && aExtra[k] !== "");
+    const bExtraKeys = Object.keys(bExtra).filter((k) => bExtra[k] != null && bExtra[k] !== "");
+    if (aExtraKeys.length !== bExtraKeys.length) return false;
+    for (const k of aExtraKeys) {
+      if (String(aExtra[k]) !== String(bExtra[k])) return false;
+    }
+
+    const aCf = a.customFilters ?? {};
+    const bCf = b.customFilters ?? {};
+    const aCfKeys = Object.keys(aCf).filter((k) => aCf[k]);
+    const bCfKeys = Object.keys(bCf).filter((k) => bCf[k]);
+    if (aCfKeys.length !== bCfKeys.length) return false;
+    for (const k of aCfKeys) {
+      if (aCf[k] !== bCf[k]) return false;
+    }
+
+    return true;
+  };
 
   const reset = async () => {
     if (!(await confirmDialog({ title: "Réinitialiser les filtres", description: "Effacer tous les filtres actifs (dates, champs personnalisés) et rétablir les filtres rapides ?", tone: "warning", confirmText: "Réinitialiser" }))) return;
     setSearch(""); setStatut(ALL); setAssigne(ALL); setSource(ALL); setTypeF(ALL);
     setDateCree(""); setDateFrom(""); setDateTo("");
     setRecoveredF(ALL); setPresetExtra({}); setCustomFilters({}); setPage(0);
-    if (filterTypeId) navigate({ to: "/prospects", search: () => ({ typeId: undefined }) });
+    try { sessionStorage.setItem("prospects:list:page", "0"); } catch {}
+    navigate({ to: "/prospects", search: () => ({ typeId: undefined }) });
     toast.success("Filtres réinitialisés");
   };
 
@@ -319,7 +386,7 @@ function ProspectsPage() {
         setRestoredProspectId(parsed.prospectId);
         // Auto-clear filters so the recovered lead is always visible
         setSearch(""); setStatut(ALL); setAssigne(ALL); setSource(ALL); setTypeF(ALL);
-        setDateCree(""); setRecoveredF(ALL); setPresetExtra({}); setCustomFilters({}); setPage(0);
+        setDateCree(""); setDateFrom(""); setDateTo(""); setRecoveredF(ALL); setPresetExtra({}); setCustomFilters({}); setPage(0);
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,8 +408,13 @@ function ProspectsPage() {
     const KEY_MAP: Record<string, keyof Prospect> = {
       statut: "status", assigne: "assignedTo",
     };
+    const wantConverted = presetExtra.converted === "true";
+
     return prospects.filter((p) => {
-      if (p.converted || p.opportunityId) return false;
+      // By default hide converted leads; if explicitly asked for converted, show only them
+      if (!wantConverted && (p.converted || p.opportunityId)) return false;
+      if (wantConverted && !(p.converted || p.opportunityId)) return false;
+
       if (q) {
         const hay = haystackById.get(p.id) ?? "";
         if (!hay.includes(q)) return false;
@@ -367,7 +439,37 @@ function ProspectsPage() {
         }
       }
       for (const [k, raw] of Object.entries(presetExtra)) {
-        if (raw == null || raw === "" || VIEW_KEYS.includes(k)) continue;
+        if (raw == null || raw === "" || VIEW_KEYS.includes(k) || k === "converted") continue;
+
+        if (k === "dateModifFrom") {
+          const d = (p.updatedAt ?? "").slice(0, 10);
+          if (!d || d < String(raw)) return false;
+          continue;
+        }
+        if (k === "dateModifTo") {
+          const d = (p.updatedAt ?? "").slice(0, 10);
+          if (!d || d > String(raw)) return false;
+          continue;
+        }
+        if (k === "dateModif") {
+          const d = (p.updatedAt ?? "").slice(0, 10);
+          if (d !== String(raw)) return false;
+          continue;
+        }
+        if (k === "birthDate") {
+          const d = (p.birthDate ?? "").slice(0, 10);
+          if (d !== String(raw)) return false;
+          continue;
+        }
+        if (k === "debit") {
+          if (p.debit == null || String(p.debit) !== String(raw)) return false;
+          continue;
+        }
+        if (k === "typeId") {
+          if (p.typeId !== String(raw)) return false;
+          continue;
+        }
+
         const field = (KEY_MAP[k] ?? k) as keyof Prospect;
         const val = (p as any)[field];
         const target = String(raw).toLowerCase();
@@ -382,10 +484,40 @@ function ProspectsPage() {
   const presetChips = useMemo(() => {
     const schema = autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs, prospectStatuses: leadStatusNames, types: allTypes });
     const labelOf = (k: string) => schema.find((s) => s.key === k)?.label ?? k;
-    return Object.entries(presetExtra)
-      .filter(([k, v]) => v != null && v !== "" && !VIEW_KEYS.includes(k))
-      .map(([k, v]) => ({ key: k, label: labelOf(k), value: String(v) }));
-  }, [presetExtra, agentOptions, prospects]);
+    const chips: { key: string; label: string; value: string; onRemove: () => void }[] = [];
+
+    if (dateFrom) chips.push({ key: "dateFrom", label: "Créé du", value: dateFrom, onRemove: () => setDateFrom("") });
+    if (dateTo) chips.push({ key: "dateTo", label: "Créé au", value: dateTo, onRemove: () => setDateTo("") });
+    if (recoveredF !== ALL) {
+      const recLabel = recoveredF === "opportunity" ? "Depuis opportunité" : recoveredF === "contract" ? "Depuis contrat" : "Récupérés";
+      chips.push({ key: "recoveredF", label: "Récupérés", value: recLabel, onRemove: () => setRecoveredF(ALL) });
+    }
+
+    for (const [k, v] of Object.entries(presetExtra)) {
+      if (v != null && v !== "" && !VIEW_KEYS.includes(k) && k !== "typeF" && k !== "typeId") {
+        chips.push({
+          key: k,
+          label: labelOf(k),
+          value: String(v),
+          onRemove: () => setPresetExtra((prev) => { const n = { ...prev }; delete n[k]; return n; }),
+        });
+      }
+    }
+
+    for (const [k, v] of Object.entries(customFilters)) {
+      if (v) {
+        const def = customDefs.find((d) => d.key === k);
+        chips.push({
+          key: `cf-${k}`,
+          label: def?.label ?? k,
+          value: v,
+          onRemove: () => setCustomFilter(k, ""),
+        });
+      }
+    }
+
+    return chips;
+  }, [presetExtra, agentOptions, prospects, dateFrom, dateTo, recoveredF, customFilters, customDefs]);
 
   const exportRows = useMemo(
     () => relabelRows(withCustomFields(withType(filtered), customDefs, customValuesById), PROSPECT_LABELS),
@@ -400,11 +532,27 @@ function ProspectsPage() {
   );
 
   // Stats (mirrors contracts: 3 KPI tiles).
-  const stats = useMemo(() => ({
-    total: filtered.length,
-    converted: filtered.filter((p) => p.converted || p.opportunityId).length,
-    unassigned: filtered.filter((p) => !p.assignedTo).length,
-  }), [filtered]);
+  const stats = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    const matchingScope = prospects.filter((p) => {
+      if (q) {
+        const hay = haystackById.get(p.id) ?? "";
+        if (!hay.includes(q)) return false;
+      }
+      if (statut !== ALL && p.status !== statut && p.status !== "Vendu") return false;
+      if (assigne !== ALL && p.assignedTo !== assigne) return false;
+      if (source !== ALL && p.source !== source) return false;
+      if (effectiveTypeId && p.typeId !== effectiveTypeId) return false;
+      if (dateFrom && (p.createdAt ?? "").slice(0, 10) < dateFrom) return false;
+      if (dateTo && (p.createdAt ?? "").slice(0, 10) > dateTo) return false;
+      return true;
+    });
+    return {
+      total: filtered.length,
+      converted: matchingScope.filter((p) => p.converted || Boolean(p.opportunityId) || p.outcome === "won" || p.status === "Vendu").length,
+      unassigned: filtered.filter((p) => !p.assignedTo).length,
+    };
+  }, [filtered, prospects, debouncedSearch, haystackById, statut, assigne, source, effectiveTypeId, dateFrom, dateTo]);
 
   const baseColumns: DataGridColumn<Prospect>[] = [
     {
@@ -565,8 +713,11 @@ function ProspectsPage() {
   };
 
   const hasActiveFilter =
-    search || statut !== ALL || source !== ALL || assigne !== ALL ||
-    typeF !== ALL || dateCree || dateFrom || dateTo || recoveredF !== ALL || filterTypeId || Object.keys(customFilters).length > 0;
+    Boolean(search) || statut !== ALL || source !== ALL || assigne !== ALL ||
+    (typeF !== ALL && Boolean(typeF)) || Boolean(dateCree) || Boolean(dateFrom) || Boolean(dateTo) ||
+    recoveredF !== ALL || Boolean(filterTypeId) ||
+    Object.keys(customFilters).length > 0 ||
+    Object.keys(presetExtra).length > 0;
 
   return (
     <AppLayout skeleton="table">
@@ -683,7 +834,7 @@ function ProspectsPage() {
                 />
               </div>
               <div
-                key={`count-${search}|${statut}|${source}|${assigne}|${typeF}|${dateCree}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
+                key={`count-${search}|${statut}|${source}|${assigne}|${effectiveTypeId ?? typeF}|${dateCree}|${dateFrom}|${dateTo}|${recoveredF}|${JSON.stringify(presetExtra)}|${JSON.stringify(customFilters)}`}
                 className="ml-auto text-xs text-muted-foreground tabular-nums animate-in fade-in slide-in-from-right-2 duration-300"
               >
                 <span className="font-semibold text-foreground">{filtered.length.toLocaleString("fr-FR")}</span> résultat(s)
@@ -693,12 +844,30 @@ function ProspectsPage() {
             <DynamicFilterBar
               scope="prospects"
               schema={autoFilterSchema("prospects", { agents: agentOptions, rows: prospects as any, customFields: customDefs, prospectStatuses: leadStatusNames, types: allTypes })}
-              values={{ statut, source, assigne, typeF, recoveredF, dateFrom, dateTo, dateCree, ...presetExtra, ...customFilters }}
+              values={{
+                statut,
+                source,
+                assigne,
+                typeF: effectiveTypeId ?? (typeF !== ALL ? typeF : ""),
+                typeId: effectiveTypeId ?? (typeF !== ALL ? typeF : ""),
+                recoveredF,
+                dateFrom,
+                dateTo,
+                dateCree,
+                ...presetExtra,
+                ...customFilters,
+              }}
               onChange={(k, v) => {
                 if (k === "statut") setStatut(v || ALL);
                 else if (k === "source") setSource(v || ALL);
                 else if (k === "assigne") setAssigne(v || ALL);
-                else if (k === "typeF") setTypeF(v || ALL);
+                else if (k === "typeF" || k === "typeId") {
+                  const targetVal = v || ALL;
+                  setTypeF(targetVal);
+                  if (filterTypeId || targetVal === ALL) {
+                    navigate({ to: "/prospects", search: () => ({ typeId: targetVal !== ALL ? targetVal : undefined }) });
+                  }
+                }
                 else if (k === "recoveredF") setRecoveredF(v || ALL);
                 else if (k === "dateFrom") setDateFrom(v || "");
                 else if (k === "dateTo") setDateTo(v || "");
@@ -710,6 +879,7 @@ function ProspectsPage() {
                   return n;
                 });
                 setPage(0);
+                try { sessionStorage.setItem("prospects:list:page", "0"); } catch {}
               }}
               onReset={reset}
             />
@@ -725,16 +895,19 @@ function ProspectsPage() {
           </div>
         </Card>
 
-        {(presetChips.length > 0 || filterTypeId) && (
+        {(presetChips.length > 0 || filterTypeId || (typeF !== ALL && typeF)) && (
           <div className="flex flex-wrap items-center gap-1.5 px-1">
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Filtres :</span>
-            {filterTypeId && (
+            {(filterTypeId || (typeF !== ALL && typeF)) && (
               <Badge variant="secondary" className="gap-1 pr-1 bg-primary/10 text-primary border-primary/20">
-                <span className="text-[11px]">Type: <span className="font-semibold">{typeNameById.get(filterTypeId) ?? filterTypeId}</span></span>
+                <span className="text-[11px]">Type: <span className="font-semibold">{typeNameById.get(effectiveTypeId ?? typeF) ?? (effectiveTypeId ?? typeF)}</span></span>
                 <button
                   type="button"
                   className="rounded hover:bg-muted-foreground/20 p-0.5"
-                  onClick={() => navigate({ to: "/prospects", search: () => ({ typeId: undefined }) })}
+                  onClick={() => {
+                    setTypeF(ALL);
+                    navigate({ to: "/prospects", search: () => ({ typeId: undefined }) });
+                  }}
                   aria-label="Retirer le filtre type"
                 >
                   <X className="h-3 w-3" />
@@ -747,15 +920,32 @@ function ProspectsPage() {
                 <button
                   type="button"
                   className="rounded hover:bg-muted-foreground/20 p-0.5"
-                  onClick={() => setPresetExtra((prev) => { const n = { ...prev }; delete n[c.key]; return n; })}
+                  onClick={c.onRemove}
                   aria-label={`Retirer ${c.label}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
               </Badge>
             ))}
-            {presetChips.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-[11px]" onClick={() => setPresetExtra({})}>Tout retirer</Button>
+            {(presetChips.length > 0 || filterTypeId || (typeF !== ALL && Boolean(typeF))) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                  setRecoveredF(ALL);
+                  setPresetExtra({});
+                  setCustomFilters({});
+                  setTypeF(ALL);
+                  setPage(0);
+                  try { sessionStorage.setItem("prospects:list:page", "0"); } catch {}
+                  navigate({ to: "/prospects", search: () => ({ typeId: undefined }) });
+                }}
+              >
+                Tout retirer
+              </Button>
             )}
           </div>
         )}
@@ -938,11 +1128,25 @@ function ProspectsPage() {
         </Card>
 
         <div
-          key={`grid-${statut}-${source}-${assigne}-${typeF}-${dateCree}-${JSON.stringify(presetExtra)}`}
+          key={`grid-${statut}-${source}-${assigne}-${effectiveTypeId ?? typeF}-${dateCree}-${dateFrom}-${dateTo}-${recoveredF}-${debouncedSearch}-${JSON.stringify(presetExtra)}-${JSON.stringify(customFilters)}`}
           className="animate-in fade-in duration-300"
         >
           <DataGrid
+            page={page}
+            onPageChange={setPage}
             storageKey="prospects:list"
+            emptyState={
+              <div className="py-8 text-center space-y-2">
+                <p className="text-muted-foreground font-medium">
+                  {hasActiveFilter ? "Aucun prospect ne correspond aux critères sélectionnés." : "Aucun prospect enregistré."}
+                </p>
+                {hasActiveFilter && (
+                  <Button variant="outline" size="sm" onClick={reset}>
+                    Réinitialiser les filtres
+                  </Button>
+                )}
+              </div>
+            }
             rows={[...filtered].sort((a, b) => {
               // Reverted leads pinned to the top, most recent first.
               const ar = a.revertedAt ? new Date(a.revertedAt).getTime() : 0;
